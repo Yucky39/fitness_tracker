@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 import '../providers/meal_provider.dart';
 import '../widgets/nutrient_bar.dart';
 
@@ -28,21 +29,75 @@ class MealScreen extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  _buildDateNavigation(context, mealState, mealNotifier),
+                  const SizedBox(height: 16),
                   _buildSummaryCard(mealState),
                   const SizedBox(height: 24),
-                  const Text(
-                    '今日の食事',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 8),
-                  _buildFoodList(mealState, mealNotifier),
+                  _buildFoodList(context, mealState, mealNotifier),
                 ],
               ),
             ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () => _showAddFoodDialog(context, mealNotifier),
+        onPressed: () => _showAddFoodDialog(context, mealState, mealNotifier),
         child: const Icon(Icons.add),
       ),
+    );
+  }
+
+  Widget _buildDateNavigation(BuildContext context, MealState state, MealNotifier notifier) {
+    final today = DateTime.now();
+    final isToday = state.selectedDate.year == today.year &&
+        state.selectedDate.month == today.month &&
+        state.selectedDate.day == today.day;
+
+    String dateLabel;
+    if (isToday) {
+      dateLabel = '今日 (${DateFormat('M/d').format(state.selectedDate)})';
+    } else {
+      final yesterday = DateTime(today.year, today.month, today.day - 1);
+      final isYesterday = state.selectedDate.year == yesterday.year &&
+          state.selectedDate.month == yesterday.month &&
+          state.selectedDate.day == yesterday.day;
+      dateLabel = isYesterday
+          ? '昨日 (${DateFormat('M/d').format(state.selectedDate)})'
+          : DateFormat('yyyy/M/d').format(state.selectedDate);
+    }
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        IconButton(
+          icon: const Icon(Icons.chevron_left),
+          onPressed: () => notifier.changeDate(
+            state.selectedDate.subtract(const Duration(days: 1)),
+          ),
+        ),
+        TextButton(
+          onPressed: () async {
+            final picked = await showDatePicker(
+              context: context,
+              initialDate: state.selectedDate,
+              firstDate: DateTime(2020),
+              lastDate: today,
+            );
+            if (picked != null) {
+              notifier.changeDate(picked);
+            }
+          },
+          child: Text(
+            dateLabel,
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          ),
+        ),
+        IconButton(
+          icon: const Icon(Icons.chevron_right),
+          onPressed: isToday
+              ? null
+              : () => notifier.changeDate(
+                    state.selectedDate.add(const Duration(days: 1)),
+                  ),
+        ),
+      ],
     );
   }
 
@@ -98,7 +153,7 @@ class MealScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildFoodList(MealState state, MealNotifier notifier) {
+  Widget _buildFoodList(BuildContext context, MealState state, MealNotifier notifier) {
     if (state.todayItems.isEmpty) {
       return const Center(
         child: Padding(
@@ -116,6 +171,26 @@ class MealScreen extends ConsumerWidget {
         final item = state.todayItems[index];
         return Dismissible(
           key: Key(item.id),
+          confirmDismiss: (_) async {
+            return await showDialog<bool>(
+              context: context,
+              builder: (_) => AlertDialog(
+                title: const Text('削除の確認'),
+                content: const Text('この記録を削除しますか？'),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context, false),
+                    child: const Text('キャンセル'),
+                  ),
+                  TextButton(
+                    onPressed: () => Navigator.pop(context, true),
+                    child: const Text('削除'),
+                  ),
+                ],
+              ),
+            ) ??
+                false;
+          },
           onDismissed: (_) => notifier.deleteFoodItem(item.id),
           background: Container(color: Colors.red),
           child: Card(
@@ -190,7 +265,7 @@ class MealScreen extends ConsumerWidget {
     );
   }
 
-  void _showAddFoodDialog(BuildContext context, MealNotifier notifier) {
+  void _showAddFoodDialog(BuildContext context, MealState mealState, MealNotifier notifier) {
     final nameController = TextEditingController();
     final calorieController = TextEditingController();
     final proteinController = TextEditingController();
@@ -199,60 +274,96 @@ class MealScreen extends ConsumerWidget {
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('食事を記録'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: nameController,
-                decoration: const InputDecoration(labelText: '食品名'),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          return AlertDialog(
+            title: const Text('食事を記録'),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (mealState.recentFoods.isNotEmpty) ...[
+                    const Text(
+                      '最近使った食品',
+                      style: TextStyle(fontSize: 12, color: Colors.grey),
+                    ),
+                    const SizedBox(height: 4),
+                    SizedBox(
+                      height: 40,
+                      child: ListView.separated(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: mealState.recentFoods.length,
+                        separatorBuilder: (_, __) => const SizedBox(width: 8),
+                        itemBuilder: (context, i) {
+                          final food = mealState.recentFoods[i];
+                          return ActionChip(
+                            label: Text(food.name),
+                            onPressed: () {
+                              setDialogState(() {
+                                nameController.text = food.name;
+                                calorieController.text = food.calories.toString();
+                                proteinController.text = food.protein.toString();
+                                fatController.text = food.fat.toString();
+                                carbsController.text = food.carbs.toString();
+                              });
+                            },
+                          );
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+                  TextField(
+                    controller: nameController,
+                    decoration: const InputDecoration(labelText: '食品名'),
+                  ),
+                  TextField(
+                    controller: calorieController,
+                    decoration: const InputDecoration(labelText: 'カロリー (kcal)'),
+                    keyboardType: TextInputType.number,
+                  ),
+                  TextField(
+                    controller: proteinController,
+                    decoration: const InputDecoration(labelText: 'タンパク質 (g)'),
+                    keyboardType: TextInputType.number,
+                  ),
+                  TextField(
+                    controller: fatController,
+                    decoration: const InputDecoration(labelText: '脂質 (g)'),
+                    keyboardType: TextInputType.number,
+                  ),
+                  TextField(
+                    controller: carbsController,
+                    decoration: const InputDecoration(labelText: '炭水化物 (g)'),
+                    keyboardType: TextInputType.number,
+                  ),
+                ],
               ),
-              TextField(
-                controller: calorieController,
-                decoration: const InputDecoration(labelText: 'カロリー (kcal)'),
-                keyboardType: TextInputType.number,
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('キャンセル'),
               ),
-              TextField(
-                controller: proteinController,
-                decoration: const InputDecoration(labelText: 'タンパク質 (g)'),
-                keyboardType: TextInputType.number,
-              ),
-              TextField(
-                controller: fatController,
-                decoration: const InputDecoration(labelText: '脂質 (g)'),
-                keyboardType: TextInputType.number,
-              ),
-              TextField(
-                controller: carbsController,
-                decoration: const InputDecoration(labelText: '炭水化物 (g)'),
-                keyboardType: TextInputType.number,
+              TextButton(
+                onPressed: () {
+                  if (nameController.text.isNotEmpty) {
+                    notifier.addFoodItem(
+                      name: nameController.text,
+                      calories: int.tryParse(calorieController.text) ?? 0,
+                      protein: double.tryParse(proteinController.text) ?? 0,
+                      fat: double.tryParse(fatController.text) ?? 0,
+                      carbs: double.tryParse(carbsController.text) ?? 0,
+                    );
+                    Navigator.pop(context);
+                  }
+                },
+                child: const Text('追加'),
               ),
             ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('キャンセル'),
-          ),
-          TextButton(
-            onPressed: () {
-              if (nameController.text.isNotEmpty) {
-                notifier.addFoodItem(
-                  name: nameController.text,
-                  calories: int.tryParse(calorieController.text) ?? 0,
-                  protein: double.tryParse(proteinController.text) ?? 0,
-                  fat: double.tryParse(fatController.text) ?? 0,
-                  carbs: double.tryParse(carbsController.text) ?? 0,
-                );
-                Navigator.pop(context);
-              }
-            },
-            child: const Text('追加'),
-          ),
-        ],
+          );
+        },
       ),
     );
   }
