@@ -29,7 +29,7 @@ class ProgressScreen extends ConsumerWidget {
               : SingleChildScrollView(
                   child: Column(
                     children: [
-                      _buildCharts(progressState.metrics),
+                      _buildCharts(context, progressState.metrics),
                       const Divider(),
                       _buildMetricsList(context, progressState.metrics, progressNotifier),
                     ],
@@ -42,7 +42,7 @@ class ProgressScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildCharts(List<BodyMetrics> metrics) {
+  Widget _buildCharts(BuildContext context, List<BodyMetrics> metrics) {
     if (metrics.length < 2) {
       return const SizedBox(
         height: 200,
@@ -50,29 +50,60 @@ class ProgressScreen extends ConsumerWidget {
       );
     }
 
-    return Container(
-      height: 300,
+    return DefaultTabController(
+      length: 3,
+      child: Column(
+        children: [
+          const TabBar(
+            tabs: [
+              Tab(text: '体重'),
+              Tab(text: '体脂肪'),
+              Tab(text: '腹囲'),
+            ],
+          ),
+          SizedBox(
+            height: MediaQuery.of(context).size.height * 0.28,
+            child: TabBarView(
+              children: [
+                _buildSingleChart(metrics, (m) => m.weight, 'kg', Colors.blue),
+                _buildSingleChart(metrics, (m) => m.bodyFatPercentage, '%', Colors.orange),
+                _buildSingleChart(metrics, (m) => m.waist, 'cm', Colors.green),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSingleChart(
+    List<BodyMetrics> metrics,
+    double Function(BodyMetrics) valueSelector,
+    String unit,
+    Color color,
+  ) {
+    final int labelInterval = (metrics.length / 6).ceil().clamp(1, metrics.length);
+
+    return Padding(
       padding: const EdgeInsets.all(16),
       child: LineChart(
         LineChartData(
           lineBarsData: [
-            // Weight Line
             LineChartBarData(
               spots: metrics.asMap().entries.map((e) {
-                return FlSpot(e.key.toDouble(), e.value.weight);
+                return FlSpot(e.key.toDouble(), valueSelector(e.value));
               }).toList(),
               isCurved: true,
-              color: Colors.blue,
+              color: color,
               barWidth: 3,
               dotData: const FlDotData(show: true),
             ),
-            // Body Fat Line (Scaled to fit roughly same range or separate axis - keeping simple for now)
-            // Ideally should use dual axis or separate charts. Let's just show Weight for now to avoid confusion.
           ],
           titlesData: FlTitlesData(
             bottomTitles: AxisTitles(
               sideTitles: SideTitles(
                 showTitles: true,
+                interval: labelInterval.toDouble(),
                 getTitlesWidget: (value, meta) {
                   final index = value.toInt();
                   if (index >= 0 && index < metrics.length) {
@@ -83,7 +114,6 @@ class ProgressScreen extends ConsumerWidget {
                   }
                   return const Text('');
                 },
-                interval: 1, // Adjust based on data size
               ),
             ),
             leftTitles: const AxisTitles(
@@ -100,7 +130,6 @@ class ProgressScreen extends ConsumerWidget {
   }
 
   Widget _buildMetricsList(BuildContext context, List<BodyMetrics> metrics, ProgressNotifier notifier) {
-    // Reverse to show newest first
     final reversedMetrics = metrics.reversed.toList();
 
     return ListView.builder(
@@ -109,8 +138,32 @@ class ProgressScreen extends ConsumerWidget {
       itemCount: reversedMetrics.length,
       itemBuilder: (context, index) {
         final item = reversedMetrics[index];
+        final otherMetricsWithPhotos = reversedMetrics
+            .where((m) => m.imagePath != null && m.id != item.id)
+            .toList();
+
         return Dismissible(
           key: Key(item.id),
+          confirmDismiss: (_) async {
+            return await showDialog<bool>(
+              context: context,
+              builder: (_) => AlertDialog(
+                title: const Text('削除の確認'),
+                content: const Text('この記録を削除しますか？'),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context, false),
+                    child: const Text('キャンセル'),
+                  ),
+                  TextButton(
+                    onPressed: () => Navigator.pop(context, true),
+                    child: const Text('削除'),
+                  ),
+                ],
+              ),
+            ) ??
+                false;
+          },
           onDismissed: (_) => notifier.deleteMetrics(item.id),
           background: Container(color: Colors.red),
           child: Card(
@@ -119,23 +172,12 @@ class ProgressScreen extends ConsumerWidget {
               leading: item.imagePath != null
                   ? GestureDetector(
                       onTap: () {
-                        // Find previous image (which is next in the reversed list, or any older one)
-                        String? prevImage;
-                        if (index + 1 < reversedMetrics.length) {
-                          for (int i = index + 1; i < reversedMetrics.length; i++) {
-                            if (reversedMetrics[i].imagePath != null) {
-                              prevImage = reversedMetrics[i].imagePath;
-                              break;
-                            }
-                          }
-                        }
-                        
                         Navigator.push(
                           context,
                           MaterialPageRoute(
                             builder: (_) => PhotoCompareScreen(
                               currentImagePath: item.imagePath!,
-                              previousImagePath: prevImage,
+                              otherMetrics: otherMetricsWithPhotos,
                             ),
                           ),
                         );
@@ -148,7 +190,7 @@ class ProgressScreen extends ConsumerWidget {
                       ),
                     )
                   : const Icon(Icons.person),
-              title: Text('${DateFormat('yyyy/MM/dd').format(item.date)}'),
+              title: Text(DateFormat('yyyy/MM/dd').format(item.date)),
               subtitle: Text(
                 '体重: ${item.weight}kg\n体脂肪率: ${item.bodyFatPercentage}%\n腹囲: ${item.waist}cm',
               ),
@@ -204,11 +246,10 @@ class ProgressScreen extends ConsumerWidget {
                       final picker = ImagePicker();
                       final XFile? image = await picker.pickImage(source: ImageSource.camera);
                       if (image != null) {
-                        // Save to app directory
                         final directory = await getApplicationDocumentsDirectory();
                         final fileName = path.basename(image.path);
                         final savedImage = await File(image.path).copy('${directory.path}/$fileName');
-                        
+
                         setState(() {
                           selectedImagePath = savedImage.path;
                         });

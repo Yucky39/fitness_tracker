@@ -1,14 +1,16 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import '../models/body_metrics.dart';
 
 class PhotoCompareScreen extends StatefulWidget {
   final String currentImagePath;
-  final String? previousImagePath;
+  final List<BodyMetrics> otherMetrics;
 
   const PhotoCompareScreen({
     super.key,
     required this.currentImagePath,
-    this.previousImagePath,
+    required this.otherMetrics,
   });
 
   @override
@@ -17,12 +19,26 @@ class PhotoCompareScreen extends StatefulWidget {
 
 class _PhotoCompareScreenState extends State<PhotoCompareScreen> {
   double _opacity = 0.5;
+  int _compareIndex = 0;
+
+  String? get _compareImagePath {
+    if (widget.otherMetrics.isEmpty) return null;
+    return widget.otherMetrics[_compareIndex].imagePath;
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('体型比較'),
+        actions: [
+          if (widget.otherMetrics.length > 1)
+            IconButton(
+              icon: const Icon(Icons.compare_arrows),
+              tooltip: '比較対象を変更',
+              onPressed: _showCompareSelector,
+            ),
+        ],
       ),
       body: Column(
         children: [
@@ -30,16 +46,13 @@ class _PhotoCompareScreenState extends State<PhotoCompareScreen> {
             child: Stack(
               fit: StackFit.expand,
               children: [
-                // Previous Image (Base)
-                if (widget.previousImagePath != null)
+                if (_compareImagePath != null)
                   Image.file(
-                    File(widget.previousImagePath!),
+                    File(_compareImagePath!),
                     fit: BoxFit.contain,
                   )
                 else
                   const Center(child: Text('比較対象の画像がありません')),
-
-                // Current Image (Overlay)
                 Opacity(
                   opacity: _opacity,
                   child: Image.file(
@@ -54,6 +67,12 @@ class _PhotoCompareScreenState extends State<PhotoCompareScreen> {
             padding: const EdgeInsets.all(16.0),
             child: Column(
               children: [
+                if (_compareImagePath != null && widget.otherMetrics.isNotEmpty)
+                  Text(
+                    '比較対象: ${DateFormat('yyyy/MM/dd').format(widget.otherMetrics[_compareIndex].date)}',
+                    style: const TextStyle(fontSize: 12, color: Colors.grey),
+                  ),
+                const SizedBox(height: 4),
                 const Text('透明度調整'),
                 Slider(
                   value: _opacity,
@@ -75,6 +94,79 @@ class _PhotoCompareScreenState extends State<PhotoCompareScreen> {
               ],
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  void _showCompareSelector() {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Padding(
+            padding: EdgeInsets.all(16),
+            child: Text(
+              '比較する記録を選択',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+          ),
+          SizedBox(
+            height: 120,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              itemCount: widget.otherMetrics.length,
+              itemBuilder: (context, i) {
+                final m = widget.otherMetrics[i];
+                final isSelected = i == _compareIndex;
+                return GestureDetector(
+                  onTap: () {
+                    setState(() => _compareIndex = i);
+                    Navigator.pop(context);
+                  },
+                  child: Container(
+                    width: 90,
+                    margin: const EdgeInsets.only(right: 12),
+                    decoration: BoxDecoration(
+                      border: Border.all(
+                        color: isSelected
+                            ? Theme.of(context).colorScheme.primary
+                            : Colors.grey,
+                        width: isSelected ? 2 : 1,
+                      ),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Column(
+                      children: [
+                        Expanded(
+                          child: ClipRRect(
+                            borderRadius: const BorderRadius.vertical(
+                              top: Radius.circular(7),
+                            ),
+                            child: Image.file(
+                              File(m.imagePath!),
+                              fit: BoxFit.cover,
+                              width: double.infinity,
+                            ),
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.all(4),
+                          child: Text(
+                            DateFormat('MM/dd').format(m.date),
+                            style: const TextStyle(fontSize: 11),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 16),
         ],
       ),
     );

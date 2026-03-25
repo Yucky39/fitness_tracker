@@ -4,9 +4,10 @@ import 'package:uuid/uuid.dart';
 import '../models/food_item.dart';
 import '../services/database_service.dart';
 
-// State class for Meal Data
 class MealState {
   final List<FoodItem> todayItems;
+  final List<FoodItem> recentFoods;
+  final DateTime selectedDate;
   final int calorieGoal;
   final double proteinGoal;
   final double fatGoal;
@@ -15,15 +16,19 @@ class MealState {
 
   MealState({
     this.todayItems = const [],
+    this.recentFoods = const [],
+    DateTime? selectedDate,
     this.calorieGoal = 2000,
     this.proteinGoal = 150,
     this.fatGoal = 60,
     this.carbsGoal = 200,
     this.isLoading = true,
-  });
+  }) : selectedDate = selectedDate ?? DateTime.now();
 
   MealState copyWith({
     List<FoodItem>? todayItems,
+    List<FoodItem>? recentFoods,
+    DateTime? selectedDate,
     int? calorieGoal,
     double? proteinGoal,
     double? fatGoal,
@@ -32,6 +37,8 @@ class MealState {
   }) {
     return MealState(
       todayItems: todayItems ?? this.todayItems,
+      recentFoods: recentFoods ?? this.recentFoods,
+      selectedDate: selectedDate ?? this.selectedDate,
       calorieGoal: calorieGoal ?? this.calorieGoal,
       proteinGoal: proteinGoal ?? this.proteinGoal,
       fatGoal: fatGoal ?? this.fatGoal,
@@ -46,7 +53,6 @@ class MealState {
   double get totalCarbs => todayItems.fold(0, (sum, item) => sum + item.carbs);
 }
 
-// Notifier
 class MealNotifier extends StateNotifier<MealState> {
   MealNotifier() : super(MealState()) {
     _loadData();
@@ -55,7 +61,8 @@ class MealNotifier extends StateNotifier<MealState> {
   Future<void> _loadData() async {
     state = state.copyWith(isLoading: true);
     await _loadGoals();
-    await _loadTodayItems();
+    await _loadItemsForDate(state.selectedDate);
+    await _loadRecentFoods();
     state = state.copyWith(isLoading: false);
   }
 
@@ -69,11 +76,10 @@ class MealNotifier extends StateNotifier<MealState> {
     );
   }
 
-  Future<void> _loadTodayItems() async {
+  Future<void> _loadItemsForDate(DateTime date) async {
     final db = await DatabaseService().database;
-    final now = DateTime.now();
-    final startOfDay = DateTime(now.year, now.month, now.day).toIso8601String();
-    final endOfDay = DateTime(now.year, now.month, now.day, 23, 59, 59).toIso8601String();
+    final startOfDay = DateTime(date.year, date.month, date.day).toIso8601String();
+    final endOfDay = DateTime(date.year, date.month, date.day, 23, 59, 59).toIso8601String();
 
     final List<Map<String, dynamic>> maps = await db.query(
       'food_items',
@@ -84,6 +90,32 @@ class MealNotifier extends StateNotifier<MealState> {
     state = state.copyWith(
       todayItems: List.generate(maps.length, (i) => FoodItem.fromMap(maps[i])),
     );
+  }
+
+  Future<void> _loadRecentFoods() async {
+    final db = await DatabaseService().database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'food_items',
+      orderBy: 'date DESC',
+      limit: 200,
+    );
+
+    final seen = <String>{};
+    final recentFoods = <FoodItem>[];
+    for (final map in maps) {
+      final item = FoodItem.fromMap(map);
+      if (!seen.contains(item.name) && recentFoods.length < 20) {
+        seen.add(item.name);
+        recentFoods.add(item);
+      }
+    }
+
+    state = state.copyWith(recentFoods: recentFoods);
+  }
+
+  Future<void> changeDate(DateTime date) async {
+    state = state.copyWith(selectedDate: date);
+    await _loadItemsForDate(date);
   }
 
   Future<void> updateGoals({
@@ -114,6 +146,8 @@ class MealNotifier extends StateNotifier<MealState> {
     required double carbs,
   }) async {
     final db = await DatabaseService().database;
+    final now = DateTime.now();
+    final selectedDate = state.selectedDate;
     final newItem = FoodItem(
       id: const Uuid().v4(),
       name: name,
@@ -121,17 +155,26 @@ class MealNotifier extends StateNotifier<MealState> {
       protein: protein,
       fat: fat,
       carbs: carbs,
-      date: DateTime.now(),
+      date: DateTime(
+        selectedDate.year,
+        selectedDate.month,
+        selectedDate.day,
+        now.hour,
+        now.minute,
+        now.second,
+      ),
     );
 
     await db.insert('food_items', newItem.toMap());
-    await _loadTodayItems();
+    await _loadItemsForDate(state.selectedDate);
+    await _loadRecentFoods();
   }
 
   Future<void> deleteFoodItem(String id) async {
     final db = await DatabaseService().database;
     await db.delete('food_items', where: 'id = ?', whereArgs: [id]);
-    await _loadTodayItems();
+    await _loadItemsForDate(state.selectedDate);
+    await _loadRecentFoods();
   }
 }
 

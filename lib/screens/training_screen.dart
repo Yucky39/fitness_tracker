@@ -26,6 +26,26 @@ class TrainingScreen extends ConsumerWidget {
                     final log = trainingState.logs[index];
                     return Dismissible(
                       key: Key(log.id),
+                      confirmDismiss: (_) async {
+                        return await showDialog<bool>(
+                          context: context,
+                          builder: (_) => AlertDialog(
+                            title: const Text('削除の確認'),
+                            content: const Text('この記録を削除しますか？'),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(context, false),
+                                child: const Text('キャンセル'),
+                              ),
+                              TextButton(
+                                onPressed: () => Navigator.pop(context, true),
+                                child: const Text('削除'),
+                              ),
+                            ],
+                          ),
+                        ) ??
+                            false;
+                      },
                       onDismissed: (_) => trainingNotifier.deleteLog(log.id),
                       background: Container(color: Colors.red),
                       child: Card(
@@ -33,11 +53,11 @@ class TrainingScreen extends ConsumerWidget {
                         child: ListTile(
                           title: Text(log.exerciseName),
                           subtitle: Text(
-                            '${log.weight}kg x ${log.reps}回 x ${log.sets}セット\n'
-                            'インターバル: ${log.interval}秒\n'
-                            '${DateFormat('yyyy/MM/dd HH:mm').format(log.date)}',
+                            '${log.weight}kg x ${log.reps}回 x ${log.sets}セット  インターバル: ${log.interval}秒\n'
+                            '${DateFormat('yyyy/MM/dd HH:mm').format(log.date)}'
+                            '${log.note.isNotEmpty ? '\nメモ: ${log.note}' : ''}',
                           ),
-                          isThreeLine: true,
+                          isThreeLine: log.note.isNotEmpty,
                         ),
                       ),
                     );
@@ -51,121 +71,161 @@ class TrainingScreen extends ConsumerWidget {
   }
 
   void _showAddTrainingDialog(BuildContext context, WidgetRef ref) {
-    final nameController = TextEditingController();
     final weightController = TextEditingController();
     final repsController = TextEditingController();
     final setsController = TextEditingController();
     final intervalController = TextEditingController();
     final noteController = TextEditingController();
+    String exerciseName = '';
+
+    final recentExerciseNames = ref
+        .read(trainingProvider)
+        .logs
+        .map((l) => l.exerciseName)
+        .toSet()
+        .toList()
+      ..sort();
 
     showDialog(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setState) {
-          TrainingLog? previousLog;
-          
-          void updatePreviousLog() {
-            final name = nameController.text;
-            if (name.isNotEmpty) {
-              final prev = ref.read(trainingProvider.notifier).getPreviousLog(name);
-              if (prev != previousLog) {
-                setState(() {
-                  previousLog = prev;
-                });
-              }
-            }
-          }
+      builder: (context) {
+        TrainingLog? previousLog;
 
-          return AlertDialog(
-            title: const Text('トレーニングを記録'),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  TextField(
-                    controller: nameController,
-                    decoration: const InputDecoration(labelText: '種目名'),
-                    onChanged: (_) => updatePreviousLog(),
-                  ),
-                  if (previousLog != null)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 8.0),
-                      child: Text(
-                        '前回: ${previousLog!.weight}kg x ${previousLog!.reps}回 x ${previousLog!.sets}セット',
-                        style: TextStyle(color: Colors.grey[600], fontSize: 12),
-                      ),
+        return StatefulBuilder(
+          builder: (context, setState) {
+            void updatePreviousLog(String name) {
+              final prev = name.isNotEmpty
+                  ? ref.read(trainingProvider.notifier).getPreviousLog(name)
+                  : null;
+              setState(() => previousLog = prev);
+            }
+
+            void fillFromPreviousLog(String name) {
+              final prev = ref.read(trainingProvider.notifier).getPreviousLog(name);
+              setState(() {
+                previousLog = prev;
+                if (prev != null) {
+                  weightController.text = prev.weight.toString();
+                  repsController.text = prev.reps.toString();
+                  setsController.text = prev.sets.toString();
+                  intervalController.text = prev.interval.toString();
+                }
+              });
+            }
+
+            return AlertDialog(
+              title: const Text('トレーニングを記録'),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Autocomplete<String>(
+                      optionsBuilder: (textEditingValue) {
+                        exerciseName = textEditingValue.text;
+                        if (textEditingValue.text.isEmpty) {
+                          return recentExerciseNames;
+                        }
+                        return recentExerciseNames.where((name) => name
+                            .toLowerCase()
+                            .contains(textEditingValue.text.toLowerCase()));
+                      },
+                      onSelected: (selection) {
+                        exerciseName = selection;
+                        fillFromPreviousLog(selection);
+                      },
+                      fieldViewBuilder: (ctx, controller, focusNode, onFieldSubmitted) {
+                        return TextField(
+                          controller: controller,
+                          focusNode: focusNode,
+                          decoration: const InputDecoration(labelText: '種目名'),
+                          onChanged: (value) {
+                            exerciseName = value;
+                            updatePreviousLog(value);
+                          },
+                        );
+                      },
                     ),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: weightController,
-                          decoration: const InputDecoration(labelText: '重量 (kg)'),
-                          keyboardType: TextInputType.number,
+                    if (previousLog != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8.0),
+                        child: Text(
+                          '前回: ${previousLog!.weight}kg x ${previousLog!.reps}回 x ${previousLog!.sets}セット'
+                          '${previousLog!.note.isNotEmpty ? '\nメモ: ${previousLog!.note}' : ''}',
+                          style: TextStyle(color: Colors.grey[600], fontSize: 12),
                         ),
                       ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: TextField(
-                          controller: repsController,
-                          decoration: const InputDecoration(labelText: '回数'),
-                          keyboardType: TextInputType.number,
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: weightController,
+                            decoration: const InputDecoration(labelText: '重量 (kg)'),
+                            keyboardType: TextInputType.number,
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: setsController,
-                          decoration: const InputDecoration(labelText: 'セット数'),
-                          keyboardType: TextInputType.number,
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: TextField(
+                            controller: repsController,
+                            decoration: const InputDecoration(labelText: '回数'),
+                            keyboardType: TextInputType.number,
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: TextField(
-                          controller: intervalController,
-                          decoration: const InputDecoration(labelText: 'インターバル (秒)'),
-                          keyboardType: TextInputType.number,
+                      ],
+                    ),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: setsController,
+                            decoration: const InputDecoration(labelText: 'セット数'),
+                            keyboardType: TextInputType.number,
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
-                  TextField(
-                    controller: noteController,
-                    decoration: const InputDecoration(labelText: 'メモ'),
-                  ),
-                ],
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: TextField(
+                            controller: intervalController,
+                            decoration: const InputDecoration(labelText: 'インターバル (秒)'),
+                            keyboardType: TextInputType.number,
+                          ),
+                        ),
+                      ],
+                    ),
+                    TextField(
+                      controller: noteController,
+                      decoration: const InputDecoration(labelText: 'メモ'),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('キャンセル'),
-              ),
-              TextButton(
-                onPressed: () {
-                  if (nameController.text.isNotEmpty) {
-                    ref.read(trainingProvider.notifier).addLog(
-                      exerciseName: nameController.text,
-                      weight: double.tryParse(weightController.text) ?? 0,
-                      reps: int.tryParse(repsController.text) ?? 0,
-                      sets: int.tryParse(setsController.text) ?? 0,
-                      interval: int.tryParse(intervalController.text) ?? 0,
-                      note: noteController.text,
-                    );
-                    Navigator.pop(context);
-                  }
-                },
-                child: const Text('記録'),
-              ),
-            ],
-          );
-        },
-      ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('キャンセル'),
+                ),
+                TextButton(
+                  onPressed: () {
+                    if (exerciseName.isNotEmpty) {
+                      ref.read(trainingProvider.notifier).addLog(
+                            exerciseName: exerciseName,
+                            weight: double.tryParse(weightController.text) ?? 0,
+                            reps: int.tryParse(repsController.text) ?? 0,
+                            sets: int.tryParse(setsController.text) ?? 0,
+                            interval: int.tryParse(intervalController.text) ?? 0,
+                            note: noteController.text,
+                          );
+                      Navigator.pop(context);
+                    }
+                  },
+                  child: const Text('記録'),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 }
