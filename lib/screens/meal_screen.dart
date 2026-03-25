@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import '../providers/advice_provider.dart';
 import '../providers/meal_provider.dart';
+import '../providers/settings_provider.dart';
 import '../widgets/nutrient_bar.dart';
 
 class MealScreen extends ConsumerWidget {
@@ -18,7 +20,7 @@ class MealScreen extends ConsumerWidget {
         actions: [
           IconButton(
             icon: const Icon(Icons.settings),
-            onPressed: () => _showGoalSettingDialog(context, mealState, mealNotifier),
+            onPressed: () => _showGoalSettingDialog(context, ref, mealState, mealNotifier),
           ),
         ],
       ),
@@ -32,7 +34,9 @@ class MealScreen extends ConsumerWidget {
                   _buildDateNavigation(context, mealState, mealNotifier),
                   const SizedBox(height: 16),
                   _buildSummaryCard(mealState),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 16),
+                  _buildAdviceCard(context, ref, mealState),
+                  const SizedBox(height: 8),
                   _buildFoodList(context, mealState, mealNotifier),
                 ],
               ),
@@ -153,6 +157,94 @@ class MealScreen extends ConsumerWidget {
     );
   }
 
+  Widget _buildAdviceCard(BuildContext context, WidgetRef ref, MealState mealState) {
+    final adviceState = ref.watch(adviceProvider);
+    final settings = ref.watch(settingsProvider);
+
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.psychology, color: Colors.teal),
+                const SizedBox(width: 8),
+                const Expanded(
+                  child: Text(
+                    'AIアドバイス',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: Colors.teal.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    settings.adviceLevelLabel,
+                    style: const TextStyle(fontSize: 12, color: Colors.teal),
+                  ),
+                ),
+                const SizedBox(width: 4),
+                adviceState.isLoading
+                    ? const SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : IconButton(
+                        icon: const Icon(Icons.refresh),
+                        tooltip: 'アドバイスを取得',
+                        onPressed: () => ref.read(adviceProvider.notifier).fetchAdvice(
+                              items: mealState.todayItems,
+                              date: mealState.selectedDate,
+                              calorieGoal: mealState.calorieGoal,
+                              proteinGoal: mealState.proteinGoal,
+                              fatGoal: mealState.fatGoal,
+                              carbsGoal: mealState.carbsGoal,
+                              adviceLevel: settings.adviceLevel,
+                              apiKey: settings.apiKey,
+                            ),
+                      ),
+              ],
+            ),
+            if (adviceState.error != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                adviceState.error!,
+                style: const TextStyle(color: Colors.red, fontSize: 13),
+              ),
+            ],
+            if (adviceState.adviceText != null) ...[
+              const SizedBox(height: 8),
+              const Divider(),
+              const SizedBox(height: 4),
+              Text(
+                adviceState.adviceText!,
+                style: const TextStyle(fontSize: 14, height: 1.6),
+              ),
+            ],
+            if (adviceState.adviceText == null &&
+                adviceState.error == null &&
+                !adviceState.isLoading)
+              const Padding(
+                padding: EdgeInsets.only(top: 4),
+                child: Text(
+                  '↑ ボタンを押してアドバイスを取得',
+                  style: TextStyle(color: Colors.grey, fontSize: 13),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildFoodList(BuildContext context, MealState state, MealNotifier notifier) {
     if (state.todayItems.isEmpty) {
       return const Center(
@@ -206,7 +298,12 @@ class MealScreen extends ConsumerWidget {
     );
   }
 
-  void _showGoalSettingDialog(BuildContext context, MealState state, MealNotifier notifier) {
+  void _showGoalSettingDialog(
+    BuildContext context,
+    WidgetRef ref,
+    MealState state,
+    MealNotifier notifier,
+  ) {
     final calorieController = TextEditingController(text: state.calorieGoal.toString());
     final proteinController = TextEditingController(text: state.proteinGoal.toString());
     final fatController = TextEditingController(text: state.fatGoal.toString());
@@ -214,55 +311,132 @@ class MealScreen extends ConsumerWidget {
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('目標設定'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: calorieController,
-                decoration: const InputDecoration(labelText: '目標カロリー (kcal)'),
-                keyboardType: TextInputType.number,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          String currentLevel = ref.read(settingsProvider).adviceLevel;
+          bool apiKeyObscure = true;
+          final apiKeyController =
+              TextEditingController(text: ref.read(settingsProvider).apiKey);
+
+          return AlertDialog(
+            title: const Text('目標・設定'),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    '栄養目標',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: calorieController,
+                    decoration: const InputDecoration(labelText: '目標カロリー (kcal)'),
+                    keyboardType: TextInputType.number,
+                  ),
+                  TextField(
+                    controller: proteinController,
+                    decoration: const InputDecoration(labelText: '目標タンパク質 (g)'),
+                    keyboardType: TextInputType.number,
+                  ),
+                  TextField(
+                    controller: fatController,
+                    decoration: const InputDecoration(labelText: '目標脂質 (g)'),
+                    keyboardType: TextInputType.number,
+                  ),
+                  TextField(
+                    controller: carbsController,
+                    decoration: const InputDecoration(labelText: '目標炭水化物 (g)'),
+                    keyboardType: TextInputType.number,
+                  ),
+                  const SizedBox(height: 20),
+                  const Divider(),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'AIアドバイス設定',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 12),
+                  const Text('アドバイスのレベル', style: TextStyle(fontSize: 13)),
+                  const SizedBox(height: 8),
+                  SegmentedButton<String>(
+                    segments: const [
+                      ButtonSegment(value: 'strict', label: Text('厳しめ')),
+                      ButtonSegment(value: 'normal', label: Text('普通')),
+                      ButtonSegment(value: 'gentle', label: Text('優しめ')),
+                    ],
+                    selected: {currentLevel},
+                    onSelectionChanged: (selection) {
+                      ref.read(settingsProvider.notifier).updateAdviceLevel(selection.first);
+                      setDialogState(() => currentLevel = selection.first);
+                    },
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    _adviceLevelDescription(currentLevel),
+                    style: const TextStyle(fontSize: 11, color: Colors.grey),
+                  ),
+                  const SizedBox(height: 12),
+                  // API Key field with show/hide toggle
+                  StatefulBuilder(
+                    builder: (context, setFieldState) => TextField(
+                      controller: apiKeyController,
+                      obscureText: apiKeyObscure,
+                      decoration: InputDecoration(
+                        labelText: 'Anthropic APIキー',
+                        hintText: 'sk-ant-...',
+                        suffixIcon: IconButton(
+                          icon: Icon(apiKeyObscure ? Icons.visibility : Icons.visibility_off),
+                          onPressed: () =>
+                              setFieldState(() => apiKeyObscure = !apiKeyObscure),
+                        ),
+                      ),
+                      onChanged: (v) =>
+                          ref.read(settingsProvider.notifier).updateApiKey(v),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'APIキーはデバイス内にのみ保存されます',
+                    style: TextStyle(fontSize: 11, color: Colors.grey),
+                  ),
+                ],
               ),
-              TextField(
-                controller: proteinController,
-                decoration: const InputDecoration(labelText: '目標タンパク質 (g)'),
-                keyboardType: TextInputType.number,
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('キャンセル'),
               ),
-              TextField(
-                controller: fatController,
-                decoration: const InputDecoration(labelText: '目標脂質 (g)'),
-                keyboardType: TextInputType.number,
-              ),
-              TextField(
-                controller: carbsController,
-                decoration: const InputDecoration(labelText: '目標炭水化物 (g)'),
-                keyboardType: TextInputType.number,
+              TextButton(
+                onPressed: () {
+                  notifier.updateGoals(
+                    calories: int.tryParse(calorieController.text) ?? 2000,
+                    protein: double.tryParse(proteinController.text) ?? 150,
+                    fat: double.tryParse(fatController.text) ?? 60,
+                    carbs: double.tryParse(carbsController.text) ?? 200,
+                  );
+                  Navigator.pop(context);
+                },
+                child: const Text('保存'),
               ),
             ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('キャンセル'),
-          ),
-          TextButton(
-            onPressed: () {
-              notifier.updateGoals(
-                calories: int.tryParse(calorieController.text) ?? 2000,
-                protein: double.tryParse(proteinController.text) ?? 150,
-                fat: double.tryParse(fatController.text) ?? 60,
-                carbs: double.tryParse(carbsController.text) ?? 200,
-              );
-              Navigator.pop(context);
-            },
-            child: const Text('保存'),
-          ),
-        ],
+          );
+        },
       ),
     );
+  }
+
+  String _adviceLevelDescription(String level) {
+    switch (level) {
+      case 'strict':
+        return '目標からの乖離を詳細に指摘し、具体的な改善計画を提示します';
+      case 'gentle':
+        return '良い点を中心に励ましながら、重大な問題のみ優しく提案します';
+      default:
+        return '良い点と改善点のバランスよく、実践しやすい提案をします';
+    }
   }
 
   void _showAddFoodDialog(BuildContext context, MealState mealState, MealNotifier notifier) {
