@@ -1,10 +1,12 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/food_item.dart';
+import '../providers/settings_provider.dart';
 
 class NutritionAdviceService {
-  static const _endpoint = 'https://api.anthropic.com/v1/messages';
-  static const _model = 'claude-haiku-4-5-20251001';
+  static const _maxTokens = 1024;
+
+  // ── Shared helpers ─────────────────────────────────────────────────────────
 
   static String _systemPrompt(String level) {
     const base = 'あなたは経験豊富な管理栄養士です。ユーザの食事記録を分析し、日本語で具体的なアドバイスを提供してください。'
@@ -59,6 +61,8 @@ $foodLines
 ''';
   }
 
+  // ── Provider dispatch ──────────────────────────────────────────────────────
+
   Future<String> getAdvice({
     required List<FoodItem> items,
     required DateTime date,
@@ -68,40 +72,114 @@ $foodLines
     required double carbsGoal,
     required String adviceLevel,
     required String apiKey,
-  }) async {
+    required AiProviderType provider,
+  }) {
+    final systemPrompt = _systemPrompt(adviceLevel);
+    final userMessage = _buildUserMessage(
+      items: items,
+      date: date,
+      calorieGoal: calorieGoal,
+      proteinGoal: proteinGoal,
+      fatGoal: fatGoal,
+      carbsGoal: carbsGoal,
+    );
+    switch (provider) {
+      case AiProviderType.anthropic:
+        return _callAnthropic(systemPrompt, userMessage, apiKey);
+      case AiProviderType.openai:
+        return _callOpenAi(systemPrompt, userMessage, apiKey);
+      case AiProviderType.gemini:
+        return _callGemini(systemPrompt, userMessage, apiKey);
+    }
+  }
+
+  // ── Anthropic ──────────────────────────────────────────────────────────────
+
+  Future<String> _callAnthropic(String system, String user, String apiKey) async {
     final response = await http.post(
-      Uri.parse(_endpoint),
+      Uri.parse('https://api.anthropic.com/v1/messages'),
       headers: {
         'x-api-key': apiKey,
         'anthropic-version': '2023-06-01',
         'content-type': 'application/json',
       },
       body: jsonEncode({
-        'model': _model,
-        'max_tokens': 1024,
-        'system': _systemPrompt(adviceLevel),
+        'model': 'claude-haiku-4-5-20251001',
+        'max_tokens': _maxTokens,
+        'system': system,
         'messages': [
-          {
-            'role': 'user',
-            'content': _buildUserMessage(
-              items: items,
-              date: date,
-              calorieGoal: calorieGoal,
-              proteinGoal: proteinGoal,
-              fatGoal: fatGoal,
-              carbsGoal: carbsGoal,
-            ),
-          }
+          {'role': 'user', 'content': user},
         ],
       }),
     );
 
     if (response.statusCode != 200) {
       final body = jsonDecode(utf8.decode(response.bodyBytes));
-      throw Exception(body['error']?['message'] ?? 'APIエラー (${response.statusCode})');
+      throw Exception(body['error']?['message'] ?? 'Anthropic APIエラー (${response.statusCode})');
     }
-
     final data = jsonDecode(utf8.decode(response.bodyBytes));
     return data['content'][0]['text'] as String;
+  }
+
+  // ── OpenAI ─────────────────────────────────────────────────────────────────
+
+  Future<String> _callOpenAi(String system, String user, String apiKey) async {
+    final response = await http.post(
+      Uri.parse('https://api.openai.com/v1/chat/completions'),
+      headers: {
+        'Authorization': 'Bearer $apiKey',
+        'content-type': 'application/json',
+      },
+      body: jsonEncode({
+        'model': 'gpt-4o-mini',
+        'max_tokens': _maxTokens,
+        'messages': [
+          {'role': 'system', 'content': system},
+          {'role': 'user', 'content': user},
+        ],
+      }),
+    );
+
+    if (response.statusCode != 200) {
+      final body = jsonDecode(utf8.decode(response.bodyBytes));
+      throw Exception(body['error']?['message'] ?? 'OpenAI APIエラー (${response.statusCode})');
+    }
+    final data = jsonDecode(utf8.decode(response.bodyBytes));
+    return data['choices'][0]['message']['content'] as String;
+  }
+
+  // ── Google Gemini ──────────────────────────────────────────────────────────
+
+  Future<String> _callGemini(String system, String user, String apiKey) async {
+    final uri = Uri.parse(
+      'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=$apiKey',
+    );
+
+    final response = await http.post(
+      uri,
+      headers: {'content-type': 'application/json'},
+      body: jsonEncode({
+        'system_instruction': {
+          'parts': [
+            {'text': system},
+          ],
+        },
+        'contents': [
+          {
+            'parts': [
+              {'text': user},
+            ],
+          },
+        ],
+        'generationConfig': {'maxOutputTokens': _maxTokens},
+      }),
+    );
+
+    if (response.statusCode != 200) {
+      final body = jsonDecode(utf8.decode(response.bodyBytes));
+      throw Exception(body['error']?['message'] ?? 'Gemini APIエラー (${response.statusCode})');
+    }
+    final data = jsonDecode(utf8.decode(response.bodyBytes));
+    return data['candidates'][0]['content']['parts'][0]['text'] as String;
   }
 }

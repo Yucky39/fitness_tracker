@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/food_item.dart';
+import '../providers/settings_provider.dart';
 import '../services/nutrition_advice_service.dart';
 
 class AdviceState {
@@ -30,10 +31,11 @@ class AdviceNotifier extends StateNotifier<AdviceState> {
     required double carbsGoal,
     required String adviceLevel,
     required String apiKey,
+    required AiProviderType provider,
   }) async {
     if (apiKey.isEmpty) {
-      state = const AdviceState(
-        error: 'APIキーが設定されていません。⚙️設定から「Anthropic APIキー」を入力してください。',
+      state = AdviceState(
+        error: '${provider.label} のAPIキーが設定されていません。⚙️設定から入力してください。',
       );
       return;
     }
@@ -49,6 +51,7 @@ class AdviceNotifier extends StateNotifier<AdviceState> {
         carbsGoal: carbsGoal,
         adviceLevel: adviceLevel,
         apiKey: apiKey,
+        provider: provider,
       );
       state = AdviceState(adviceText: text);
     } catch (e) {

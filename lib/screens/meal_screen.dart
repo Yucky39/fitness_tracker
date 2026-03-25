@@ -186,7 +186,7 @@ class MealScreen extends ConsumerWidget {
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
-                    settings.adviceLevelLabel,
+                    '${settings.selectedProvider.label} · ${settings.adviceLevelLabel}',
                     style: const TextStyle(fontSize: 12, color: Colors.teal),
                   ),
                 ),
@@ -208,7 +208,8 @@ class MealScreen extends ConsumerWidget {
                               fatGoal: mealState.fatGoal,
                               carbsGoal: mealState.carbsGoal,
                               adviceLevel: settings.adviceLevel,
-                              apiKey: settings.apiKey,
+                              apiKey: settings.currentApiKey,
+                              provider: settings.selectedProvider,
                             ),
                       ),
               ],
@@ -309,14 +310,37 @@ class MealScreen extends ConsumerWidget {
     final fatController = TextEditingController(text: state.fatGoal.toString());
     final carbsController = TextEditingController(text: state.carbsGoal.toString());
 
+    final initialSettings = ref.read(settingsProvider);
+    final anthropicKeyCtrl = TextEditingController(text: initialSettings.anthropicApiKey);
+    final openAiKeyCtrl = TextEditingController(text: initialSettings.openAiApiKey);
+    final geminiKeyCtrl = TextEditingController(text: initialSettings.geminiApiKey);
+
     showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) {
           String currentLevel = ref.read(settingsProvider).adviceLevel;
-          bool apiKeyObscure = true;
-          final apiKeyController =
-              TextEditingController(text: ref.read(settingsProvider).apiKey);
+          AiProviderType currentProvider = ref.read(settingsProvider).selectedProvider;
+
+          Widget apiKeyField(AiProviderType provider, TextEditingController ctrl) {
+            bool obscure = true;
+            return StatefulBuilder(
+              builder: (context, setFieldState) => TextField(
+                controller: ctrl,
+                obscureText: obscure,
+                decoration: InputDecoration(
+                  labelText: '${provider.label} APIキー',
+                  hintText: provider.apiKeyHint,
+                  suffixIcon: IconButton(
+                    icon: Icon(obscure ? Icons.visibility : Icons.visibility_off),
+                    onPressed: () => setFieldState(() => obscure = !obscure),
+                  ),
+                ),
+                onChanged: (v) =>
+                    ref.read(settingsProvider.notifier).updateApiKey(provider, v),
+              ),
+            );
+          }
 
           return AlertDialog(
             title: const Text('目標・設定'),
@@ -325,10 +349,7 @@ class MealScreen extends ConsumerWidget {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    '栄養目標',
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
+                  const Text('栄養目標', style: TextStyle(fontWeight: FontWeight.bold)),
                   const SizedBox(height: 8),
                   TextField(
                     controller: calorieController,
@@ -353,11 +374,42 @@ class MealScreen extends ConsumerWidget {
                   const SizedBox(height: 20),
                   const Divider(),
                   const SizedBox(height: 8),
-                  const Text(
-                    'AIアドバイス設定',
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
+                  const Text('AIアドバイス設定', style: TextStyle(fontWeight: FontWeight.bold)),
                   const SizedBox(height: 12),
+
+                  // ── Provider selector ──────────────────────────────────
+                  const Text('使用するAI', style: TextStyle(fontSize: 13)),
+                  const SizedBox(height: 8),
+                  DropdownButtonFormField<AiProviderType>(
+                    value: currentProvider,
+                    decoration: const InputDecoration(
+                      border: OutlineInputBorder(),
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    ),
+                    items: AiProviderType.values.map((p) {
+                      return DropdownMenuItem(
+                        value: p,
+                        child: Row(
+                          children: [
+                            Text(p.label),
+                            const SizedBox(width: 8),
+                            Text(
+                              p.modelLabel,
+                              style: const TextStyle(fontSize: 12, color: Colors.grey),
+                            ),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                    onChanged: (p) {
+                      if (p == null) return;
+                      ref.read(settingsProvider.notifier).updateSelectedProvider(p);
+                      setDialogState(() => currentProvider = p);
+                    },
+                  ),
+                  const SizedBox(height: 16),
+
+                  // ── Advice level ───────────────────────────────────────
                   const Text('アドバイスのレベル', style: TextStyle(fontSize: 13)),
                   const SizedBox(height: 8),
                   SegmentedButton<String>(
@@ -377,25 +429,16 @@ class MealScreen extends ConsumerWidget {
                     _adviceLevelDescription(currentLevel),
                     style: const TextStyle(fontSize: 11, color: Colors.grey),
                   ),
-                  const SizedBox(height: 12),
-                  // API Key field with show/hide toggle
-                  StatefulBuilder(
-                    builder: (context, setFieldState) => TextField(
-                      controller: apiKeyController,
-                      obscureText: apiKeyObscure,
-                      decoration: InputDecoration(
-                        labelText: 'Anthropic APIキー',
-                        hintText: 'sk-ant-...',
-                        suffixIcon: IconButton(
-                          icon: Icon(apiKeyObscure ? Icons.visibility : Icons.visibility_off),
-                          onPressed: () =>
-                              setFieldState(() => apiKeyObscure = !apiKeyObscure),
-                        ),
-                      ),
-                      onChanged: (v) =>
-                          ref.read(settingsProvider.notifier).updateApiKey(v),
-                    ),
-                  ),
+                  const SizedBox(height: 16),
+
+                  // ── API keys (all providers) ───────────────────────────
+                  const Text('APIキー', style: TextStyle(fontSize: 13)),
+                  const SizedBox(height: 8),
+                  apiKeyField(AiProviderType.anthropic, anthropicKeyCtrl),
+                  const SizedBox(height: 8),
+                  apiKeyField(AiProviderType.openai, openAiKeyCtrl),
+                  const SizedBox(height: 8),
+                  apiKeyField(AiProviderType.gemini, geminiKeyCtrl),
                   const SizedBox(height: 4),
                   const Text(
                     'APIキーはデバイス内にのみ保存されます',
