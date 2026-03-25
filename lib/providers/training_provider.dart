@@ -30,11 +30,12 @@ class TrainingNotifier extends StateNotifier<TrainingState> {
 
   Future<void> _loadLogs() async {
     state = state.copyWith(isLoading: true);
-    final db = await DatabaseService().database;
-    final List<Map<String, dynamic>> maps = await db.query(
+    final adapter = await DatabaseService().database;
+    final List<Map<String, dynamic>> maps = await adapter.query(
       'training_logs',
       orderBy: 'date DESC',
     );
+
 
     state = state.copyWith(
       logs: List.generate(maps.length, (i) => TrainingLog.fromMap(maps[i])),
@@ -50,7 +51,7 @@ class TrainingNotifier extends StateNotifier<TrainingState> {
     required int interval,
     required String note,
   }) async {
-    final db = await DatabaseService().database;
+    final adapter = await DatabaseService().database;
     final newLog = TrainingLog(
       id: const Uuid().v4(),
       exerciseName: exerciseName,
@@ -62,13 +63,13 @@ class TrainingNotifier extends StateNotifier<TrainingState> {
       date: DateTime.now(),
     );
 
-    await db.insert('training_logs', newLog.toMap());
+    await adapter.insert('training_logs', newLog.toMap());
     await _loadLogs();
   }
 
   Future<void> deleteLog(String id) async {
-    final db = await DatabaseService().database;
-    await db.delete('training_logs', where: 'id = ?', whereArgs: [id]);
+    final adapter = await DatabaseService().database;
+    await adapter.delete('training_logs', where: 'id = ?', whereArgs: [id]);
     await _loadLogs();
   }
 

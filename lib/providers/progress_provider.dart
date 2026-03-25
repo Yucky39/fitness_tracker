@@ -30,8 +30,8 @@ class ProgressNotifier extends StateNotifier<ProgressState> {
 
   Future<void> _loadMetrics() async {
     state = state.copyWith(isLoading: true);
-    final db = await DatabaseService().database;
-    final List<Map<String, dynamic>> maps = await db.query(
+    final adapter = await DatabaseService().database;
+    final List<Map<String, dynamic>> maps = await adapter.query(
       'body_metrics',
       orderBy: 'date ASC', // Ascending for graphs
     );
@@ -48,7 +48,7 @@ class ProgressNotifier extends StateNotifier<ProgressState> {
     required double bodyFatPercentage,
     String? imagePath,
   }) async {
-    final db = await DatabaseService().database;
+    final adapter = await DatabaseService().database;
     final newMetrics = BodyMetrics(
       id: const Uuid().v4(),
       weight: weight,
@@ -58,13 +58,13 @@ class ProgressNotifier extends StateNotifier<ProgressState> {
       date: DateTime.now(),
     );
 
-    await db.insert('body_metrics', newMetrics.toMap());
+    await adapter.insert('body_metrics', newMetrics.toMap());
     await _loadMetrics();
   }
 
   Future<void> deleteMetrics(String id) async {
-    final db = await DatabaseService().database;
-    await db.delete('body_metrics', where: 'id = ?', whereArgs: [id]);
+    final adapter = await DatabaseService().database;
+    await adapter.delete('body_metrics', where: 'id = ?', whereArgs: [id]);
     await _loadMetrics();
   }
 }

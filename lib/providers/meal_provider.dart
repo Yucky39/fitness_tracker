@@ -77,11 +77,11 @@ class MealNotifier extends StateNotifier<MealState> {
   }
 
   Future<void> _loadItemsForDate(DateTime date) async {
-    final db = await DatabaseService().database;
+    final adapter = await DatabaseService().database;
     final startOfDay = DateTime(date.year, date.month, date.day).toIso8601String();
     final endOfDay = DateTime(date.year, date.month, date.day, 23, 59, 59).toIso8601String();
 
-    final List<Map<String, dynamic>> maps = await db.query(
+    final List<Map<String, dynamic>> maps = await adapter.query(
       'food_items',
       where: 'date BETWEEN ? AND ?',
       whereArgs: [startOfDay, endOfDay],
@@ -93,8 +93,8 @@ class MealNotifier extends StateNotifier<MealState> {
   }
 
   Future<void> _loadRecentFoods() async {
-    final db = await DatabaseService().database;
-    final List<Map<String, dynamic>> maps = await db.query(
+    final adapter = await DatabaseService().database;
+    final List<Map<String, dynamic>> maps = await adapter.query(
       'food_items',
       orderBy: 'date DESC',
       limit: 200,
@@ -145,7 +145,7 @@ class MealNotifier extends StateNotifier<MealState> {
     required double fat,
     required double carbs,
   }) async {
-    final db = await DatabaseService().database;
+    final adapter = await DatabaseService().database;
     final now = DateTime.now();
     final selectedDate = state.selectedDate;
     final newItem = FoodItem(
@@ -165,14 +165,14 @@ class MealNotifier extends StateNotifier<MealState> {
       ),
     );
 
-    await db.insert('food_items', newItem.toMap());
+    await adapter.insert('food_items', newItem.toMap());
     await _loadItemsForDate(state.selectedDate);
     await _loadRecentFoods();
   }
 
   Future<void> deleteFoodItem(String id) async {
-    final db = await DatabaseService().database;
-    await db.delete('food_items', where: 'id = ?', whereArgs: [id]);
+    final adapter = await DatabaseService().database;
+    await adapter.delete('food_items', where: 'id = ?', whereArgs: [id]);
     await _loadItemsForDate(state.selectedDate);
     await _loadRecentFoods();
   }
