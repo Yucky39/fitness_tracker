@@ -3,7 +3,25 @@
     "allow": [
       "Bash(gh auth:*)",
       "Bash(git init:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(gh api:*)",
+      "Bash(git config:*)",
+      "Bash(gh repo:*)",
+      "Bash(flutter build:*)",
+      "Bash(vercel whoami:*)",
+      "Bash(git push:*)",
+      "Bash(flutter pub:*)",
+      "Bash(export PATH=\"$PATH\":\"$HOME/.pub-cache/bin\")",
+      "Bash(flutterfire --version)",
+      "Read(//Users/yucky/**)",
+      "Bash(export PATH=\"$PATH:$HOME/.pub-cache/bin\")",
+      "Bash(flutterfire configure:*)",
+      "Bash(flutter analyze:*)",
+      "Bash(pod install:*)"
+    ],
+    "additionalDirectories": [
+      "/Users/yucky"
     ]
   }
 }

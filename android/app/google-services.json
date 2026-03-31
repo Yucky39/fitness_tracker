@@ -1,0 +1,127 @@
+{
+  "project_info": {
+    "project_number": "933856956733",
+    "firebase_url": "https://hello-963d5.firebaseio.com",
+    "project_id": "hello-963d5",
+    "storage_bucket": "hello-963d5.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:933856956733:android:ef7f0c4d32e736ee48b554",
+        "android_client_info": {
+          "package_name": "com.aigis.aigis"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "933856956733-82r5j3p95kt5rfadl7ebu8ovf33mqd9j.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDwN8S5gqRCUVvI2_2BxhP8AKErc7Zg5BM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "933856956733-4bnb4ke88tg3uk9u1khorm41ui82v69g.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "933856956733-avltfivmlmrii4f8561ea32h1jptd6jj.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.aigis.aigis"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:933856956733:android:f3f011f60713e4f048b554",
+        "android_client_info": {
+          "package_name": "com.aigis.android"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "933856956733-hmgf1bq1661raohe0a63iqu1l1qfn1bq.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.aigis.android",
+            "certificate_hash": "b95aac4b35e600fb298147ace9e5beea1013a18b"
+          }
+        },
+        {
+          "client_id": "933856956733-82r5j3p95kt5rfadl7ebu8ovf33mqd9j.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDwN8S5gqRCUVvI2_2BxhP8AKErc7Zg5BM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "933856956733-4bnb4ke88tg3uk9u1khorm41ui82v69g.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "933856956733-avltfivmlmrii4f8561ea32h1jptd6jj.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.aigis.aigis"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:933856956733:android:e2e2b2831e81823d48b554",
+        "android_client_info": {
+          "package_name": "com.example.fitness_tracker"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "933856956733-82r5j3p95kt5rfadl7ebu8ovf33mqd9j.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDwN8S5gqRCUVvI2_2BxhP8AKErc7Zg5BM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "933856956733-4bnb4ke88tg3uk9u1khorm41ui82v69g.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "933856956733-avltfivmlmrii4f8561ea32h1jptd6jj.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.aigis.aigis"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

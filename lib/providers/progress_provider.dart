@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import '../models/body_metrics.dart';
 import '../services/database_service.dart';
+import '../services/sync_service.dart';
 
 class ProgressState {
   final List<BodyMetrics> metrics;
@@ -59,12 +60,14 @@ class ProgressNotifier extends StateNotifier<ProgressState> {
     );
 
     await adapter.insert('body_metrics', newMetrics.toMap());
+    SyncService().syncRecord('body_metrics', newMetrics.toMap());
     await _loadMetrics();
   }
 
   Future<void> deleteMetrics(String id) async {
     final adapter = await DatabaseService().database;
     await adapter.delete('body_metrics', where: 'id = ?', whereArgs: [id]);
+    SyncService().deleteRecord('body_metrics', id);
     await _loadMetrics();
   }
 }

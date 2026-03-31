@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import '../models/training_log.dart';
 import '../services/database_service.dart';
+import '../services/sync_service.dart';
 
 class TrainingState {
   final List<TrainingLog> logs;
@@ -64,12 +65,14 @@ class TrainingNotifier extends StateNotifier<TrainingState> {
     );
 
     await adapter.insert('training_logs', newLog.toMap());
+    SyncService().syncRecord('training_logs', newLog.toMap());
     await _loadLogs();
   }
 
   Future<void> deleteLog(String id) async {
     final adapter = await DatabaseService().database;
     await adapter.delete('training_logs', where: 'id = ?', whereArgs: [id]);
+    SyncService().deleteRecord('training_logs', id);
     await _loadLogs();
   }
 

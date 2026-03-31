@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 import '../models/food_item.dart';
 import '../services/database_service.dart';
+import '../services/sync_service.dart';
 
 class MealState {
   final List<FoodItem> todayItems;
@@ -166,6 +167,7 @@ class MealNotifier extends StateNotifier<MealState> {
     );
 
     await adapter.insert('food_items', newItem.toMap());
+    SyncService().syncRecord('food_items', newItem.toMap());
     await _loadItemsForDate(state.selectedDate);
     await _loadRecentFoods();
   }
@@ -173,6 +175,7 @@ class MealNotifier extends StateNotifier<MealState> {
   Future<void> deleteFoodItem(String id) async {
     final adapter = await DatabaseService().database;
     await adapter.delete('food_items', where: 'id = ?', whereArgs: [id]);
+    SyncService().deleteRecord('food_items', id);
     await _loadItemsForDate(state.selectedDate);
     await _loadRecentFoods();
   }
