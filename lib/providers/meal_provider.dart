@@ -61,10 +61,13 @@ class MealNotifier extends StateNotifier<MealState> {
 
   Future<void> _loadData() async {
     state = state.copyWith(isLoading: true);
-    await _loadGoals();
-    await _loadItemsForDate(state.selectedDate);
-    await _loadRecentFoods();
-    state = state.copyWith(isLoading: false);
+    try {
+      await _loadGoals();
+      await _loadItemsForDate(state.selectedDate);
+      await _loadRecentFoods();
+    } finally {
+      state = state.copyWith(isLoading: false);
+    }
   }
 
   Future<void> _loadGoals() async {

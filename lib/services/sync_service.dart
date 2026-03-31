@@ -59,7 +59,9 @@ class SyncService {
 
       for (final doc in snapshot.docs) {
         if (!localIds.contains(doc.id)) {
-          await adapter.insert(table, doc.data() as Map<String, dynamic>);
+          final row = Map<String, dynamic>.from(doc.data() as Map);
+          row['id'] ??= doc.id;
+          await adapter.insert(table, row);
         }
       }
     }
