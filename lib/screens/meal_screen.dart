@@ -1,9 +1,12 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import '../providers/advice_provider.dart';
 import '../providers/meal_provider.dart';
 import '../providers/settings_provider.dart';
+import '../services/meal_image_analysis_service.dart';
 import '../widgets/nutrient_bar.dart';
 
 class MealScreen extends ConsumerWidget {
@@ -42,7 +45,7 @@ class MealScreen extends ConsumerWidget {
               ),
             ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () => _showAddFoodDialog(context, mealState, mealNotifier),
+        onPressed: () => _showAddMethodSheet(context, ref, mealState, mealNotifier),
         child: const Icon(Icons.add),
       ),
     );
@@ -583,5 +586,359 @@ class MealScreen extends ConsumerWidget {
         },
       ),
     );
+  }
+
+  // ── Add-method selection ──────────────────────────────────────────────────
+
+  void _showAddMethodSheet(
+    BuildContext context,
+    WidgetRef ref,
+    MealState mealState,
+    MealNotifier notifier,
+  ) {
+    showModalBottomSheet(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.edit_note),
+                title: const Text('手動で入力'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _showAddFoodDialog(context, mealState, notifier);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.camera_alt),
+                title: const Text('写真で自動分析'),
+                subtitle: const Text('AIが食事内容を認識してPFC・栄養素を自動入力します'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _showPhotoAnalysisDialog(context, ref, notifier);
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showPhotoAnalysisDialog(
+    BuildContext context,
+    WidgetRef ref,
+    MealNotifier notifier,
+  ) async {
+    final settings = ref.read(settingsProvider);
+
+    final source = await showDialog<ImageSource>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('写真を選択'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.camera_alt),
+              title: const Text('カメラで撮影'),
+              onTap: () => Navigator.pop(ctx, ImageSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library),
+              title: const Text('ギャラリーから選択'),
+              onTap: () => Navigator.pop(ctx, ImageSource.gallery),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (source == null || !context.mounted) return;
+
+    XFile? xFile;
+    try {
+      xFile = await ImagePicker().pickImage(
+        source: source,
+        maxWidth: 1024,
+        maxHeight: 1024,
+        imageQuality: 85,
+      );
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('画像の取得に失敗しました: $e')),
+        );
+      }
+      return;
+    }
+
+    if (xFile == null || !context.mounted) return;
+
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => _PhotoAnalysisDialog(
+        imageFile: xFile!,
+        apiKey: settings.currentApiKey,
+        provider: settings.selectedProvider,
+        onAdd: (items) {
+          for (final item in items) {
+            notifier.addFoodItem(
+              name: item.amount.isNotEmpty
+                  ? '${item.name}（${item.amount}）'
+                  : item.name,
+              calories: item.calories,
+              protein: item.protein,
+              fat: item.fat,
+              carbs: item.carbs,
+            );
+          }
+        },
+      ),
+    );
+  }
+}
+
+// ── Photo Analysis Dialog ─────────────────────────────────────────────────
+
+class _PhotoAnalysisDialog extends StatefulWidget {
+  final XFile imageFile;
+  final String apiKey;
+  final AiProviderType provider;
+  final void Function(List<AnalyzedFoodItem> items) onAdd;
+
+  const _PhotoAnalysisDialog({
+    required this.imageFile,
+    required this.apiKey,
+    required this.provider,
+    required this.onAdd,
+  });
+
+  @override
+  State<_PhotoAnalysisDialog> createState() => _PhotoAnalysisDialogState();
+}
+
+class _PhotoAnalysisDialogState extends State<_PhotoAnalysisDialog> {
+  bool _isLoading = true;
+  String? _error;
+  List<AnalyzedFoodItem> _items = [];
+  Uint8List? _imageBytes;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAndAnalyze();
+  }
+
+  Future<void> _loadAndAnalyze() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+    try {
+      final bytes = _imageBytes ?? await widget.imageFile.readAsBytes();
+      if (_imageBytes == null && mounted) {
+        setState(() => _imageBytes = bytes);
+      }
+
+      final items = await MealImageAnalysisService().analyzeImage(
+        imageBytes: bytes,
+        filePath: widget.imageFile.path,
+        apiKey: widget.apiKey,
+        provider: widget.provider,
+      );
+
+      if (mounted) {
+        setState(() {
+          _items = items;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = e.toString().replaceAll('Exception: ', '');
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('写真で食事を記録'),
+      content: SizedBox(
+        width: double.maxFinite,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (_imageBytes != null)
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Image.memory(
+                  _imageBytes!,
+                  height: 130,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                ),
+              ),
+            const SizedBox(height: 12),
+            _buildBody(),
+          ],
+        ),
+      ),
+      actions: _buildActions(context),
+    );
+  }
+
+  Widget _buildBody() {
+    if (_isLoading) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 24),
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(height: 12),
+              Text('AIが食事内容を分析中...', style: TextStyle(color: Colors.grey)),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (_error != null) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Column(
+          children: [
+            const Icon(Icons.error_outline, color: Colors.red, size: 40),
+            const SizedBox(height: 8),
+            Text(
+              _error!,
+              style: const TextStyle(color: Colors.red, fontSize: 13),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (_items.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 8),
+        child: Text('食品を検出できませんでした。別の写真でお試しください。'),
+      );
+    }
+
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxHeight: 320),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              '${_items.length}品目を検出しました',
+              style: const TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+            const SizedBox(height: 4),
+            ..._items.map(_buildItemTile),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildItemTile(AnalyzedFoodItem item) {
+    return Card(
+      margin: const EdgeInsets.symmetric(vertical: 3),
+      child: CheckboxListTile(
+        value: item.selected,
+        onChanged: (v) => setState(() => item.selected = v ?? false),
+        controlAffinity: ListTileControlAffinity.leading,
+        title: Row(
+          children: [
+            Expanded(
+              child: Text(
+                item.name,
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+              ),
+            ),
+            Text(
+              '${item.calories} kcal',
+              style: const TextStyle(fontSize: 13),
+            ),
+          ],
+        ),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (item.amount.isNotEmpty)
+              Text(
+                item.amount,
+                style: const TextStyle(color: Colors.grey, fontSize: 11),
+              ),
+            Text(
+              'P: ${item.protein}g  F: ${item.fat}g  C: ${item.carbs}g',
+              style: const TextStyle(fontSize: 12),
+            ),
+            if (item.sugar > 0 || item.fiber > 0 || item.sodium > 0)
+              Text(
+                '糖質: ${item.sugar}g  食物繊維: ${item.fiber}g  Na: ${item.sodium.toInt()}mg',
+                style: const TextStyle(fontSize: 11, color: Colors.grey),
+              ),
+          ],
+        ),
+        isThreeLine: true,
+      ),
+    );
+  }
+
+  List<Widget> _buildActions(BuildContext context) {
+    if (_isLoading) {
+      return [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('キャンセル'),
+        ),
+      ];
+    }
+
+    if (_error != null) {
+      return [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('キャンセル'),
+        ),
+        TextButton(
+          onPressed: _loadAndAnalyze,
+          child: const Text('再試行'),
+        ),
+      ];
+    }
+
+    final selected = _items.where((i) => i.selected).toList();
+    return [
+      TextButton(
+        onPressed: () => Navigator.pop(context),
+        child: const Text('キャンセル'),
+      ),
+      TextButton(
+        onPressed: selected.isEmpty
+            ? null
+            : () {
+                widget.onAdd(selected);
+                Navigator.pop(context);
+              },
+        child: Text('${selected.length}品目を追加'),
+      ),
+    ];
   }
 }
