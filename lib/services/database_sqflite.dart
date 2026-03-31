@@ -14,7 +14,7 @@ class SqfliteDatabaseAdapter implements DatabaseAdapter {
 
     _database = await openDatabase(
       path,
-      version: 3,
+      version: 4,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -36,6 +36,10 @@ class SqfliteDatabaseAdapter implements DatabaseAdapter {
           created_at TEXT
         )
       ''');
+    }
+    if (oldVersion < 4) {
+      await db.execute(
+          "ALTER TABLE training_logs ADD COLUMN exercise_type TEXT DEFAULT 'free_weight'");
     }
   }
 
@@ -60,6 +64,7 @@ class SqfliteDatabaseAdapter implements DatabaseAdapter {
       CREATE TABLE training_logs(
         id TEXT PRIMARY KEY,
         exerciseName TEXT,
+        exercise_type TEXT DEFAULT 'free_weight',
         weight REAL,
         reps INTEGER,
         sets INTEGER,

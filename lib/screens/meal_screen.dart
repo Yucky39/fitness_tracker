@@ -1,19 +1,28 @@
+import 'dart:math' show max;
 import 'dart:typed_data';
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import '../models/energy_profile.dart';
 import '../models/food_item.dart';
 import '../models/meal_preset.dart';
 import '../providers/advice_provider.dart';
+import '../providers/energy_profile_provider.dart';
 import '../providers/meal_provider.dart';
+import '../providers/nutrition_trend_provider.dart';
 import '../providers/preset_provider.dart';
 import '../providers/settings_provider.dart';
 import '../services/barcode_lookup_service.dart';
+import '../services/energy_goal_calculator.dart';
 import '../services/meal_image_analysis_service.dart';
 import '../widgets/nutrient_bar.dart';
+
+// View-mode toggle: false = grouped list, true = timeline
+final _timelineViewProvider = StateProvider<bool>((ref) => false);
 
 class MealScreen extends ConsumerWidget {
   const MealScreen({super.key});
@@ -43,7 +52,9 @@ class MealScreen extends ConsumerWidget {
                   _buildDateNavigation(context, mealState, mealNotifier),
                   const SizedBox(height: 16),
                   _buildSummaryCard(context, mealState),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 8),
+                  _buildTrendCard(context, ref, mealState),
+                  const SizedBox(height: 8),
                   _buildAdviceCard(context, ref, mealState),
                   const SizedBox(height: 8),
                   _buildFoodList(context, ref, mealState, mealNotifier),
@@ -212,6 +223,143 @@ class MealScreen extends ConsumerWidget {
     );
   }
 
+  // ── Weekly calorie trend card ───────────────────────────────────────────────
+
+  Widget _buildTrendCard(BuildContext context, WidgetRef ref, MealState mealState) {
+    final trendAsync = ref.watch(nutritionTrendProvider);
+
+    return trendAsync.when(
+      loading: () => const SizedBox.shrink(),
+      error: (_, __) => const SizedBox.shrink(),
+      data: (summaries) {
+        // Only show last 7 days
+        final last7 = summaries.length >= 7
+            ? summaries.sublist(summaries.length - 7)
+            : summaries;
+
+        // Hide card when there is no data at all
+        if (last7.every((s) => s.calories == 0)) return const SizedBox.shrink();
+
+        final maxCal = last7
+            .map((s) => s.calories.toDouble())
+            .fold(0.0, max)
+            .clamp(mealState.calorieGoal * 0.5, double.infinity) *
+            1.25;
+
+        return Card(
+          elevation: 2,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.bar_chart, color: Colors.indigo, size: 20),
+                    const SizedBox(width: 8),
+                    const Expanded(
+                      child: Text(
+                        '週間カロリートレンド',
+                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                    Text(
+                      '目標 ${mealState.calorieGoal} kcal',
+                      style: const TextStyle(fontSize: 11, color: Colors.grey),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  height: 130,
+                  child: BarChart(
+                    BarChartData(
+                      maxY: maxCal,
+                      barTouchData: BarTouchData(
+                        touchTooltipData: BarTouchTooltipData(
+                          getTooltipItem: (group, _, rod, __) {
+                            final cal = rod.toY.toInt();
+                            return BarTooltipItem(
+                              '$cal kcal',
+                              const TextStyle(color: Colors.white, fontSize: 12),
+                            );
+                          },
+                        ),
+                      ),
+                      barGroups: last7.asMap().entries.map((e) {
+                        final i = e.key;
+                        final s = e.value;
+                        final isToday = i == last7.length - 1;
+                        final over = s.calories > mealState.calorieGoal;
+                        return BarChartGroupData(
+                          x: i,
+                          barRods: [
+                            BarChartRodData(
+                              toY: s.calories.toDouble(),
+                              color: s.calories == 0
+                                  ? Colors.grey.shade200
+                                  : over
+                                      ? Colors.red.withValues(alpha: isToday ? 1.0 : 0.7)
+                                      : Colors.indigo.withValues(alpha: isToday ? 1.0 : 0.7),
+                              width: 22,
+                              borderRadius:
+                                  const BorderRadius.vertical(top: Radius.circular(4)),
+                            ),
+                          ],
+                        );
+                      }).toList(),
+                      titlesData: FlTitlesData(
+                        bottomTitles: AxisTitles(
+                          sideTitles: SideTitles(
+                            showTitles: true,
+                            reservedSize: 22,
+                            getTitlesWidget: (value, _) {
+                              final i = value.toInt();
+                              if (i < 0 || i >= last7.length) return const Text('');
+                              final isToday = i == last7.length - 1;
+                              return Text(
+                                isToday ? '今日' : DateFormat('M/d').format(last7[i].date),
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight:
+                                      isToday ? FontWeight.bold : FontWeight.normal,
+                                  color: isToday ? Colors.indigo : Colors.grey,
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                        leftTitles:
+                            const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                        topTitles:
+                            const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                        rightTitles:
+                            const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                      ),
+                      gridData: const FlGridData(show: false),
+                      borderData: FlBorderData(show: false),
+                      extraLinesData: ExtraLinesData(
+                        horizontalLines: [
+                          HorizontalLine(
+                            y: mealState.calorieGoal.toDouble(),
+                            color: Colors.red.withValues(alpha: 0.5),
+                            strokeWidth: 1.5,
+                            dashArray: [6, 4],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   Widget _microNutrientChip(String label, String value, Color color) {
     return Column(
       children: [
@@ -320,7 +468,9 @@ class MealScreen extends ConsumerWidget {
       );
     }
 
-    // Group by meal type in display order
+    final isTimeline = ref.watch(_timelineViewProvider);
+
+    // Group by meal type in display order (used only in list mode)
     final grouped = <MealType, List<FoodItem>>{};
     for (final item in state.todayItems) {
       grouped.putIfAbsent(item.mealType, () => []).add(item);
@@ -329,12 +479,39 @@ class MealScreen extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        for (final type in MealType.values)
-          if (grouped.containsKey(type)) ...[
-            _buildMealTypeHeader(type, grouped[type]!),
-            for (final item in grouped[type]!)
-              _buildFoodTile(context, item, state, notifier),
+        // ── View toggle header ─────────────────────────────────────────
+        Row(
+          children: [
+            Text(
+              '今日の食事 (${state.todayItems.length}品目)',
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+            ),
+            const Spacer(),
+            Tooltip(
+              message: isTimeline ? 'グループ表示に切替' : 'タイムライン表示に切替',
+              child: IconButton(
+                icon: Icon(
+                  isTimeline ? Icons.view_list_outlined : Icons.view_timeline_outlined,
+                  size: 20,
+                ),
+                onPressed: () =>
+                    ref.read(_timelineViewProvider.notifier).state = !isTimeline,
+              ),
+            ),
           ],
+        ),
+
+        if (isTimeline) ...[
+          _buildTimelineView(context, state, notifier),
+        ] else ...[
+          for (final type in MealType.values)
+            if (grouped.containsKey(type)) ...[
+              _buildMealTypeHeader(type, grouped[type]!),
+              for (final item in grouped[type]!)
+                _buildFoodTile(context, item, state, notifier),
+            ],
+        ],
+
         // Save preset button
         const SizedBox(height: 12),
         Center(
@@ -345,6 +522,171 @@ class MealScreen extends ConsumerWidget {
           ),
         ),
       ],
+    );
+  }
+
+  // ── Timeline view ──────────────────────────────────────────────────────────
+
+  Widget _buildTimelineView(
+      BuildContext context, MealState state, MealNotifier notifier) {
+    final sorted = List<FoodItem>.from(state.todayItems)
+      ..sort((a, b) => a.date.compareTo(b.date));
+
+    return Column(
+      children: List.generate(sorted.length, (i) {
+        final item = sorted[i];
+        final isLast = i == sorted.length - 1;
+        return IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Time column
+              SizedBox(
+                width: 44,
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 14),
+                  child: Text(
+                    DateFormat('HH:mm').format(item.date),
+                    style: const TextStyle(fontSize: 11, color: Colors.grey),
+                    textAlign: TextAlign.right,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              // Timeline line + dot
+              Column(
+                children: [
+                  if (i > 0)
+                    Container(width: 1.5, height: 14, color: Colors.grey.shade300),
+                  Container(
+                    width: 10,
+                    height: 10,
+                    decoration: BoxDecoration(
+                      color: Colors.indigo.withValues(alpha: 0.8),
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  if (!isLast)
+                    Expanded(
+                        child: Container(width: 1.5, color: Colors.grey.shade300)),
+                ],
+              ),
+              const SizedBox(width: 10),
+              // Content
+              Expanded(
+                child: GestureDetector(
+                  onTap: () => _showFoodDialog(
+                    context: context,
+                    mealState: state,
+                    notifier: notifier,
+                    existingItem: item,
+                  ),
+                  child: Padding(
+                    padding: EdgeInsets.only(bottom: isLast ? 0 : 12, top: 4),
+                    child: Card(
+                      margin: EdgeInsets.zero,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 8),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 5, vertical: 1),
+                                        decoration: BoxDecoration(
+                                          color: Colors.indigo
+                                              .withValues(alpha: 0.1),
+                                          borderRadius:
+                                              BorderRadius.circular(4),
+                                        ),
+                                        child: Text(
+                                          item.mealType.label,
+                                          style: const TextStyle(
+                                              fontSize: 10,
+                                              color: Colors.indigo),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Expanded(
+                                        child: Text(
+                                          item.name,
+                                          style: const TextStyle(
+                                              fontWeight: FontWeight.w600,
+                                              fontSize: 14),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    'P: ${item.protein}g  F: ${item.fat}g  C: ${item.carbs}g',
+                                    style: const TextStyle(
+                                        fontSize: 11, color: Colors.grey),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                Text('${item.calories}',
+                                    style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 15)),
+                                const Text('kcal',
+                                    style: TextStyle(
+                                        fontSize: 10, color: Colors.grey)),
+                              ],
+                            ),
+                            const SizedBox(width: 4),
+                            IconButton(
+                              icon: const Icon(Icons.delete_outline,
+                                  size: 18, color: Colors.red),
+                              constraints: const BoxConstraints(
+                                  minWidth: 32, minHeight: 32),
+                              padding: EdgeInsets.zero,
+                              onPressed: () async {
+                                final ok = await showDialog<bool>(
+                                  context: context,
+                                  builder: (_) => AlertDialog(
+                                    title: const Text('削除の確認'),
+                                    content:
+                                        Text('「${item.name}」を削除しますか？'),
+                                    actions: [
+                                      TextButton(
+                                          onPressed: () =>
+                                              Navigator.pop(_, false),
+                                          child: const Text('キャンセル')),
+                                      TextButton(
+                                          onPressed: () =>
+                                              Navigator.pop(_, true),
+                                          child: const Text('削除',
+                                              style: TextStyle(
+                                                  color: Colors.red))),
+                                    ],
+                                  ),
+                                );
+                                if (ok == true) notifier.deleteFoodItem(item.id);
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      }),
     );
   }
 
@@ -448,10 +790,26 @@ class MealScreen extends ConsumerWidget {
     MealState state,
     MealNotifier notifier,
   ) {
+    final ep = ref.read(energyProfileProvider);
+    var dialogSex = ep.sex;
+    var dialogActivity = ep.activityLevel;
+    ComputedNutritionGoals? lastComputed;
+
     final calorieController = TextEditingController(text: state.calorieGoal.toString());
     final proteinController = TextEditingController(text: state.proteinGoal.toString());
     final fatController = TextEditingController(text: state.fatGoal.toString());
     final carbsController = TextEditingController(text: state.carbsGoal.toString());
+
+    final ageController =
+        TextEditingController(text: ep.age > 0 ? ep.age.toString() : '');
+    final heightController =
+        TextEditingController(text: ep.heightCm > 0 ? ep.heightCm.toString() : '');
+    final weightController =
+        TextEditingController(text: ep.weightKg > 0 ? ep.weightKg.toString() : '');
+    final targetWeightController =
+        TextEditingController(text: ep.targetWeightKg > 0 ? ep.targetWeightKg.toString() : '');
+    final weeksController =
+        TextEditingController(text: ep.goalWeeks > 0 ? ep.goalWeeks.toString() : '12');
 
     final initialSettings = ref.read(settingsProvider);
     final anthropicKeyCtrl = TextEditingController(text: initialSettings.anthropicApiKey);
@@ -492,7 +850,195 @@ class MealScreen extends ConsumerWidget {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('栄養目標', style: TextStyle(fontWeight: FontWeight.bold)),
+                  const Text('カロリー目標の算出',
+                      style: TextStyle(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 6),
+                  Text(
+                    '身長・体重・年齢・性別から基礎代謝（Mifflin–St Jeor）、活動量から1日の推定消費カロリー（TDEE）を求め、目標体重までの期間に応じて1日の摂取目標を割り出します（体重1kgあたり約${EnergyGoalCalculator.kcalPerKgBodyChange.toInt()}kcal換算）。',
+                    style: TextStyle(fontSize: 11, color: Colors.grey[700], height: 1.35),
+                  ),
+                  const SizedBox(height: 10),
+                  const Text('性別', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                  const SizedBox(height: 4),
+                  Wrap(
+                    spacing: 8,
+                    children: BiologicalSex.values.map((s) {
+                      return ChoiceChip(
+                        label: Text(s.label),
+                        selected: dialogSex == s,
+                        onSelected: (_) => setDialogState(() => dialogSex = s),
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: ageController,
+                    decoration: const InputDecoration(labelText: '年齢（歳）'),
+                    keyboardType: TextInputType.number,
+                  ),
+                  TextField(
+                    controller: heightController,
+                    decoration: const InputDecoration(labelText: '身長 (cm)'),
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  ),
+                  TextField(
+                    controller: weightController,
+                    decoration: const InputDecoration(labelText: '現在の体重 (kg)'),
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  ),
+                  TextField(
+                    controller: targetWeightController,
+                    decoration: const InputDecoration(labelText: '目標体重 (kg)'),
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  ),
+                  TextField(
+                    controller: weeksController,
+                    decoration: const InputDecoration(
+                      labelText: '達成までの期間（週）',
+                      helperText: '例：12週 ≒ 約3か月',
+                    ),
+                    keyboardType: TextInputType.number,
+                  ),
+                  const SizedBox(height: 8),
+                  const Text('1日の活動レベル',
+                      style: TextStyle(fontSize: 12, color: Colors.grey)),
+                  const SizedBox(height: 4),
+                  DropdownButtonFormField<ActivityLevel>(
+                    value: dialogActivity,
+                    decoration: const InputDecoration(
+                      border: OutlineInputBorder(),
+                      contentPadding:
+                          EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    ),
+                    isExpanded: true,
+                    items: ActivityLevel.values.map((e) {
+                      return DropdownMenuItem(
+                        value: e,
+                        child: Text(e.label, style: const TextStyle(fontSize: 13)),
+                      );
+                    }).toList(),
+                    onChanged: (v) {
+                      if (v != null) setDialogState(() => dialogActivity = v);
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  FilledButton.icon(
+                    icon: const Icon(Icons.calculate_outlined, size: 20),
+                    label: const Text('この条件で栄養目標を自動計算'),
+                    onPressed: () {
+                      if (dialogSex == null) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('性別を選択してください')),
+                        );
+                        return;
+                      }
+                      final age = int.tryParse(ageController.text);
+                      final height = double.tryParse(heightController.text);
+                      final weight = double.tryParse(weightController.text);
+                      final targetW = double.tryParse(targetWeightController.text);
+                      final weeks = int.tryParse(weeksController.text);
+                      if (age == null || age <= 0 || age > 120) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('有効な年齢を入力してください')),
+                        );
+                        return;
+                      }
+                      if (height == null || height < 50 || height > 250) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('身長は50〜250cmの範囲で入力してください')),
+                        );
+                        return;
+                      }
+                      if (weight == null || weight < 20 || weight > 300) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('現在体重は20〜300kgの範囲で入力してください')),
+                        );
+                        return;
+                      }
+                      if (targetW == null || targetW < 20 || targetW > 300) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('目標体重は20〜300kgの範囲で入力してください')),
+                        );
+                        return;
+                      }
+                      if (weeks == null || weeks < 1 || weeks > 520) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                              content: Text('達成期間は1〜520週の範囲で入力してください')),
+                        );
+                        return;
+                      }
+                      final profile = EnergyProfile(
+                        sex: dialogSex!,
+                        age: age,
+                        heightCm: height,
+                        weightKg: weight,
+                        targetWeightKg: targetW,
+                        goalWeeks: weeks,
+                        activityLevel: dialogActivity,
+                      );
+                      final result = EnergyGoalCalculator.compute(profile);
+                      calorieController.text = result.calories.toString();
+                      proteinController.text = result.proteinG.toString();
+                      fatController.text = result.fatG.toString();
+                      carbsController.text = result.carbsG.toString();
+                      setDialogState(() => lastComputed = result);
+                      if (result.notes.isNotEmpty && context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(result.notes.first),
+                            duration: const Duration(seconds: 5),
+                          ),
+                        );
+                      }
+                    },
+                  ),
+                  if (lastComputed != null) ...[
+                    const SizedBox(height: 10),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '基礎代謝 ${lastComputed!.bmr.round()} kcal/日 ・ 推定消費（TDEE） ${lastComputed!.tdee.round()} kcal/日',
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            _appliedEnergyBalanceLabel(lastComputed!.appliedDailyDelta),
+                            style: TextStyle(fontSize: 12, color: Colors.grey[800]),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            '理論上の体重変化ペース: 1日あたり約 ${lastComputed!.dailyEnergyBalance.round()} kcal相当',
+                            style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                          ),
+                          if (lastComputed!.notes.isNotEmpty) ...[
+                            const SizedBox(height: 8),
+                            ...lastComputed!.notes.map(
+                              (n) => Padding(
+                                padding: const EdgeInsets.only(bottom: 4),
+                                child: Text(
+                                  n,
+                                  style: const TextStyle(
+                                      fontSize: 11, color: Colors.deepOrange),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 18),
+                  const Text('栄養目標（自動計算後も手動で微調整できます）',
+                      style: TextStyle(fontWeight: FontWeight.bold)),
                   const SizedBox(height: 8),
                   TextField(
                     controller: calorieController,
@@ -586,7 +1132,20 @@ class MealScreen extends ConsumerWidget {
                 child: const Text('キャンセル'),
               ),
               TextButton(
-                onPressed: () {
+                onPressed: () async {
+                  await ref.read(energyProfileProvider.notifier).save(
+                        EnergyProfileState(
+                          sex: dialogSex,
+                          age: int.tryParse(ageController.text) ?? 0,
+                          heightCm: double.tryParse(heightController.text) ?? 0,
+                          weightKg: double.tryParse(weightController.text) ?? 0,
+                          targetWeightKg:
+                              double.tryParse(targetWeightController.text) ?? 0,
+                          goalWeeks: int.tryParse(weeksController.text) ?? 12,
+                          activityLevel: dialogActivity,
+                        ),
+                      );
+                  if (!context.mounted) return;
                   notifier.updateGoals(
                     calories: int.tryParse(calorieController.text) ?? 2000,
                     protein: double.tryParse(proteinController.text) ?? 150,
@@ -602,6 +1161,16 @@ class MealScreen extends ConsumerWidget {
         },
       ),
     );
+  }
+
+  String _appliedEnergyBalanceLabel(int delta) {
+    if (delta.abs() < 8) {
+      return '目標摂取は推定消費とほぼ同水準（体重維持寄り）です';
+    }
+    if (delta > 0) {
+      return '目標摂取は推定消費より +$delta kcal/日（増量寄り）';
+    }
+    return '目標摂取は推定消費より $delta kcal/日（減量寄り）';
   }
 
   String _adviceLevelDescription(String level) {

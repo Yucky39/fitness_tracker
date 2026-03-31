@@ -3,6 +3,7 @@ import 'package:uuid/uuid.dart';
 import '../models/training_log.dart';
 import '../services/database_service.dart';
 import '../services/sync_service.dart';
+import '../services/training_calorie_calculator.dart';
 
 class TrainingState {
   final List<TrainingLog> logs;
@@ -22,6 +23,16 @@ class TrainingState {
       isLoading: isLoading ?? this.isLoading,
     );
   }
+
+  /// 今日のログ
+  List<TrainingLog> get todayLogs {
+    final now = DateTime.now();
+    return logs.where((l) {
+      return l.date.year == now.year &&
+          l.date.month == now.month &&
+          l.date.day == now.day;
+    }).toList();
+  }
 }
 
 class TrainingNotifier extends StateNotifier<TrainingState> {
@@ -36,16 +47,15 @@ class TrainingNotifier extends StateNotifier<TrainingState> {
       'training_logs',
       orderBy: 'date DESC',
     );
-
-
     state = state.copyWith(
-      logs: List.generate(maps.length, (i) => TrainingLog.fromMap(maps[i])),
+      logs: maps.map(TrainingLog.fromMap).toList(),
       isLoading: false,
     );
   }
 
   Future<void> addLog({
     required String exerciseName,
+    required ExerciseType exerciseType,
     required double weight,
     required int reps,
     required int sets,
@@ -56,6 +66,7 @@ class TrainingNotifier extends StateNotifier<TrainingState> {
     final newLog = TrainingLog(
       id: const Uuid().v4(),
       exerciseName: exerciseName,
+      exerciseType: exerciseType,
       weight: weight,
       reps: reps,
       sets: sets,
@@ -63,9 +74,20 @@ class TrainingNotifier extends StateNotifier<TrainingState> {
       note: note,
       date: DateTime.now(),
     );
-
     await adapter.insert('training_logs', newLog.toMap());
     SyncService().syncRecord('training_logs', newLog.toMap());
+    await _loadLogs();
+  }
+
+  Future<void> updateLog(TrainingLog updated) async {
+    final adapter = await DatabaseService().database;
+    await adapter.update(
+      'training_logs',
+      updated.toMap(),
+      where: 'id = ?',
+      whereArgs: [updated.id],
+    );
+    SyncService().syncRecord('training_logs', updated.toMap());
     await _loadLogs();
   }
 
@@ -76,20 +98,67 @@ class TrainingNotifier extends StateNotifier<TrainingState> {
     await _loadLogs();
   }
 
-  // Helper to get previous log for a specific exercise
-  TrainingLog? getPreviousLog(String exerciseName) {
+  /// 指定種目の直近ログ（編集対象以外）
+  TrainingLog? getPreviousLog(String exerciseName, {String? excludeId}) {
     try {
-      // Filter logs for the exercise, exclude today (optional, but "previous" usually means before now)
-      // For simplicity, just find the first one that isn't the one we are about to add (which doesn't exist yet)
-      // Actually, since we just want "last recorded", we can take the first one from the sorted list
-      // that matches the name.
-      return state.logs.firstWhere((log) => log.exerciseName == exerciseName);
-    } catch (e) {
+      return state.logs.firstWhere(
+        (log) =>
+            log.exerciseName == exerciseName &&
+            (excludeId == null || log.id != excludeId),
+      );
+    } catch (_) {
       return null;
     }
   }
+
+  /// 指定種目の自己ベスト (1RM換算: weight × (1 + reps/30))
+  double getBestOneRepMax(String exerciseName, {String? excludeId}) {
+    final candidates = state.logs.where((l) =>
+        l.exerciseName == exerciseName &&
+        (excludeId == null || l.id != excludeId));
+    if (candidates.isEmpty) return 0;
+    return candidates
+        .map((l) => l.weight * (1 + l.reps / 30.0))
+        .reduce((a, b) => a > b ? a : b);
+  }
+
+  /// 指定種目の最大重量
+  double getBestWeight(String exerciseName, {String? excludeId}) {
+    final candidates = state.logs.where((l) =>
+        l.exerciseName == exerciseName &&
+        (excludeId == null || l.id != excludeId));
+    if (candidates.isEmpty) return 0;
+    return candidates.map((l) => l.weight).reduce((a, b) => a > b ? a : b);
+  }
+
+  /// 記録が自己ベスト（最大重量）を更新しているか
+  bool isPersonalRecord(TrainingLog log) {
+    final best = getBestWeight(log.exerciseName, excludeId: log.id);
+    return best > 0 && log.weight >= best;
+  }
+
+  /// 1RM換算値
+  static double oneRepMax(double weight, int reps) {
+    if (reps <= 0 || weight <= 0) return 0;
+    return weight * (1 + reps / 30.0);
+  }
+
+  /// 消費カロリー推定
+  static double estimateCalories(
+    TrainingLog log, {
+    double bodyWeightKg = TrainingCalorieCalculator.defaultBodyWeightKg,
+  }) =>
+      TrainingCalorieCalculator.estimate(
+        weight: log.weight,
+        reps: log.reps,
+        sets: log.sets,
+        intervalSec: log.interval,
+        exerciseType: log.exerciseType,
+        bodyWeightKg: bodyWeightKg,
+      );
 }
 
-final trainingProvider = StateNotifierProvider<TrainingNotifier, TrainingState>((ref) {
+final trainingProvider =
+    StateNotifierProvider<TrainingNotifier, TrainingState>((ref) {
   return TrainingNotifier();
 });

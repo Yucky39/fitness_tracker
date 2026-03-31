@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 enum AiProviderType {
@@ -113,16 +114,40 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
     _load();
   }
 
+  static const _secureStorage = FlutterSecureStorage(
+    aOptions: AndroidOptions(encryptedSharedPreferences: true),
+  );
+
   Future<void> _load() async {
     final prefs = await SharedPreferences.getInstance();
+
+    // Migrate API keys from SharedPreferences → secure storage if needed
+    for (final provider in AiProviderType.values) {
+      final inPrefs = prefs.getString(provider.storageKey) ?? '';
+      if (inPrefs.isNotEmpty) {
+        final inSecure = await _secureStorage.read(key: provider.storageKey);
+        if (inSecure == null || inSecure.isEmpty) {
+          await _secureStorage.write(key: provider.storageKey, value: inPrefs);
+        }
+        await prefs.remove(provider.storageKey);
+      }
+    }
+
+    final anthropicKey =
+        await _secureStorage.read(key: AiProviderType.anthropic.storageKey) ?? '';
+    final openAiKey =
+        await _secureStorage.read(key: AiProviderType.openai.storageKey) ?? '';
+    final geminiKey =
+        await _secureStorage.read(key: AiProviderType.gemini.storageKey) ?? '';
+
     state = SettingsState(
       adviceLevel: prefs.getString('adviceLevel') ?? 'normal',
       selectedProvider: AiProviderType.fromString(
         prefs.getString('selectedAiProvider') ?? 'anthropic',
       ),
-      anthropicApiKey: prefs.getString('anthropicApiKey') ?? '',
-      openAiApiKey: prefs.getString('openAiApiKey') ?? '',
-      geminiApiKey: prefs.getString('geminiApiKey') ?? '',
+      anthropicApiKey: anthropicKey,
+      openAiApiKey: openAiKey,
+      geminiApiKey: geminiKey,
     );
   }
 
@@ -139,8 +164,7 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
   }
 
   Future<void> updateApiKey(AiProviderType provider, String key) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(provider.storageKey, key);
+    await _secureStorage.write(key: provider.storageKey, value: key);
     switch (provider) {
       case AiProviderType.anthropic:
         state = state.copyWith(anthropicApiKey: key);
