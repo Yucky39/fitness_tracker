@@ -68,6 +68,13 @@ class SettingsState {
   final String anthropicApiKey;
   final String openAiApiKey;
   final String geminiApiKey;
+  // Notification settings
+  final bool mealReminderEnabled;
+  final int mealReminderHour;
+  final int mealReminderMinute;
+  final bool workoutReminderEnabled;
+  final int workoutReminderHour;
+  final int workoutReminderMinute;
 
   const SettingsState({
     this.adviceLevel = 'normal',
@@ -75,6 +82,12 @@ class SettingsState {
     this.anthropicApiKey = '',
     this.openAiApiKey = '',
     this.geminiApiKey = '',
+    this.mealReminderEnabled = false,
+    this.mealReminderHour = 12,
+    this.mealReminderMinute = 0,
+    this.workoutReminderEnabled = false,
+    this.workoutReminderHour = 18,
+    this.workoutReminderMinute = 0,
   });
 
   /// Returns the API key for the currently selected provider.
@@ -98,6 +111,12 @@ class SettingsState {
     String? anthropicApiKey,
     String? openAiApiKey,
     String? geminiApiKey,
+    bool? mealReminderEnabled,
+    int? mealReminderHour,
+    int? mealReminderMinute,
+    bool? workoutReminderEnabled,
+    int? workoutReminderHour,
+    int? workoutReminderMinute,
   }) =>
       SettingsState(
         adviceLevel: adviceLevel ?? this.adviceLevel,
@@ -105,6 +124,14 @@ class SettingsState {
         anthropicApiKey: anthropicApiKey ?? this.anthropicApiKey,
         openAiApiKey: openAiApiKey ?? this.openAiApiKey,
         geminiApiKey: geminiApiKey ?? this.geminiApiKey,
+        mealReminderEnabled: mealReminderEnabled ?? this.mealReminderEnabled,
+        mealReminderHour: mealReminderHour ?? this.mealReminderHour,
+        mealReminderMinute: mealReminderMinute ?? this.mealReminderMinute,
+        workoutReminderEnabled:
+            workoutReminderEnabled ?? this.workoutReminderEnabled,
+        workoutReminderHour: workoutReminderHour ?? this.workoutReminderHour,
+        workoutReminderMinute:
+            workoutReminderMinute ?? this.workoutReminderMinute,
       );
 }
 
@@ -123,6 +150,37 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
       anthropicApiKey: prefs.getString('anthropicApiKey') ?? '',
       openAiApiKey: prefs.getString('openAiApiKey') ?? '',
       geminiApiKey: prefs.getString('geminiApiKey') ?? '',
+      mealReminderEnabled: prefs.getBool('mealReminderEnabled') ?? false,
+      mealReminderHour: prefs.getInt('mealReminderHour') ?? 12,
+      mealReminderMinute: prefs.getInt('mealReminderMinute') ?? 0,
+      workoutReminderEnabled: prefs.getBool('workoutReminderEnabled') ?? false,
+      workoutReminderHour: prefs.getInt('workoutReminderHour') ?? 18,
+      workoutReminderMinute: prefs.getInt('workoutReminderMinute') ?? 0,
+    );
+  }
+
+  Future<void> updateNotificationSettings({
+    bool? mealEnabled,
+    int? mealHour,
+    int? mealMinute,
+    bool? workoutEnabled,
+    int? workoutHour,
+    int? workoutMinute,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (mealEnabled != null) await prefs.setBool('mealReminderEnabled', mealEnabled);
+    if (mealHour != null) await prefs.setInt('mealReminderHour', mealHour);
+    if (mealMinute != null) await prefs.setInt('mealReminderMinute', mealMinute);
+    if (workoutEnabled != null) await prefs.setBool('workoutReminderEnabled', workoutEnabled);
+    if (workoutHour != null) await prefs.setInt('workoutReminderHour', workoutHour);
+    if (workoutMinute != null) await prefs.setInt('workoutReminderMinute', workoutMinute);
+    state = state.copyWith(
+      mealReminderEnabled: mealEnabled,
+      mealReminderHour: mealHour,
+      mealReminderMinute: mealMinute,
+      workoutReminderEnabled: workoutEnabled,
+      workoutReminderHour: workoutHour,
+      workoutReminderMinute: workoutMinute,
     );
   }
 

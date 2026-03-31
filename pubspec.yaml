@@ -21,6 +21,10 @@ dependencies:
   http: ^1.2.1
   uuid: ^4.3.3
   cupertino_icons: ^1.0.2
+  flutter_local_notifications: ^17.2.3
+  share_plus: ^10.1.4
+  timezone: ^0.9.4
+  flutter_timezone: ^1.0.9
 
 dev_dependencies:
   flutter_test:

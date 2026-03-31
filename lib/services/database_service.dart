@@ -24,8 +24,9 @@ class DatabaseService {
 
     return await openDatabase(
       path,
-      version: 1,
+      version: 2,
       onCreate: _onCreate,
+      onUpgrade: _onUpgrade,
     );
   }
 
@@ -68,5 +69,28 @@ class DatabaseService {
         date TEXT
       )
     ''');
+
+    // Training Routines Table
+    await db.execute('''
+      CREATE TABLE training_routines(
+        id TEXT PRIMARY KEY,
+        name TEXT,
+        weekdays TEXT,
+        note TEXT
+      )
+    ''');
+  }
+
+  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS training_routines(
+          id TEXT PRIMARY KEY,
+          name TEXT,
+          weekdays TEXT,
+          note TEXT
+        )
+      ''');
+    }
   }
 }
