@@ -27,6 +27,30 @@ class AnalyzedFoodItem {
     this.selected = true,
   });
 
+  AnalyzedFoodItem copyWith({
+    String? name,
+    String? amount,
+    int? calories,
+    double? protein,
+    double? fat,
+    double? carbs,
+    double? sugar,
+    double? fiber,
+    double? sodium,
+  }) =>
+      AnalyzedFoodItem(
+        name: name ?? this.name,
+        amount: amount ?? this.amount,
+        calories: calories ?? this.calories,
+        protein: protein ?? this.protein,
+        fat: fat ?? this.fat,
+        carbs: carbs ?? this.carbs,
+        sugar: sugar ?? this.sugar,
+        fiber: fiber ?? this.fiber,
+        sodium: sodium ?? this.sodium,
+        selected: selected,
+      );
+
   factory AnalyzedFoodItem.fromJson(Map<String, dynamic> json) {
     return AnalyzedFoodItem(
       name: json['name'] as String? ?? '不明な食品',

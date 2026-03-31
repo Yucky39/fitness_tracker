@@ -1,12 +1,17 @@
 import 'dart:typed_data';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
 import '../models/food_item.dart';
+import '../models/meal_preset.dart';
 import '../providers/advice_provider.dart';
 import '../providers/meal_provider.dart';
+import '../providers/preset_provider.dart';
 import '../providers/settings_provider.dart';
+import '../services/barcode_lookup_service.dart';
 import '../services/meal_image_analysis_service.dart';
 import '../widgets/nutrient_bar.dart';
 
@@ -37,11 +42,11 @@ class MealScreen extends ConsumerWidget {
                 children: [
                   _buildDateNavigation(context, mealState, mealNotifier),
                   const SizedBox(height: 16),
-                  _buildSummaryCard(mealState),
+                  _buildSummaryCard(context, mealState),
                   const SizedBox(height: 16),
                   _buildAdviceCard(context, ref, mealState),
                   const SizedBox(height: 8),
-                  _buildFoodList(context, mealState, mealNotifier),
+                  _buildFoodList(context, ref, mealState, mealNotifier),
                   const SizedBox(height: 80),
                 ],
               ),
@@ -112,7 +117,7 @@ class MealScreen extends ConsumerWidget {
 
   // ── Summary card ───────────────────────────────────────────────────────────
 
-  Widget _buildSummaryCard(MealState state) {
+  Widget _buildSummaryCard(BuildContext context, MealState state) {
     return Card(
       elevation: 4,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -137,6 +142,31 @@ class MealScreen extends ConsumerWidget {
                 ),
               ],
             ),
+            if (state.todayItems.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              const Text(
+                '食事タイプ別',
+                style: TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 8,
+                runSpacing: 6,
+                children: [
+                  for (final type in MealType.values)
+                    if ((state.caloriesByMealType[type] ?? 0) > 0)
+                      Chip(
+                        visualDensity: VisualDensity.compact,
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        label: Text(
+                          '${type.label} ${state.caloriesByMealType[type]} kcal',
+                          style: const TextStyle(fontSize: 12),
+                        ),
+                        backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+                      ),
+                ],
+              ),
+            ],
             const SizedBox(height: 16),
             NutrientBar(
               label: 'タンパク質 (P)',
@@ -236,7 +266,7 @@ class MealScreen extends ConsumerWidget {
                       )
                     : IconButton(
                         icon: const Icon(Icons.refresh),
-                        tooltip: 'アドバイスを取得',
+                        tooltip: adviceState.adviceText != null ? '再取得（更新）' : 'アドバイスを取得',
                         onPressed: () => ref.read(adviceProvider.notifier).fetchAdvice(
                               items: mealState.todayItems,
                               date: mealState.selectedDate,
@@ -247,6 +277,7 @@ class MealScreen extends ConsumerWidget {
                               adviceLevel: settings.adviceLevel,
                               apiKey: settings.currentApiKey,
                               provider: settings.selectedProvider,
+                              forceRefresh: true,
                             ),
                       ),
               ],
@@ -277,7 +308,8 @@ class MealScreen extends ConsumerWidget {
 
   // ── Food list grouped by meal type ─────────────────────────────────────────
 
-  Widget _buildFoodList(BuildContext context, MealState state, MealNotifier notifier) {
+  Widget _buildFoodList(
+      BuildContext context, WidgetRef ref, MealState state, MealNotifier notifier) {
     if (state.todayItems.isEmpty) {
       return const Center(
         child: Padding(
@@ -303,6 +335,15 @@ class MealScreen extends ConsumerWidget {
             for (final item in grouped[type]!)
               _buildFoodTile(context, item, state, notifier),
           ],
+        // Save preset button
+        const SizedBox(height: 12),
+        Center(
+          child: OutlinedButton.icon(
+            icon: const Icon(Icons.bookmark_add, size: 18),
+            label: const Text('今日の食事をプリセット保存'),
+            onPressed: () => _showSavePresetDialog(context, ref, state.todayItems),
+          ),
+        ),
       ],
     );
   }
@@ -357,40 +398,43 @@ class MealScreen extends ConsumerWidget {
       ),
       child: Card(
         margin: const EdgeInsets.symmetric(vertical: 3),
-        child: ListTile(
-          onTap: () => _showFoodDialog(
-            context: context,
-            mealState: mealState,
-            notifier: notifier,
-            existingItem: item,
+        child: Tooltip(
+          message: 'タップして編集',
+          child: ListTile(
+            onTap: () => _showFoodDialog(
+              context: context,
+              mealState: mealState,
+              notifier: notifier,
+              existingItem: item,
+            ),
+            title: Text(item.name),
+            subtitle: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('P: ${item.protein}g  F: ${item.fat}g  C: ${item.carbs}g',
+                    style: const TextStyle(fontSize: 12)),
+                if (hasMicro)
+                  Text(
+                    [
+                      if (item.sugar > 0) '糖質: ${item.sugar}g',
+                      if (item.fiber > 0) '食物繊維: ${item.fiber}g',
+                      if (item.sodium > 0) 'Na: ${item.sodium.toInt()}mg',
+                    ].join('  '),
+                    style: const TextStyle(fontSize: 11, color: Colors.grey),
+                  ),
+              ],
+            ),
+            trailing: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text('${item.calories}',
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                const Text('kcal', style: TextStyle(fontSize: 10, color: Colors.grey)),
+              ],
+            ),
+            isThreeLine: hasMicro,
           ),
-          title: Text(item.name),
-          subtitle: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('P: ${item.protein}g  F: ${item.fat}g  C: ${item.carbs}g',
-                  style: const TextStyle(fontSize: 12)),
-              if (hasMicro)
-                Text(
-                  [
-                    if (item.sugar > 0) '糖質: ${item.sugar}g',
-                    if (item.fiber > 0) '食物繊維: ${item.fiber}g',
-                    if (item.sodium > 0) 'Na: ${item.sodium.toInt()}mg',
-                  ].join('  '),
-                  style: const TextStyle(fontSize: 11, color: Colors.grey),
-                ),
-            ],
-          ),
-          trailing: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text('${item.calories}',
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-              const Text('kcal', style: TextStyle(fontSize: 10, color: Colors.grey)),
-            ],
-          ),
-          isThreeLine: hasMicro,
         ),
       ),
     );
@@ -814,12 +858,204 @@ class MealScreen extends ConsumerWidget {
                   _showPhotoAnalysisDialog(context, ref, notifier);
                 },
               ),
+              ListTile(
+                leading: const Icon(Icons.qr_code_scanner),
+                title: const Text('バーコードスキャン'),
+                subtitle: const Text('商品バーコードからOpen Food Factsで栄養素を取得'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _showBarcodeScanSheet(context, ref, mealState, notifier);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.bookmark_outlined),
+                title: const Text('プリセットから追加'),
+                subtitle: const Text('保存済みの食事セットをワンタップで追加'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _showPresetSheet(context, ref, notifier);
+                },
+              ),
             ],
           ),
         ),
       ),
     );
   }
+
+  // ── Barcode scan ───────────────────────────────────────────────────────────
+
+  void _showBarcodeScanSheet(
+    BuildContext context,
+    WidgetRef ref,
+    MealState mealState,
+    MealNotifier notifier,
+  ) {
+    if (kIsWeb) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('バーコードスキャンはWebでは利用できません')),
+      );
+      return;
+    }
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) => _BarcodeScanSheet(
+        onScanned: (barcode) => _handleBarcodeResult(context, ref, mealState, notifier, barcode),
+      ),
+    );
+  }
+
+  Future<void> _handleBarcodeResult(
+    BuildContext context,
+    WidgetRef ref,
+    MealState mealState,
+    MealNotifier notifier,
+    String barcode,
+  ) async {
+    if (!context.mounted) return;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const AlertDialog(
+        content: Padding(
+          padding: EdgeInsets.symmetric(vertical: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(height: 12),
+              Text('商品情報を検索中...'),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    final result = await BarcodeLookupService().lookup(barcode);
+
+    if (!context.mounted) return;
+    Navigator.pop(context); // close loading dialog
+
+    if (result == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('バーコード「$barcode」の商品が見つかりませんでした')),
+      );
+      return;
+    }
+
+    await showDialog(
+      context: context,
+      builder: (_) => _BarcodeResultDialog(
+        result: result,
+        onAdd: ({
+          required String name,
+          required int calories,
+          required double protein,
+          required double fat,
+          required double carbs,
+          required double sugar,
+          required double fiber,
+          required double sodium,
+          required MealType mealType,
+        }) {
+          notifier.addFoodItem(
+            name: name,
+            calories: calories,
+            protein: protein,
+            fat: fat,
+            carbs: carbs,
+            sugar: sugar,
+            fiber: fiber,
+            sodium: sodium,
+            mealType: mealType,
+          );
+        },
+      ),
+    );
+  }
+
+  // ── Preset sheet ───────────────────────────────────────────────────────────
+
+  void _showPresetSheet(
+    BuildContext context,
+    WidgetRef ref,
+    MealNotifier notifier,
+  ) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) => _PresetSheet(
+        onApply: (preset) {
+          for (final item in preset.items) {
+            notifier.addFoodItem(
+              name: item.name,
+              calories: item.calories,
+              protein: item.protein,
+              fat: item.fat,
+              carbs: item.carbs,
+              sugar: item.sugar,
+              fiber: item.fiber,
+              sodium: item.sodium,
+              mealType: item.mealType,
+            );
+          }
+        },
+      ),
+    );
+  }
+
+  void _showSavePresetDialog(
+    BuildContext context,
+    WidgetRef ref,
+    List<FoodItem> items,
+  ) {
+    final nameController = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('プリセットとして保存'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('${items.length}品目・合計${items.fold(0, (s, i) => s + i.calories)} kcal を保存します',
+                style: const TextStyle(fontSize: 13, color: Colors.grey)),
+            const SizedBox(height: 12),
+            TextField(
+              controller: nameController,
+              decoration: const InputDecoration(labelText: 'プリセット名', hintText: '例：いつもの昼食'),
+              autofocus: true,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('キャンセル'),
+          ),
+          TextButton(
+            onPressed: () {
+              if (nameController.text.trim().isEmpty) return;
+              ref.read(presetProvider.notifier).savePreset(
+                    nameController.text.trim(),
+                    items,
+                  );
+              Navigator.pop(ctx);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('「${nameController.text.trim()}」を保存しました')),
+              );
+            },
+            child: const Text('保存'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Photo analysis ─────────────────────────────────────────────────────────
 
   Future<void> _showPhotoAnalysisDialog(
     BuildContext context,
@@ -898,6 +1134,380 @@ class MealScreen extends ConsumerWidget {
   }
 }
 
+// ── Barcode scan sheet ────────────────────────────────────────────────────
+
+class _BarcodeScanSheet extends StatefulWidget {
+  final void Function(String barcode) onScanned;
+  const _BarcodeScanSheet({required this.onScanned});
+
+  @override
+  State<_BarcodeScanSheet> createState() => _BarcodeScanSheetState();
+}
+
+class _BarcodeScanSheetState extends State<_BarcodeScanSheet> {
+  final MobileScannerController _controller = MobileScannerController();
+  bool _scanned = false;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: SizedBox(
+        height: 340,
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: Row(
+                children: [
+                  const Expanded(
+                    child: Text(
+                      'バーコードをスキャン',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: Stack(
+                children: [
+                  MobileScanner(
+                    controller: _controller,
+                    onDetect: (BarcodeCapture capture) {
+                      if (_scanned) return;
+                      final barcode = capture.barcodes.firstOrNull;
+                      if (barcode?.rawValue != null) {
+                        _scanned = true;
+                        Navigator.pop(context);
+                        widget.onScanned(barcode!.rawValue!);
+                      }
+                    },
+                  ),
+                  // Scan frame overlay
+                  Center(
+                    child: Container(
+                      width: 260,
+                      height: 80,
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.green, width: 2.5),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                  ),
+                  const Positioned(
+                    bottom: 12,
+                    left: 0,
+                    right: 0,
+                    child: Text(
+                      'バーコードをフレーム内に合わせてください',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: Colors.white, fontSize: 12),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Barcode result dialog ─────────────────────────────────────────────────
+
+class _BarcodeResultDialog extends StatefulWidget {
+  final BarcodeResult result;
+  final void Function({
+    required String name,
+    required int calories,
+    required double protein,
+    required double fat,
+    required double carbs,
+    required double sugar,
+    required double fiber,
+    required double sodium,
+    required MealType mealType,
+  }) onAdd;
+
+  const _BarcodeResultDialog({required this.result, required this.onAdd});
+
+  @override
+  State<_BarcodeResultDialog> createState() => _BarcodeResultDialogState();
+}
+
+class _BarcodeResultDialogState extends State<_BarcodeResultDialog> {
+  late final TextEditingController _nameController;
+  late final TextEditingController _gramsController;
+  MealType _mealType = MealType.detectFromTime(DateTime.now());
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController = TextEditingController(text: widget.result.name);
+    final defaultGrams = widget.result.defaultServingGrams ?? 100.0;
+    _gramsController = TextEditingController(text: defaultGrams.toStringAsFixed(0));
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _gramsController.dispose();
+    super.dispose();
+  }
+
+  Map<String, num> get _nutrients {
+    final grams = double.tryParse(_gramsController.text) ?? 100.0;
+    return widget.result.forGrams(grams);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('商品が見つかりました'),
+      content: SingleChildScrollView(
+        child: StatefulBuilder(
+          builder: (context, setDialogState) {
+            final n = _nutrients;
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextField(
+                  controller: _nameController,
+                  decoration: const InputDecoration(labelText: '食品名'),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _gramsController,
+                        decoration: const InputDecoration(
+                          labelText: '量 (g)',
+                          suffixText: 'g',
+                        ),
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        onChanged: (_) => setDialogState(() {}),
+                      ),
+                    ),
+                    if (widget.result.defaultServingGrams != null) ...[
+                      const SizedBox(width: 8),
+                      TextButton(
+                        onPressed: () {
+                          _gramsController.text =
+                              widget.result.defaultServingGrams!.toStringAsFixed(0);
+                          setDialogState(() {});
+                        },
+                        child: const Text('1食分'),
+                      ),
+                    ],
+                    const SizedBox(width: 8),
+                    TextButton(
+                      onPressed: () {
+                        _gramsController.text = '100';
+                        setDialogState(() {});
+                      },
+                      child: const Text('100g'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('${n['calories']} kcal',
+                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 4),
+                      Text('P: ${n['protein']}g  F: ${n['fat']}g  C: ${n['carbs']}g',
+                          style: const TextStyle(fontSize: 13)),
+                      if ((n['sugar'] as num) > 0 ||
+                          (n['fiber'] as num) > 0 ||
+                          (n['sodium'] as num) > 0)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 2),
+                          child: Text(
+                            [
+                              if ((n['sugar'] as num) > 0) '糖質: ${n['sugar']}g',
+                              if ((n['fiber'] as num) > 0) '食物繊維: ${n['fiber']}g',
+                              if ((n['sodium'] as num) > 0) 'Na: ${n['sodium']}mg',
+                            ].join('  '),
+                            style: const TextStyle(fontSize: 11, color: Colors.grey),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+                const Text('食事の種類', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                const SizedBox(height: 6),
+                Wrap(
+                  spacing: 8,
+                  children: MealType.values.map((t) {
+                    return ChoiceChip(
+                      label: Text(t.label),
+                      selected: _mealType == t,
+                      onSelected: (_) => setState(() => _mealType = t),
+                    );
+                  }).toList(),
+                ),
+              ],
+            );
+          },
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('キャンセル'),
+        ),
+        TextButton(
+          onPressed: () {
+            final n = _nutrients;
+            widget.onAdd(
+              name: _nameController.text.trim().isEmpty
+                  ? widget.result.name
+                  : _nameController.text.trim(),
+              calories: n['calories'] as int,
+              protein: (n['protein'] as num).toDouble(),
+              fat: (n['fat'] as num).toDouble(),
+              carbs: (n['carbs'] as num).toDouble(),
+              sugar: (n['sugar'] as num).toDouble(),
+              fiber: (n['fiber'] as num).toDouble(),
+              sodium: (n['sodium'] as num).toDouble(),
+              mealType: _mealType,
+            );
+            Navigator.pop(context);
+          },
+          child: const Text('追加'),
+        ),
+      ],
+    );
+  }
+}
+
+// ── Preset sheet ──────────────────────────────────────────────────────────
+
+class _PresetSheet extends ConsumerWidget {
+  final void Function(MealPreset preset) onApply;
+  const _PresetSheet({required this.onApply});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final presetState = ref.watch(presetProvider);
+    final presets = presetState.presets;
+
+    return SafeArea(
+      child: DraggableScrollableSheet(
+        initialChildSize: 0.6,
+        minChildSize: 0.4,
+        maxChildSize: 0.9,
+        expand: false,
+        builder: (context, scrollController) => Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: Row(
+                children: [
+                  const Expanded(
+                    child: Text('プリセットから追加',
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 1),
+            if (presets.isEmpty)
+              const Expanded(
+                child: Center(
+                  child: Text(
+                    'プリセットがまだありません\n食事一覧の「プリセット保存」ボタンで追加できます',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.grey),
+                  ),
+                ),
+              )
+            else
+              Expanded(
+                child: ListView.builder(
+                  controller: scrollController,
+                  itemCount: presets.length,
+                  itemBuilder: (ctx, i) {
+                    final preset = presets[i];
+                    return ListTile(
+                      leading: const Icon(Icons.bookmark),
+                      title: Text(preset.name),
+                      subtitle: Text(
+                        '${preset.items.length}品目・${preset.totalCalories} kcal',
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                      trailing: IconButton(
+                        icon: const Icon(Icons.delete_outline, color: Colors.red),
+                        onPressed: () async {
+                          final confirm = await showDialog<bool>(
+                            context: ctx,
+                            builder: (_) => AlertDialog(
+                              title: const Text('削除の確認'),
+                              content: Text('「${preset.name}」を削除しますか？'),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.pop(_, false),
+                                  child: const Text('キャンセル'),
+                                ),
+                                TextButton(
+                                  onPressed: () => Navigator.pop(_, true),
+                                  child: const Text('削除',
+                                      style: TextStyle(color: Colors.red)),
+                                ),
+                              ],
+                            ),
+                          );
+                          if (confirm == true) {
+                            ref.read(presetProvider.notifier).deletePreset(preset.id);
+                          }
+                        },
+                      ),
+                      onTap: () {
+                        onApply(preset);
+                        Navigator.pop(ctx);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                                '「${preset.name}」の${preset.items.length}品目を追加しました'),
+                          ),
+                        );
+                      },
+                    );
+                  },
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 // ── Photo Analysis Dialog ─────────────────────────────────────────────────
 
 class _PhotoAnalysisDialog extends StatefulWidget {
@@ -924,10 +1534,70 @@ class _PhotoAnalysisDialogState extends State<_PhotoAnalysisDialog> {
   Uint8List? _imageBytes;
   MealType _selectedMealType = MealType.detectFromTime(DateTime.now());
 
+  // Inline editing state
+  int? _editingIndex;
+  Map<String, TextEditingController>? _editControllers;
+
   @override
   void initState() {
     super.initState();
     _loadAndAnalyze();
+  }
+
+  @override
+  void dispose() {
+    _disposeEditControllers();
+    super.dispose();
+  }
+
+  void _disposeEditControllers() {
+    _editControllers?.values.forEach((c) => c.dispose());
+    _editControllers = null;
+  }
+
+  void _startEditing(int index) {
+    _disposeEditControllers();
+    final item = _items[index];
+    _editControllers = {
+      'name': TextEditingController(text: item.name),
+      'calories': TextEditingController(text: item.calories.toString()),
+      'protein': TextEditingController(text: item.protein.toString()),
+      'fat': TextEditingController(text: item.fat.toString()),
+      'carbs': TextEditingController(text: item.carbs.toString()),
+      'sugar': TextEditingController(
+          text: item.sugar > 0 ? item.sugar.toString() : ''),
+      'fiber': TextEditingController(
+          text: item.fiber > 0 ? item.fiber.toString() : ''),
+      'sodium': TextEditingController(
+          text: item.sodium > 0 ? item.sodium.toString() : ''),
+    };
+    setState(() => _editingIndex = index);
+  }
+
+  void _confirmEdit(int index) {
+    if (_editControllers == null) return;
+    final updated = _items[index].copyWith(
+      name: _editControllers!['name']!.text.trim().isNotEmpty
+          ? _editControllers!['name']!.text.trim()
+          : null,
+      calories: int.tryParse(_editControllers!['calories']!.text),
+      protein: double.tryParse(_editControllers!['protein']!.text),
+      fat: double.tryParse(_editControllers!['fat']!.text),
+      carbs: double.tryParse(_editControllers!['carbs']!.text),
+      sugar: double.tryParse(_editControllers!['sugar']!.text),
+      fiber: double.tryParse(_editControllers!['fiber']!.text),
+      sodium: double.tryParse(_editControllers!['sodium']!.text),
+    );
+    _disposeEditControllers();
+    setState(() {
+      _items[index] = updated;
+      _editingIndex = null;
+    });
+  }
+
+  void _cancelEdit() {
+    _disposeEditControllers();
+    setState(() => _editingIndex = null);
   }
 
   Future<void> _loadAndAnalyze() async {
@@ -1040,57 +1710,191 @@ class _PhotoAnalysisDialogState extends State<_PhotoAnalysisDialog> {
     }
 
     return ConstrainedBox(
-      constraints: const BoxConstraints(maxHeight: 280),
+      constraints: const BoxConstraints(maxHeight: 320),
       child: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text('${_items.length}品目を検出しました',
-                style: const TextStyle(fontSize: 12, color: Colors.grey)),
+            Row(
+              children: [
+                Text('${_items.length}品目を検出しました',
+                    style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                const SizedBox(width: 4),
+                Text('（タップで編集）',
+                    style: TextStyle(fontSize: 11, color: Colors.grey[400])),
+              ],
+            ),
             const SizedBox(height: 4),
-            ..._items.map(_buildItemTile),
+            ...List.generate(_items.length, (i) => _buildItemTile(_items[i], i)),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildItemTile(AnalyzedFoodItem item) {
+  Widget _buildItemTile(AnalyzedFoodItem item, int index) {
+    final isEditing = _editingIndex == index;
+
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 3),
-      child: CheckboxListTile(
-        value: item.selected,
-        onChanged: (v) => setState(() => item.selected = v ?? false),
-        controlAffinity: ListTileControlAffinity.leading,
-        title: Row(
-          children: [
-            Expanded(
-              child: Text(item.name,
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-            ),
-            Text('${item.calories} kcal', style: const TextStyle(fontSize: 13)),
-          ],
-        ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (item.amount.isNotEmpty)
-              Text(item.amount,
-                  style: const TextStyle(color: Colors.grey, fontSize: 11)),
-            Text('P: ${item.protein}g  F: ${item.fat}g  C: ${item.carbs}g',
-                style: const TextStyle(fontSize: 12)),
-            if (item.sugar > 0 || item.fiber > 0 || item.sodium > 0)
-              Text(
-                [
-                  if (item.sugar > 0) '糖質: ${item.sugar}g',
-                  if (item.fiber > 0) '食物繊維: ${item.fiber}g',
-                  if (item.sodium > 0) 'Na: ${item.sodium.toInt()}mg',
-                ].join('  '),
-                style: const TextStyle(fontSize: 11, color: Colors.grey),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          CheckboxListTile(
+            value: item.selected,
+            onChanged: (v) => setState(() => item.selected = v ?? false),
+            controlAffinity: ListTileControlAffinity.leading,
+            title: isEditing
+                ? TextField(
+                    controller: _editControllers!['name'],
+                    decoration: const InputDecoration(isDense: true, labelText: '名前'),
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                  )
+                : Row(
+                    children: [
+                      Expanded(
+                        child: Text(item.name,
+                            style: const TextStyle(
+                                fontWeight: FontWeight.bold, fontSize: 14)),
+                      ),
+                      Text('${item.calories} kcal',
+                          style: const TextStyle(fontSize: 13)),
+                    ],
+                  ),
+            subtitle: isEditing
+                ? null
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (item.amount.isNotEmpty)
+                        Text(item.amount,
+                            style: const TextStyle(color: Colors.grey, fontSize: 11)),
+                      Text('P: ${item.protein}g  F: ${item.fat}g  C: ${item.carbs}g',
+                          style: const TextStyle(fontSize: 12)),
+                      if (item.sugar > 0 || item.fiber > 0 || item.sodium > 0)
+                        Text(
+                          [
+                            if (item.sugar > 0) '糖質: ${item.sugar}g',
+                            if (item.fiber > 0) '食物繊維: ${item.fiber}g',
+                            if (item.sodium > 0) 'Na: ${item.sodium.toInt()}mg',
+                          ].join('  '),
+                          style: const TextStyle(fontSize: 11, color: Colors.grey),
+                        ),
+                    ],
+                  ),
+            isThreeLine: !isEditing &&
+                (item.amount.isNotEmpty ||
+                    item.sugar > 0 ||
+                    item.fiber > 0 ||
+                    item.sodium > 0),
+            secondary: isEditing
+                ? null
+                : IconButton(
+                    icon: const Icon(Icons.edit, size: 18),
+                    tooltip: '編集',
+                    onPressed: () => _startEditing(index),
+                  ),
+          ),
+          // Inline edit form
+          if (isEditing)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _editControllers!['calories'],
+                          decoration: const InputDecoration(
+                              isDense: true, labelText: 'kcal'),
+                          keyboardType: TextInputType.number,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: TextField(
+                          controller: _editControllers!['protein'],
+                          decoration: const InputDecoration(
+                              isDense: true, labelText: 'P (g)'),
+                          keyboardType:
+                              const TextInputType.numberWithOptions(decimal: true),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: TextField(
+                          controller: _editControllers!['fat'],
+                          decoration: const InputDecoration(
+                              isDense: true, labelText: 'F (g)'),
+                          keyboardType:
+                              const TextInputType.numberWithOptions(decimal: true),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: TextField(
+                          controller: _editControllers!['carbs'],
+                          decoration: const InputDecoration(
+                              isDense: true, labelText: 'C (g)'),
+                          keyboardType:
+                              const TextInputType.numberWithOptions(decimal: true),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _editControllers!['sugar'],
+                          decoration: const InputDecoration(
+                              isDense: true, labelText: '糖質 (g)'),
+                          keyboardType:
+                              const TextInputType.numberWithOptions(decimal: true),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: TextField(
+                          controller: _editControllers!['fiber'],
+                          decoration: const InputDecoration(
+                              isDense: true, labelText: '繊維 (g)'),
+                          keyboardType:
+                              const TextInputType.numberWithOptions(decimal: true),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: TextField(
+                          controller: _editControllers!['sodium'],
+                          decoration: const InputDecoration(
+                              isDense: true, labelText: 'Na (mg)'),
+                          keyboardType: TextInputType.number,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      TextButton(
+                        onPressed: _cancelEdit,
+                        child: const Text('キャンセル'),
+                      ),
+                      const SizedBox(width: 8),
+                      FilledButton(
+                        onPressed: () => _confirmEdit(index),
+                        child: const Text('確定'),
+                      ),
+                    ],
+                  ),
+                ],
               ),
-          ],
-        ),
-        isThreeLine: true,
+            ),
+        ],
       ),
     );
   }

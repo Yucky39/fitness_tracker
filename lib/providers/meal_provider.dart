@@ -55,6 +55,15 @@ class MealState {
   double get totalSugar => todayItems.fold(0.0, (sum, item) => sum + item.sugar);
   double get totalFiber => todayItems.fold(0.0, (sum, item) => sum + item.fiber);
   double get totalSodium => todayItems.fold(0.0, (sum, item) => sum + item.sodium);
+
+  /// 食事タイプごとのカロリー合計（表示順は [MealType.values]）
+  Map<MealType, int> get caloriesByMealType {
+    final map = {for (final t in MealType.values) t: 0};
+    for (final item in todayItems) {
+      map[item.mealType] = (map[item.mealType] ?? 0) + item.calories;
+    }
+    return map;
+  }
 }
 
 class MealNotifier extends StateNotifier<MealState> {

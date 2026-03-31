@@ -14,7 +14,7 @@ class SqfliteDatabaseAdapter implements DatabaseAdapter {
 
     _database = await openDatabase(
       path,
-      version: 2,
+      version: 3,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -26,6 +26,16 @@ class SqfliteDatabaseAdapter implements DatabaseAdapter {
       await db.execute("ALTER TABLE food_items ADD COLUMN fiber REAL DEFAULT 0");
       await db.execute("ALTER TABLE food_items ADD COLUMN sodium REAL DEFAULT 0");
       await db.execute("ALTER TABLE food_items ADD COLUMN meal_type TEXT DEFAULT 'snack'");
+    }
+    if (oldVersion < 3) {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS meal_presets(
+          id TEXT PRIMARY KEY,
+          name TEXT,
+          items TEXT,
+          created_at TEXT
+        )
+      ''');
     }
   }
 
@@ -67,6 +77,15 @@ class SqfliteDatabaseAdapter implements DatabaseAdapter {
         bodyFatPercentage REAL,
         imagePath TEXT,
         date TEXT
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE meal_presets(
+        id TEXT PRIMARY KEY,
+        name TEXT,
+        items TEXT,
+        created_at TEXT
       )
     ''');
   }
