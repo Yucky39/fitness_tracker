@@ -52,6 +52,9 @@ class MealState {
   double get totalProtein => todayItems.fold(0, (sum, item) => sum + item.protein);
   double get totalFat => todayItems.fold(0, (sum, item) => sum + item.fat);
   double get totalCarbs => todayItems.fold(0, (sum, item) => sum + item.carbs);
+  double get totalSugar => todayItems.fold(0.0, (sum, item) => sum + item.sugar);
+  double get totalFiber => todayItems.fold(0.0, (sum, item) => sum + item.fiber);
+  double get totalSodium => todayItems.fold(0.0, (sum, item) => sum + item.sodium);
 }
 
 class MealNotifier extends StateNotifier<MealState> {
@@ -89,10 +92,11 @@ class MealNotifier extends StateNotifier<MealState> {
       'food_items',
       where: 'date BETWEEN ? AND ?',
       whereArgs: [startOfDay, endOfDay],
+      orderBy: 'date ASC',
     );
 
     state = state.copyWith(
-      todayItems: List.generate(maps.length, (i) => FoodItem.fromMap(maps[i])),
+      todayItems: maps.map(FoodItem.fromMap).toList(),
     );
   }
 
@@ -148,6 +152,10 @@ class MealNotifier extends StateNotifier<MealState> {
     required double protein,
     required double fat,
     required double carbs,
+    double sugar = 0.0,
+    double fiber = 0.0,
+    double sodium = 0.0,
+    MealType? mealType,
   }) async {
     final adapter = await DatabaseService().database;
     final now = DateTime.now();
@@ -159,6 +167,10 @@ class MealNotifier extends StateNotifier<MealState> {
       protein: protein,
       fat: fat,
       carbs: carbs,
+      sugar: sugar,
+      fiber: fiber,
+      sodium: sodium,
+      mealType: mealType ?? MealType.detectFromTime(now),
       date: DateTime(
         selectedDate.year,
         selectedDate.month,
@@ -171,6 +183,19 @@ class MealNotifier extends StateNotifier<MealState> {
 
     await adapter.insert('food_items', newItem.toMap());
     SyncService().syncRecord('food_items', newItem.toMap());
+    await _loadItemsForDate(state.selectedDate);
+    await _loadRecentFoods();
+  }
+
+  Future<void> updateFoodItem(FoodItem updated) async {
+    final adapter = await DatabaseService().database;
+    await adapter.update(
+      'food_items',
+      updated.toMap(),
+      where: 'id = ?',
+      whereArgs: [updated.id],
+    );
+    SyncService().syncRecord('food_items', updated.toMap());
     await _loadItemsForDate(state.selectedDate);
     await _loadRecentFoods();
   }

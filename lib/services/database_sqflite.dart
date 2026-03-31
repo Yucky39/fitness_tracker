@@ -14,9 +14,19 @@ class SqfliteDatabaseAdapter implements DatabaseAdapter {
 
     _database = await openDatabase(
       path,
-      version: 1,
+      version: 2,
       onCreate: _onCreate,
+      onUpgrade: _onUpgrade,
     );
+  }
+
+  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      await db.execute("ALTER TABLE food_items ADD COLUMN sugar REAL DEFAULT 0");
+      await db.execute("ALTER TABLE food_items ADD COLUMN fiber REAL DEFAULT 0");
+      await db.execute("ALTER TABLE food_items ADD COLUMN sodium REAL DEFAULT 0");
+      await db.execute("ALTER TABLE food_items ADD COLUMN meal_type TEXT DEFAULT 'snack'");
+    }
   }
 
   Future<void> _onCreate(Database db, int version) async {
@@ -28,6 +38,10 @@ class SqfliteDatabaseAdapter implements DatabaseAdapter {
         protein REAL,
         fat REAL,
         carbs REAL,
+        sugar REAL DEFAULT 0,
+        fiber REAL DEFAULT 0,
+        sodium REAL DEFAULT 0,
+        meal_type TEXT DEFAULT 'snack',
         date TEXT
       )
     ''');
@@ -77,6 +91,16 @@ class SqfliteDatabaseAdapter implements DatabaseAdapter {
       orderBy: orderBy,
       limit: limit,
     );
+  }
+
+  @override
+  Future<int> update(
+    String table,
+    Map<String, dynamic> values, {
+    String? where,
+    List<dynamic>? whereArgs,
+  }) async {
+    return await _database!.update(table, values, where: where, whereArgs: whereArgs);
   }
 
   @override

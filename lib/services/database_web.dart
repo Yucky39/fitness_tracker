@@ -107,6 +107,29 @@ class WebDatabaseAdapter implements DatabaseAdapter {
   }
 
   @override
+  Future<int> update(
+    String table,
+    Map<String, dynamic> values, {
+    String? where,
+    List<dynamic>? whereArgs,
+  }) async {
+    final rows = _tables[table]!;
+    final targets = where != null
+        ? _applyWhere(List.from(rows), where, whereArgs ?? [])
+        : List<Map<String, dynamic>>.from(rows);
+    final targetIds = targets.map((r) => r['id']).toSet();
+    int count = 0;
+    for (var i = 0; i < rows.length; i++) {
+      if (targetIds.contains(rows[i]['id'])) {
+        rows[i] = Map<String, dynamic>.from(values);
+        count++;
+      }
+    }
+    _saveToStorage();
+    return count;
+  }
+
+  @override
   Future<int> delete(String table, {String? where, List<dynamic>? whereArgs}) async {
     if (where == null) {
       final count = _tables[table]!.length;

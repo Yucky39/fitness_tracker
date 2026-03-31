@@ -13,5 +13,12 @@ abstract class DatabaseAdapter {
     int? limit,
   });
 
+  Future<int> update(
+    String table,
+    Map<String, dynamic> values, {
+    String? where,
+    List<dynamic>? whereArgs,
+  });
+
   Future<int> delete(String table, {String? where, List<dynamic>? whereArgs});
 }
