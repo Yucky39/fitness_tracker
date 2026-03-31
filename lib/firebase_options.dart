@@ -44,46 +44,40 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyAw8c6amGNi3YdXwIk-5DSTVj7C4n7b_Xk',
-    appId: '1:933856956733:web:1182e2b72957324f48b554',
-    messagingSenderId: '933856956733',
-    projectId: 'hello-963d5',
-    authDomain: 'hello-963d5.firebaseapp.com',
-    databaseURL: 'https://hello-963d5.firebaseio.com',
-    storageBucket: 'hello-963d5.firebasestorage.app',
+    apiKey: 'AIzaSyBKtMPmdgnmdXEPyxF1_Q3TM0G41RujE2s',
+    appId: '1:1041203655666:web:7478c1b7a3bffad2bdf16b',
+    messagingSenderId: '1041203655666',
+    projectId: 'fitness-tracker-828df',
+    authDomain: 'fitness-tracker-828df.firebaseapp.com',
+    storageBucket: 'fitness-tracker-828df.firebasestorage.app',
+    measurementId: 'G-HD3S67610M',
   );
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyDwN8S5gqRCUVvI2_2BxhP8AKErc7Zg5BM',
-    appId: '1:933856956733:android:e2e2b2831e81823d48b554',
-    messagingSenderId: '933856956733',
-    projectId: 'hello-963d5',
-    databaseURL: 'https://hello-963d5.firebaseio.com',
-    storageBucket: 'hello-963d5.firebasestorage.app',
+    apiKey: 'AIzaSyD8SuR1Vw7eVwCs31LhGqwnXHrdLxMjOKw',
+    appId: '1:1041203655666:android:b8ef1b1122a719c9bdf16b',
+    messagingSenderId: '1041203655666',
+    projectId: 'fitness-tracker-828df',
+    storageBucket: 'fitness-tracker-828df.firebasestorage.app',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyAxFu4dF56DJmBhVVrLTlx0pbFsCG7F64w',
-    appId: '1:933856956733:ios:ccd47341c5f1365f48b554',
-    messagingSenderId: '933856956733',
-    projectId: 'hello-963d5',
-    databaseURL: 'https://hello-963d5.firebaseio.com',
-    storageBucket: 'hello-963d5.firebasestorage.app',
-    androidClientId: '933856956733-hmgf1bq1661raohe0a63iqu1l1qfn1bq.apps.googleusercontent.com',
-    iosClientId: '933856956733-hcu4tpuk4r1uctsteq614icppebg50ti.apps.googleusercontent.com',
-    iosBundleId: 'com.example.fitnessTracker',
+    apiKey: 'AIzaSyD_g54xQLocP_tWo0Nl5Nl6nDw1bOrEY2U',
+    appId: '1:1041203655666:ios:84e5c91a60f5ca76bdf16b',
+    messagingSenderId: '1041203655666',
+    projectId: 'fitness-tracker-828df',
+    storageBucket: 'fitness-tracker-828df.firebasestorage.app',
+    iosBundleId: 'com.takayukimasaki.fitnessTracker',
+  );
+
+  static const FirebaseOptions macos = FirebaseOptions(
+    apiKey: 'AIzaSyD_g54xQLocP_tWo0Nl5Nl6nDw1bOrEY2U',
+    appId: '1:1041203655666:ios:84e5c91a60f5ca76bdf16b',
+    messagingSenderId: '1041203655666',
+    projectId: 'fitness-tracker-828df',
+    storageBucket: 'fitness-tracker-828df.firebasestorage.app',
+    iosBundleId: 'com.takayukimasaki.fitnessTracker',
   );
 
   /// Same Firebase Apple app as [ios] (`Runner/GoogleService-Info.plist` on macOS).
-  static const FirebaseOptions macos = FirebaseOptions(
-    apiKey: 'AIzaSyAxFu4dF56DJmBhVVrLTlx0pbFsCG7F64w',
-    appId: '1:933856956733:ios:ccd47341c5f1365f48b554',
-    messagingSenderId: '933856956733',
-    projectId: 'hello-963d5',
-    databaseURL: 'https://hello-963d5.firebaseio.com',
-    storageBucket: 'hello-963d5.firebasestorage.app',
-    androidClientId: '933856956733-hmgf1bq1661raohe0a63iqu1l1qfn1bq.apps.googleusercontent.com',
-    iosClientId: '933856956733-hcu4tpuk4r1uctsteq614icppebg50ti.apps.googleusercontent.com',
-    iosBundleId: 'com.example.fitnessTracker',
-  );
 }

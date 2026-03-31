@@ -153,6 +153,16 @@ class _AuthScreenState extends State<AuthScreen>
         return '試行回数が多すぎます。しばらくしてからお試しください';
       case 'network-request-failed':
         return 'ネットワークエラーが発生しました。接続を確認してください';
+      case 'keychain-error':
+        return 'macOS のキーチェーンにアクセスできません。'
+            'Xcode で Runner の Signing に開発チームを設定し、'
+            'クリーンビルドしてから再度お試しください';
+      case 'operation-not-allowed':
+        return 'このログイン方法は Firebase で無効です。'
+            'Firebase コンソールの「Authentication」→「Sign-in method」で'
+            '「メール/パスワード」を有効にしてください';
+      case 'user-disabled':
+        return 'このアカウントは無効化されています。管理者にお問い合わせください';
       default:
         return 'エラーが発生しました（$code）';
     }
