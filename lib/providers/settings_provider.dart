@@ -30,11 +30,21 @@ enum AiProviderType {
         return [
           (id: 'gpt-4o-mini', label: 'GPT-4o mini（高速・低コスト）'),
           (id: 'gpt-4o', label: 'GPT-4o（高性能）'),
+          (id: 'gpt-4.1-mini', label: 'GPT-4.1 mini（高速）'),
+          (id: 'gpt-4.1', label: 'GPT-4.1（高性能）'),
+          (id: 'o4-mini', label: 'o4 mini（推論・高速）'),
+          (id: 'o3', label: 'o3（推論・最高性能）'),
+          (id: 'gpt-5.4-nano', label: 'GPT-5.4 nano（最新・高速・低コスト）'),
+          (id: 'gpt-5.4-mini', label: 'GPT-5.4 mini（最新・高速）'),
+          (id: 'gpt-5.4', label: 'GPT-5.4（最新・最高性能）'),
         ];
       case AiProviderType.gemini:
         return [
           (id: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash（高速）'),
-          (id: 'gemini-1.5-pro', label: 'Gemini 1.5 Pro（高性能）'),
+          (id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash（高速）'),
+          (id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro（高性能）'),
+          (id: 'gemini-3-flash-preview', label: 'Gemini 3 Flash プレビュー（最新・高速）'),
+          (id: 'gemini-3.1-pro-preview', label: 'Gemini 3.1 Pro プレビュー（最新・最高性能）'),
         ];
     }
   }
@@ -44,9 +54,9 @@ enum AiProviderType {
       case AiProviderType.anthropic:
         return 'claude-haiku-4-5-20251001';
       case AiProviderType.openai:
-        return 'gpt-4o-mini';
+        return 'gpt-5.4-mini';
       case AiProviderType.gemini:
-        return 'gemini-2.0-flash';
+        return 'gemini-3-flash-preview';
     }
   }
 
@@ -55,9 +65,9 @@ enum AiProviderType {
       case AiProviderType.anthropic:
         return 'Claude Haiku 4.5';
       case AiProviderType.openai:
-        return 'GPT-4o mini';
+        return 'GPT-5.4 mini';
       case AiProviderType.gemini:
-        return 'Gemini 2.0 Flash';
+        return 'Gemini 3 Flash';
     }
   }
 
@@ -123,8 +133,8 @@ class SettingsState {
     this.openAiApiKey = '',
     this.geminiApiKey = '',
     this.selectedAnthropicModel = 'claude-haiku-4-5-20251001',
-    this.selectedOpenAiModel = 'gpt-4o-mini',
-    this.selectedGeminiModel = 'gemini-2.0-flash',
+    this.selectedOpenAiModel = 'gpt-5.4-mini',
+    this.selectedGeminiModel = 'gemini-3-flash-preview',
   });
 
   /// Returns the API key for the currently selected provider.
