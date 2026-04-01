@@ -401,7 +401,7 @@ class MealScreen extends ConsumerWidget {
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
-                    '${settings.selectedProvider.label} · ${settings.adviceLevelLabel}',
+                    '${settings.selectedProvider.label} · ${settings.currentModelLabel} · ${settings.adviceLevelLabel}',
                     style: const TextStyle(fontSize: 12, color: Colors.teal),
                   ),
                 ),
@@ -425,6 +425,7 @@ class MealScreen extends ConsumerWidget {
                               adviceLevel: settings.adviceLevel,
                               apiKey: settings.currentApiKey,
                               provider: settings.selectedProvider,
+                              model: settings.currentModel,
                               forceRefresh: true,
                             ),
                       ),
@@ -822,6 +823,7 @@ class MealScreen extends ConsumerWidget {
         builder: (context, setDialogState) {
           String currentLevel = ref.read(settingsProvider).adviceLevel;
           AiProviderType currentProvider = ref.read(settingsProvider).selectedProvider;
+          String currentModel = ref.read(settingsProvider).currentModel;
 
           Widget apiKeyField(AiProviderType provider, TextEditingController ctrl) {
             bool obscure = true;
@@ -1076,20 +1078,37 @@ class MealScreen extends ConsumerWidget {
                     items: AiProviderType.values.map((p) {
                       return DropdownMenuItem(
                         value: p,
-                        child: Row(
-                          children: [
-                            Text(p.label),
-                            const SizedBox(width: 8),
-                            Text(p.modelLabel,
-                                style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                          ],
-                        ),
+                        child: Text(p.label),
                       );
                     }).toList(),
                     onChanged: (p) {
                       if (p == null) return;
                       ref.read(settingsProvider.notifier).updateSelectedProvider(p);
-                      setDialogState(() => currentProvider = p);
+                      setDialogState(() {
+                        currentProvider = p;
+                        currentModel = ref.read(settingsProvider).currentModel;
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  const Text('使用するモデル', style: TextStyle(fontSize: 13)),
+                  const SizedBox(height: 8),
+                  DropdownButtonFormField<String>(
+                    value: currentModel,
+                    decoration: const InputDecoration(
+                      border: OutlineInputBorder(),
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    ),
+                    items: currentProvider.availableModels.map((m) {
+                      return DropdownMenuItem(
+                        value: m.id,
+                        child: Text(m.label, style: const TextStyle(fontSize: 13)),
+                      );
+                    }).toList(),
+                    onChanged: (m) {
+                      if (m == null) return;
+                      ref.read(settingsProvider.notifier).updateModel(currentProvider, m);
+                      setDialogState(() => currentModel = m);
                     },
                   ),
                   const SizedBox(height: 16),
@@ -1683,6 +1702,7 @@ class MealScreen extends ConsumerWidget {
         imageFile: xFile!,
         apiKey: settings.currentApiKey,
         provider: settings.selectedProvider,
+        model: settings.currentModel,
         onAdd: (items, mealType) {
           for (final item in items) {
             notifier.addFoodItem(
@@ -2083,12 +2103,14 @@ class _PhotoAnalysisDialog extends StatefulWidget {
   final XFile imageFile;
   final String apiKey;
   final AiProviderType provider;
+  final String model;
   final void Function(List<AnalyzedFoodItem> items, MealType mealType) onAdd;
 
   const _PhotoAnalysisDialog({
     required this.imageFile,
     required this.apiKey,
     required this.provider,
+    required this.model,
     required this.onAdd,
   });
 
@@ -2183,6 +2205,7 @@ class _PhotoAnalysisDialogState extends State<_PhotoAnalysisDialog> {
         filePath: widget.imageFile.path,
         apiKey: widget.apiKey,
         provider: widget.provider,
+        model: widget.model,
       );
 
       if (mounted) setState(() { _items = items; _isLoading = false; });

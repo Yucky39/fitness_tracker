@@ -99,6 +99,7 @@ class MealImageAnalysisService {
     required String filePath,
     required String apiKey,
     required AiProviderType provider,
+    String? model,
   }) async {
     if (apiKey.isEmpty) {
       throw Exception('APIキーが設定されていません。設定画面からAPIキーを入力してください。');
@@ -106,15 +107,16 @@ class MealImageAnalysisService {
 
     final base64Image = base64Encode(imageBytes);
     final mediaType = _detectMediaType(filePath);
+    final resolvedModel = model ?? provider.defaultModel;
 
     final String rawText;
     switch (provider) {
       case AiProviderType.anthropic:
-        rawText = await _callAnthropic(base64Image, mediaType, apiKey);
+        rawText = await _callAnthropic(base64Image, mediaType, apiKey, resolvedModel);
       case AiProviderType.openai:
-        rawText = await _callOpenAi(base64Image, mediaType, apiKey);
+        rawText = await _callOpenAi(base64Image, mediaType, apiKey, resolvedModel);
       case AiProviderType.gemini:
-        rawText = await _callGemini(base64Image, mediaType, apiKey);
+        rawText = await _callGemini(base64Image, mediaType, apiKey, resolvedModel);
     }
 
     return _parseJson(rawText);
@@ -146,7 +148,7 @@ class MealImageAnalysisService {
   // ── Anthropic (Claude) ─────────────────────────────────────────────────────
 
   Future<String> _callAnthropic(
-      String base64Image, String mediaType, String apiKey) async {
+      String base64Image, String mediaType, String apiKey, String model) async {
     final res = await http.post(
       Uri.parse('https://api.anthropic.com/v1/messages'),
       headers: {
@@ -155,7 +157,7 @@ class MealImageAnalysisService {
         'content-type': 'application/json',
       },
       body: jsonEncode({
-        'model': 'claude-haiku-4-5-20251001',
+        'model': model,
         'max_tokens': _maxTokens,
         'messages': [
           {
@@ -186,7 +188,7 @@ class MealImageAnalysisService {
   // ── OpenAI (GPT-4o-mini) ───────────────────────────────────────────────────
 
   Future<String> _callOpenAi(
-      String base64Image, String mediaType, String apiKey) async {
+      String base64Image, String mediaType, String apiKey, String model) async {
     final res = await http.post(
       Uri.parse('https://api.openai.com/v1/chat/completions'),
       headers: {
@@ -194,7 +196,7 @@ class MealImageAnalysisService {
         'content-type': 'application/json',
       },
       body: jsonEncode({
-        'model': 'gpt-4o-mini',
+        'model': model,
         'max_tokens': _maxTokens,
         'messages': [
           {
@@ -221,10 +223,10 @@ class MealImageAnalysisService {
   // ── Google Gemini ──────────────────────────────────────────────────────────
 
   Future<String> _callGemini(
-      String base64Image, String mediaType, String apiKey) async {
+      String base64Image, String mediaType, String apiKey, String model) async {
     final res = await http.post(
       Uri.parse(
-        'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=$apiKey',
+        'https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=$apiKey',
       ),
       headers: {'content-type': 'application/json'},
       body: jsonEncode({

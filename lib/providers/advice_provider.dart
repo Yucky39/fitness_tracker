@@ -27,6 +27,7 @@ class AdviceNotifier extends StateNotifier<AdviceState> {
     List<FoodItem> items,
     String adviceLevel,
     AiProviderType provider,
+    String model,
   ) {
     final totalCal = items.fold(0, (s, i) => s + i.calories);
     final totalP = items.fold(0.0, (s, i) => s + i.protein);
@@ -36,7 +37,7 @@ class AdviceNotifier extends StateNotifier<AdviceState> {
         '${totalP.toStringAsFixed(1)}_'
         '${totalF.toStringAsFixed(1)}_'
         '${totalC.toStringAsFixed(1)}_'
-        '${adviceLevel}_${provider.name}';
+        '${adviceLevel}_${provider.name}_$model';
   }
 
   Future<void> fetchAdvice({
@@ -49,6 +50,7 @@ class AdviceNotifier extends StateNotifier<AdviceState> {
     required String adviceLevel,
     required String apiKey,
     required AiProviderType provider,
+    String? model,
     bool forceRefresh = false,
   }) async {
     if (apiKey.isEmpty) {
@@ -58,7 +60,8 @@ class AdviceNotifier extends StateNotifier<AdviceState> {
       return;
     }
 
-    final key = _cacheKey(items, adviceLevel, provider);
+    final resolvedModel = model ?? provider.defaultModel;
+    final key = _cacheKey(items, adviceLevel, provider, resolvedModel);
     if (!forceRefresh && key == _cachedKey && state.adviceText != null) {
       // キャッシュヒット — 食事内容が変わっていないため再取得をスキップ
       return;
@@ -76,6 +79,7 @@ class AdviceNotifier extends StateNotifier<AdviceState> {
         adviceLevel: adviceLevel,
         apiKey: apiKey,
         provider: provider,
+        model: resolvedModel,
       );
       _cachedKey = key;
       state = AdviceState(adviceText: text);
