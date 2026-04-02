@@ -14,7 +14,7 @@ class SqfliteDatabaseAdapter implements DatabaseAdapter {
 
     _database = await openDatabase(
       path,
-      version: 4,
+      version: 5,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -40,6 +40,12 @@ class SqfliteDatabaseAdapter implements DatabaseAdapter {
     if (oldVersion < 4) {
       await db.execute(
           "ALTER TABLE training_logs ADD COLUMN exercise_type TEXT DEFAULT 'free_weight'");
+    }
+    if (oldVersion < 5) {
+      await db.execute(
+          "ALTER TABLE training_logs ADD COLUMN distance_km REAL DEFAULT 0");
+      await db.execute(
+          "ALTER TABLE training_logs ADD COLUMN duration_minutes INTEGER DEFAULT 0");
     }
   }
 
@@ -69,6 +75,8 @@ class SqfliteDatabaseAdapter implements DatabaseAdapter {
         reps INTEGER,
         sets INTEGER,
         interval INTEGER,
+        distance_km REAL DEFAULT 0,
+        duration_minutes INTEGER DEFAULT 0,
         note TEXT,
         date TEXT
       )

@@ -60,6 +60,8 @@ class TrainingNotifier extends StateNotifier<TrainingState> {
     required int reps,
     required int sets,
     required int interval,
+    double distanceKm = 0,
+    int durationMinutes = 0,
     required String note,
   }) async {
     final adapter = await DatabaseService().database;
@@ -71,11 +73,21 @@ class TrainingNotifier extends StateNotifier<TrainingState> {
       reps: reps,
       sets: sets,
       interval: interval,
+      distanceKm: distanceKm,
+      durationMinutes: durationMinutes,
       note: note,
       date: DateTime.now(),
     );
     await adapter.insert('training_logs', newLog.toMap());
     SyncService().syncRecord('training_logs', newLog.toMap());
+    await _loadLogs();
+  }
+
+  /// HealthKit / Health Connect から取得済みの TrainingLog をそのまま保存
+  Future<void> addLogFromHealth(TrainingLog log) async {
+    final adapter = await DatabaseService().database;
+    await adapter.insert('training_logs', log.toMap());
+    SyncService().syncRecord('training_logs', log.toMap());
     await _loadLogs();
   }
 
@@ -115,6 +127,7 @@ class TrainingNotifier extends StateNotifier<TrainingState> {
   double getBestOneRepMax(String exerciseName, {String? excludeId}) {
     final candidates = state.logs.where((l) =>
         l.exerciseName == exerciseName &&
+        l.exerciseType != ExerciseType.cardio &&
         (excludeId == null || l.id != excludeId));
     if (candidates.isEmpty) return 0;
     return candidates
@@ -126,13 +139,15 @@ class TrainingNotifier extends StateNotifier<TrainingState> {
   double getBestWeight(String exerciseName, {String? excludeId}) {
     final candidates = state.logs.where((l) =>
         l.exerciseName == exerciseName &&
+        l.exerciseType != ExerciseType.cardio &&
         (excludeId == null || l.id != excludeId));
     if (candidates.isEmpty) return 0;
     return candidates.map((l) => l.weight).reduce((a, b) => a > b ? a : b);
   }
 
-  /// 記録が自己ベスト（最大重量）を更新しているか
+  /// 記録が自己ベスト（最大重量）を更新しているか（有酸素種目は対象外）
   bool isPersonalRecord(TrainingLog log) {
+    if (log.exerciseType == ExerciseType.cardio) return false;
     final best = getBestWeight(log.exerciseName, excludeId: log.id);
     return best > 0 && log.weight >= best;
   }
@@ -155,6 +170,8 @@ class TrainingNotifier extends StateNotifier<TrainingState> {
         intervalSec: log.interval,
         exerciseType: log.exerciseType,
         bodyWeightKg: bodyWeightKg,
+        exerciseName: log.exerciseName,
+        durationMinutes: log.durationMinutes,
       );
 }
 

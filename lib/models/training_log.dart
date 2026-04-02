@@ -2,7 +2,8 @@
 enum ExerciseType {
   freeWeight('free_weight', 'フリーウェイト'),
   machine('machine', 'マシン'),
-  bodyweight('bodyweight', '自重');
+  bodyweight('bodyweight', '自重'),
+  cardio('cardio', '有酸素運動');
 
   const ExerciseType(this.key, this.label);
   final String key;
@@ -22,6 +23,10 @@ class TrainingLog {
   final int reps;
   final int sets;
   final int interval;
+  /// 有酸素種目：走行距離 (km)。筋トレ種目では 0。
+  final double distanceKm;
+  /// 有酸素種目：運動時間 (分)。筋トレ種目では 0。
+  final int durationMinutes;
   final String note;
   final DateTime date;
 
@@ -33,6 +38,8 @@ class TrainingLog {
     required this.reps,
     required this.sets,
     required this.interval,
+    this.distanceKm = 0,
+    this.durationMinutes = 0,
     required this.note,
     required this.date,
   });
@@ -45,6 +52,8 @@ class TrainingLog {
     int? reps,
     int? sets,
     int? interval,
+    double? distanceKm,
+    int? durationMinutes,
     String? note,
     DateTime? date,
   }) =>
@@ -56,12 +65,21 @@ class TrainingLog {
         reps: reps ?? this.reps,
         sets: sets ?? this.sets,
         interval: interval ?? this.interval,
+        distanceKm: distanceKm ?? this.distanceKm,
+        durationMinutes: durationMinutes ?? this.durationMinutes,
         note: note ?? this.note,
         date: date ?? this.date,
       );
 
-  /// 総ボリューム (kg)  例: 100kg × 10rep × 3set = 3000kg
+  /// 総ボリューム (kg)  例: 100kg × 10rep × 3set = 3000kg（筋トレのみ）
   double get totalVolume => weight * reps * sets;
+
+  /// ペース (分/km)。有酸素種目で distance > 0 の場合のみ有効。
+  double? get paceMinPerKm {
+    if (exerciseType != ExerciseType.cardio) return null;
+    if (distanceKm <= 0 || durationMinutes <= 0) return null;
+    return durationMinutes / distanceKm;
+  }
 
   Map<String, dynamic> toMap() {
     return {
@@ -72,6 +90,8 @@ class TrainingLog {
       'reps': reps,
       'sets': sets,
       'interval': interval,
+      'distance_km': distanceKm,
+      'duration_minutes': durationMinutes,
       'note': note,
       'date': date.toIso8601String(),
     };
@@ -86,6 +106,8 @@ class TrainingLog {
       reps: map['reps'] as int,
       sets: map['sets'] as int,
       interval: map['interval'] as int,
+      distanceKm: (map['distance_km'] as num? ?? 0).toDouble(),
+      durationMinutes: map['duration_minutes'] as int? ?? 0,
       note: map['note'] as String,
       date: DateTime.parse(map['date'] as String),
     );
@@ -148,6 +170,18 @@ class ExercisePresets {
       'プランク',
       'バーピー',
     ],
+    '有酸素運動': [
+      'ランニング',
+      'ウォーキング',
+      'サイクリング',
+      '水泳',
+      'HIIT',
+      'ジャンプロープ',
+      'エアロビクス',
+      'ローイングマシン',
+      'エリプティカル',
+      'トレッドミル',
+    ],
   };
 
   /// 種目名から器具種別を推定
@@ -156,6 +190,7 @@ class ExercisePresets {
       if (entry.value.contains(name)) {
         if (entry.key.contains('マシン')) return ExerciseType.machine;
         if (entry.key.contains('自重')) return ExerciseType.bodyweight;
+        if (entry.key.contains('有酸素')) return ExerciseType.cardio;
         return ExerciseType.freeWeight;
       }
     }
