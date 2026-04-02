@@ -27,6 +27,10 @@ dependencies:
   firebase_auth: ^6.3.0
   cloud_firestore: ^6.2.0
   health: ^10.2.0
+  flutter_local_notifications: ^17.2.3
+  share_plus: ^10.1.4
+  timezone: ^0.9.4
+  flutter_timezone: ^5.0.2
 
 dev_dependencies:
   flutter_test:

@@ -19,6 +19,9 @@ import '../providers/settings_provider.dart';
 import '../services/barcode_lookup_service.dart';
 import '../services/energy_goal_calculator.dart';
 import '../services/meal_image_analysis_service.dart';
+import '../services/export_service.dart';
+import '../services/food_search_service.dart';
+import '../services/notification_service.dart';
 import '../widgets/nutrient_bar.dart';
 
 // View-mode toggle: false = grouped list, true = timeline
@@ -1140,8 +1143,102 @@ class MealScreen extends ConsumerWidget {
                   const SizedBox(height: 8),
                   apiKeyField(AiProviderType.gemini, geminiKeyCtrl),
                   const SizedBox(height: 4),
-                  const Text('APIキーはデバイス内にのみ保存されます',
-                      style: TextStyle(fontSize: 11, color: Colors.grey)),
+                  const Text(
+                    'APIキーはデバイス内にのみ保存されます',
+                    style: TextStyle(fontSize: 11, color: Colors.grey),
+                  ),
+                  const SizedBox(height: 20),
+                  const Divider(),
+                  const SizedBox(height: 8),
+                  const Text('トレーニングAIアドバイス',
+                      style: TextStyle(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Switch(
+                        value: ref.read(settingsProvider).trainingAdviceEnabled,
+                        onChanged: (v) {
+                          ref
+                              .read(settingsProvider.notifier)
+                              .updateTrainingAdviceEnabled(v);
+                          setDialogState(() {});
+                        },
+                      ),
+                      const Expanded(
+                        child: Text(
+                          'トレーニング画面でAI評価を表示する',
+                          style: TextStyle(fontSize: 13),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  const Divider(),
+                  const SizedBox(height: 8),
+                  const Text('リマインダー通知',
+                      style: TextStyle(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 12),
+                  _buildReminderRow(
+                    context,
+                    ref,
+                    label: '食事記録リマインダー',
+                    enabled: ref.read(settingsProvider).mealReminderEnabled,
+                    hour: ref.read(settingsProvider).mealReminderHour,
+                    minute: ref.read(settingsProvider).mealReminderMinute,
+                    onChanged: (enabled, hour, minute) async {
+                      await ref
+                          .read(settingsProvider.notifier)
+                          .updateNotificationSettings(
+                            mealEnabled: enabled,
+                            mealHour: hour,
+                            mealMinute: minute,
+                          );
+                      await NotificationService().rescheduleFromSettings();
+                      setDialogState(() {});
+                    },
+                  ),
+                  const SizedBox(height: 8),
+                  _buildReminderRow(
+                    context,
+                    ref,
+                    label: 'トレーニングリマインダー',
+                    enabled: ref.read(settingsProvider).workoutReminderEnabled,
+                    hour: ref.read(settingsProvider).workoutReminderHour,
+                    minute: ref.read(settingsProvider).workoutReminderMinute,
+                    onChanged: (enabled, hour, minute) async {
+                      await ref
+                          .read(settingsProvider.notifier)
+                          .updateNotificationSettings(
+                            workoutEnabled: enabled,
+                            workoutHour: hour,
+                            workoutMinute: minute,
+                          );
+                      await NotificationService().rescheduleFromSettings();
+                      setDialogState(() {});
+                    },
+                  ),
+                  const SizedBox(height: 20),
+                  const Divider(),
+                  const SizedBox(height: 8),
+                  const Text('データ管理',
+                      style: TextStyle(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 12),
+                  OutlinedButton.icon(
+                    icon: const Icon(Icons.download),
+                    label: const Text('全データをCSVでエクスポート'),
+                    onPressed: () async {
+                      Navigator.pop(context);
+                      try {
+                        await ExportService().exportAll();
+                      } catch (e) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('エクスポートに失敗しました: $e')),
+                          );
+                        }
+                      }
+                    },
+                  ),
                 ],
               ),
             ),
@@ -1203,6 +1300,41 @@ class MealScreen extends ConsumerWidget {
     }
   }
 
+  Widget _buildReminderRow(
+    BuildContext context,
+    WidgetRef ref, {
+    required String label,
+    required bool enabled,
+    required int hour,
+    required int minute,
+    required void Function(bool enabled, int hour, int minute) onChanged,
+  }) {
+    return Row(
+      children: [
+        Switch(
+          value: enabled,
+          onChanged: (v) => onChanged(v, hour, minute),
+        ),
+        Expanded(
+          child: Text(label, style: const TextStyle(fontSize: 13)),
+        ),
+        TextButton(
+          onPressed: () async {
+            final t = await showTimePicker(
+              context: context,
+              initialTime: TimeOfDay(hour: hour, minute: minute),
+            );
+            if (t != null) onChanged(enabled, t.hour, t.minute);
+          },
+          child: Text(
+            '${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}',
+            style: const TextStyle(fontWeight: FontWeight.bold),
+          ),
+        ),
+      ],
+    );
+  }
+
   // ── Unified add / edit food dialog ────────────────────────────────────────
 
   void _showFoodDialog({
@@ -1236,6 +1368,18 @@ class MealScreen extends ConsumerWidget {
 
     MealType selectedMealType =
         existingItem?.mealType ?? MealType.detectFromTime(DateTime.now());
+
+    void fillFromSearch(FoodSearchResult result, int grams) {
+      final ratio = grams / 100.0;
+      nameController.text = result.name;
+      calorieController.text =
+          (result.caloriesPer100g * ratio).round().toString();
+      proteinController.text =
+          (result.proteinPer100g * ratio).toStringAsFixed(1);
+      fatController.text = (result.fatPer100g * ratio).toStringAsFixed(1);
+      carbsController.text =
+          (result.carbsPer100g * ratio).toStringAsFixed(1);
+    }
 
     showDialog(
       context: context,
@@ -1300,6 +1444,20 @@ class MealScreen extends ConsumerWidget {
                       ),
                     ),
                     const SizedBox(height: 12),
+                  ],
+
+                  if (!isEdit) ...[
+                    OutlinedButton.icon(
+                      icon: const Icon(Icons.search, size: 16),
+                      label: const Text('食品データベースから検索'),
+                      onPressed: () => _showFoodSearchDialog(
+                        context,
+                        (result, grams) {
+                          setDialogState(() => fillFromSearch(result, grams));
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 8),
                   ],
 
                   // ── Main fields ────────────────────────────────────────
@@ -1405,6 +1563,150 @@ class MealScreen extends ConsumerWidget {
                   Navigator.pop(context);
                 },
                 child: Text(isEdit ? '保存' : '追加'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  void _showFoodSearchDialog(
+    BuildContext context,
+    void Function(FoodSearchResult result, int grams) onSelect,
+  ) {
+    final searchController = TextEditingController();
+    final gramsController = TextEditingController(text: '100');
+    final service = FoodSearchService();
+    List<FoodSearchResult> results = [];
+    bool isSearching = false;
+    String? error;
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          return AlertDialog(
+            title: const Text('食品データベース検索'),
+            content: SizedBox(
+              width: double.maxFinite,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: searchController,
+                          decoration: const InputDecoration(
+                            labelText: '食品名（英語が精度高）',
+                            hintText: 'chicken breast, rice...',
+                          ),
+                          onSubmitted: (_) async {
+                            setDialogState(() {
+                              isSearching = true;
+                              error = null;
+                            });
+                            try {
+                              final r =
+                                  await service.search(searchController.text);
+                              setDialogState(() {
+                                results = r;
+                                isSearching = false;
+                              });
+                            } catch (_) {
+                              setDialogState(() {
+                                error = '検索に失敗しました';
+                                isSearching = false;
+                              });
+                            }
+                          },
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.search),
+                        onPressed: () async {
+                          setDialogState(() {
+                            isSearching = true;
+                            error = null;
+                          });
+                          try {
+                            final r =
+                                await service.search(searchController.text);
+                            setDialogState(() {
+                              results = r;
+                              isSearching = false;
+                            });
+                          } catch (_) {
+                            setDialogState(() {
+                              error = '検索に失敗しました';
+                              isSearching = false;
+                            });
+                          }
+                        },
+                      ),
+                    ],
+                  ),
+                  Row(
+                    children: [
+                      const Text('摂取量: ', style: TextStyle(fontSize: 13)),
+                      SizedBox(
+                        width: 70,
+                        child: TextField(
+                          controller: gramsController,
+                          keyboardType: TextInputType.number,
+                          decoration: const InputDecoration(
+                            suffix: Text('g'),
+                            isDense: true,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  if (isSearching)
+                    const Padding(
+                      padding: EdgeInsets.all(16),
+                      child: CircularProgressIndicator(),
+                    )
+                  else if (error != null)
+                    Text(error!, style: const TextStyle(color: Colors.red))
+                  else if (results.isNotEmpty)
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxHeight: 250),
+                      child: ListView.builder(
+                        shrinkWrap: true,
+                        itemCount: results.length,
+                        itemBuilder: (context, i) {
+                          final r = results[i];
+                          return ListTile(
+                            dense: true,
+                            title: Text(
+                              r.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            subtitle: Text(
+                              '${r.caloriesPer100g}kcal/100g  '
+                              'P:${r.proteinPer100g.toStringAsFixed(1)}g',
+                            ),
+                            onTap: () {
+                              final grams =
+                                  int.tryParse(gramsController.text) ?? 100;
+                              onSelect(r, grams);
+                              Navigator.pop(context);
+                            },
+                          );
+                        },
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('閉じる'),
               ),
             ],
           );

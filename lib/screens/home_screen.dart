@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
+import 'dashboard_screen.dart';
 import 'meal_screen.dart';
 import 'training_screen.dart';
 import 'progress_screen.dart';
@@ -14,17 +15,12 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
 
-  static const List<Widget> _widgetOptions = <Widget>[
+  static const List<Widget> _screens = [
+    DashboardScreen(),
     MealScreen(),
     TrainingScreen(),
     ProgressScreen(),
   ];
-
-  void _onItemTapped(int index) {
-    setState(() {
-      _selectedIndex = index;
-    });
-  }
 
   Future<void> _signOut(BuildContext context) async {
     final confirmed = await showDialog<bool>(
@@ -63,8 +59,10 @@ class _HomeScreenState extends State<HomeScreen> {
             itemBuilder: (_) => [
               PopupMenuItem(
                 enabled: false,
-                child: Text(email,
-                    style: Theme.of(context).textTheme.bodySmall),
+                child: Text(
+                  email,
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
               ),
               const PopupMenuDivider(),
               const PopupMenuItem(
@@ -84,23 +82,29 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
-      body: Center(
-        child: _widgetOptions.elementAt(_selectedIndex),
-      ),
+      body: _screens[_selectedIndex],
       bottomNavigationBar: NavigationBar(
-        onDestinationSelected: _onItemTapped,
+        onDestinationSelected: (index) => setState(() => _selectedIndex = index),
         selectedIndex: _selectedIndex,
-        destinations: const <Widget>[
+        destinations: const [
           NavigationDestination(
-            icon: Icon(Icons.restaurant),
+            icon: Icon(Icons.dashboard_outlined),
+            selectedIcon: Icon(Icons.dashboard),
+            label: 'ホーム',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.restaurant_outlined),
+            selectedIcon: Icon(Icons.restaurant),
             label: '食事',
           ),
           NavigationDestination(
-            icon: Icon(Icons.fitness_center),
+            icon: Icon(Icons.fitness_center_outlined),
+            selectedIcon: Icon(Icons.fitness_center),
             label: 'トレーニング',
           ),
           NavigationDestination(
-            icon: Icon(Icons.show_chart),
+            icon: Icon(Icons.show_chart_outlined),
+            selectedIcon: Icon(Icons.show_chart),
             label: '進捗',
           ),
         ],
