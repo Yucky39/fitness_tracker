@@ -1,0 +1,6 @@
+{
+  "buildCommand": "flutter/bin/flutter build web --release",
+  "installCommand": "git clone https://github.com/flutter/flutter.git --depth 1 -b stable && flutter/bin/flutter doctor",
+  "outputDirectory": "build/web",
+  "framework": null
+}

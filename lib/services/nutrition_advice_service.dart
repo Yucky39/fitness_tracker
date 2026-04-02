@@ -73,6 +73,7 @@ $foodLines
     required String adviceLevel,
     required String apiKey,
     required AiProviderType provider,
+    String? model,
   }) {
     final systemPrompt = _systemPrompt(adviceLevel);
     final userMessage = _buildUserMessage(
@@ -83,19 +84,20 @@ $foodLines
       fatGoal: fatGoal,
       carbsGoal: carbsGoal,
     );
+    final resolvedModel = model ?? provider.defaultModel;
     switch (provider) {
       case AiProviderType.anthropic:
-        return _callAnthropic(systemPrompt, userMessage, apiKey);
+        return _callAnthropic(systemPrompt, userMessage, apiKey, resolvedModel);
       case AiProviderType.openai:
-        return _callOpenAi(systemPrompt, userMessage, apiKey);
+        return _callOpenAi(systemPrompt, userMessage, apiKey, resolvedModel);
       case AiProviderType.gemini:
-        return _callGemini(systemPrompt, userMessage, apiKey);
+        return _callGemini(systemPrompt, userMessage, apiKey, resolvedModel);
     }
   }
 
   // ── Anthropic ──────────────────────────────────────────────────────────────
 
-  Future<String> _callAnthropic(String system, String user, String apiKey) async {
+  Future<String> _callAnthropic(String system, String user, String apiKey, String model) async {
     final response = await http.post(
       Uri.parse('https://api.anthropic.com/v1/messages'),
       headers: {
@@ -104,7 +106,7 @@ $foodLines
         'content-type': 'application/json',
       },
       body: jsonEncode({
-        'model': 'claude-haiku-4-5-20251001',
+        'model': model,
         'max_tokens': _maxTokens,
         'system': system,
         'messages': [
@@ -123,7 +125,7 @@ $foodLines
 
   // ── OpenAI ─────────────────────────────────────────────────────────────────
 
-  Future<String> _callOpenAi(String system, String user, String apiKey) async {
+  Future<String> _callOpenAi(String system, String user, String apiKey, String model) async {
     final response = await http.post(
       Uri.parse('https://api.openai.com/v1/chat/completions'),
       headers: {
@@ -131,7 +133,7 @@ $foodLines
         'content-type': 'application/json',
       },
       body: jsonEncode({
-        'model': 'gpt-4o-mini',
+        'model': model,
         'max_tokens': _maxTokens,
         'messages': [
           {'role': 'system', 'content': system},
@@ -150,9 +152,9 @@ $foodLines
 
   // ── Google Gemini ──────────────────────────────────────────────────────────
 
-  Future<String> _callGemini(String system, String user, String apiKey) async {
+  Future<String> _callGemini(String system, String user, String apiKey, String model) async {
     final uri = Uri.parse(
-      'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=$apiKey',
+      'https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=$apiKey',
     );
 
     final response = await http.post(

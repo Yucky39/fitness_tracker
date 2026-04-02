@@ -62,6 +62,8 @@ class NotificationService {
       scheduled,
       details,
       androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+      uiLocalNotificationDateInterpretation:
+          UILocalNotificationDateInterpretation.wallClockTime,
       matchDateTimeComponents: DateTimeComponents.time,
     );
   }

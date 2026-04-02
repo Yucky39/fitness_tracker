@@ -16,29 +16,35 @@ class NutrientBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final double progress = (current / goal).clamp(0.0, 1.0);
-    
+    final bool isOver = goal > 0 && current > goal;
+    final double progress = goal > 0 ? (current / goal).clamp(0.0, 1.0) : 0.0;
+    final Color displayColor = isOver ? Colors.red : color;
+    final String valueText = isOver
+        ? '${current.toStringAsFixed(1)} / ${goal.toStringAsFixed(1)} g  (+${(current - goal).toStringAsFixed(1)}超)'
+        : '${current.toStringAsFixed(1)} / ${goal.toStringAsFixed(1)} g';
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
+            Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
             Text(
-              label,
-              style: const TextStyle(fontWeight: FontWeight.bold),
-            ),
-            Text(
-              '${current.toStringAsFixed(1)} / ${goal.toStringAsFixed(1)} g',
-              style: TextStyle(color: Colors.grey[600], fontSize: 12),
+              valueText,
+              style: TextStyle(
+                color: isOver ? Colors.red : Colors.grey[600],
+                fontSize: 12,
+                fontWeight: isOver ? FontWeight.bold : FontWeight.normal,
+              ),
             ),
           ],
         ),
         const SizedBox(height: 4),
         LinearProgressIndicator(
           value: progress,
-          backgroundColor: color.withOpacity(0.2),
-          color: color,
+          backgroundColor: displayColor.withValues(alpha: 0.2),
+          color: displayColor,
           minHeight: 8,
           borderRadius: BorderRadius.circular(4),
         ),

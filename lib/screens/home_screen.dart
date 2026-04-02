@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../services/auth_service.dart';
 import 'dashboard_screen.dart';
 import 'meal_screen.dart';
 import 'training_screen.dart';
@@ -21,13 +22,69 @@ class _HomeScreenState extends State<HomeScreen> {
     ProgressScreen(),
   ];
 
+  Future<void> _signOut(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('ログアウト'),
+        content: const Text('ログアウトしますか？'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('キャンセル'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('ログアウト'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) {
+      await AuthService().signOut();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final email = AuthService().userEmail ?? '';
     return Scaffold(
+      appBar: AppBar(
+        automaticallyImplyLeading: false,
+        title: const Text('Fitness Tracker'),
+        actions: [
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.account_circle_outlined),
+            tooltip: 'アカウント',
+            itemBuilder: (_) => [
+              PopupMenuItem(
+                enabled: false,
+                child: Text(
+                  email,
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ),
+              const PopupMenuDivider(),
+              const PopupMenuItem(
+                value: 'signout',
+                child: Row(
+                  children: [
+                    Icon(Icons.logout),
+                    SizedBox(width: 8),
+                    Text('ログアウト'),
+                  ],
+                ),
+              ),
+            ],
+            onSelected: (value) {
+              if (value == 'signout') _signOut(context);
+            },
+          ),
+        ],
+      ),
       body: _screens[_selectedIndex],
       bottomNavigationBar: NavigationBar(
-        onDestinationSelected: (index) =>
-            setState(() => _selectedIndex = index),
+        onDestinationSelected: (index) => setState(() => _selectedIndex = index),
         selectedIndex: _selectedIndex,
         destinations: const [
           NavigationDestination(
