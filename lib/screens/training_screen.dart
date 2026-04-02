@@ -148,7 +148,7 @@ class _TrainingScreenState extends ConsumerState<TrainingScreen> {
         SliverToBoxAdapter(
           child: _buildOneRmCard(state),
         ),
-        if (settings.trainingAdviceEnabled && todayLogs.isNotEmpty)
+        if (settings.trainingAdviceEnabled)
           SliverToBoxAdapter(
             child: _buildTrainingAdviceCard(
               context,
@@ -452,9 +452,9 @@ class _TrainingScreenState extends ConsumerState<TrainingScreen> {
         .toSet()
         .toList()
       ..sort();
-    final suggestions = {
+    final suggestions = <String>{
       ...recentExerciseNames,
-      ...allExerciseNames
+      ...allExerciseNames,
     }.toList();
 
     showDialog(
@@ -860,17 +860,21 @@ class _TrainingScreenState extends ConsumerState<TrainingScreen> {
                       )
                     : IconButton(
                         icon: const Icon(Icons.refresh),
-                        tooltip: '今日のトレーニングを評価',
-                        onPressed: () => ref
-                            .read(trainingAdviceProvider.notifier)
-                            .fetchAdvice(
-                              todayLogs: todayLogs,
-                              allLogs: allLogs,
-                              date: DateTime.now(),
-                              adviceLevel: settings.adviceLevel,
-                              apiKey: settings.currentApiKey,
-                              provider: settings.selectedProvider,
-                            ),
+                        tooltip: todayLogs.isEmpty
+                            ? '今日の記録がないため評価できません'
+                            : '今日のトレーニングを評価',
+                        onPressed: todayLogs.isEmpty
+                            ? null
+                            : () => ref
+                                .read(trainingAdviceProvider.notifier)
+                                .fetchAdvice(
+                                  todayLogs: todayLogs,
+                                  allLogs: allLogs,
+                                  date: DateTime.now(),
+                                  adviceLevel: settings.adviceLevel,
+                                  apiKey: settings.currentApiKey,
+                                  provider: settings.selectedProvider,
+                                ),
                       ),
               ],
             ),
@@ -893,11 +897,13 @@ class _TrainingScreenState extends ConsumerState<TrainingScreen> {
             if (adviceState.adviceText == null &&
                 adviceState.error == null &&
                 !adviceState.isLoading)
-              const Padding(
-                padding: EdgeInsets.only(top: 4),
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
                 child: Text(
-                  '↑ ボタンを押して今日のトレーニングを評価',
-                  style: TextStyle(color: Colors.grey, fontSize: 12),
+                  todayLogs.isEmpty
+                      ? '今日分の記録がありません。ヘルスケア連携の時刻は端末の「今日」とずれることがあります。'
+                      : '↑ ボタンを押して今日のトレーニングを評価',
+                  style: const TextStyle(color: Colors.grey, fontSize: 12),
                 ),
               ),
           ],

@@ -1,4 +1,4 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:riverpod/legacy.dart';
 import 'package:uuid/uuid.dart';
 import '../models/body_metrics.dart';
 import '../services/database_service.dart';
