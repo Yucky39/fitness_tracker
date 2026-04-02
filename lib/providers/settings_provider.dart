@@ -75,6 +75,8 @@ class SettingsState {
   final bool workoutReminderEnabled;
   final int workoutReminderHour;
   final int workoutReminderMinute;
+  // Training AI advice toggle
+  final bool trainingAdviceEnabled;
 
   const SettingsState({
     this.adviceLevel = 'normal',
@@ -88,6 +90,7 @@ class SettingsState {
     this.workoutReminderEnabled = false,
     this.workoutReminderHour = 18,
     this.workoutReminderMinute = 0,
+    this.trainingAdviceEnabled = true,
   });
 
   /// Returns the API key for the currently selected provider.
@@ -117,6 +120,7 @@ class SettingsState {
     bool? workoutReminderEnabled,
     int? workoutReminderHour,
     int? workoutReminderMinute,
+    bool? trainingAdviceEnabled,
   }) =>
       SettingsState(
         adviceLevel: adviceLevel ?? this.adviceLevel,
@@ -132,6 +136,8 @@ class SettingsState {
         workoutReminderHour: workoutReminderHour ?? this.workoutReminderHour,
         workoutReminderMinute:
             workoutReminderMinute ?? this.workoutReminderMinute,
+        trainingAdviceEnabled:
+            trainingAdviceEnabled ?? this.trainingAdviceEnabled,
       );
 }
 
@@ -156,7 +162,14 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
       workoutReminderEnabled: prefs.getBool('workoutReminderEnabled') ?? false,
       workoutReminderHour: prefs.getInt('workoutReminderHour') ?? 18,
       workoutReminderMinute: prefs.getInt('workoutReminderMinute') ?? 0,
+      trainingAdviceEnabled: prefs.getBool('trainingAdviceEnabled') ?? true,
     );
+  }
+
+  Future<void> updateTrainingAdviceEnabled(bool enabled) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('trainingAdviceEnabled', enabled);
+    state = state.copyWith(trainingAdviceEnabled: enabled);
   }
 
   Future<void> updateNotificationSettings({

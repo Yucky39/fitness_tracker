@@ -450,6 +450,28 @@ class MealScreen extends ConsumerWidget {
                   const SizedBox(height: 20),
                   const Divider(),
                   const SizedBox(height: 8),
+                  const Text('トレーニングAIアドバイス', style: TextStyle(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Switch(
+                        value: ref.read(settingsProvider).trainingAdviceEnabled,
+                        onChanged: (v) {
+                          ref.read(settingsProvider.notifier).updateTrainingAdviceEnabled(v);
+                          setDialogState(() {});
+                        },
+                      ),
+                      const Expanded(
+                        child: Text(
+                          'トレーニング画面でAI評価を表示する',
+                          style: TextStyle(fontSize: 13),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  const Divider(),
+                  const SizedBox(height: 8),
                   const Text('リマインダー通知', style: TextStyle(fontWeight: FontWeight.bold)),
                   const SizedBox(height: 12),
                   _buildReminderRow(

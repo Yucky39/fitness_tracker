@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../models/training_log.dart';
+import '../providers/settings_provider.dart';
+import '../providers/training_advice_provider.dart';
 import '../providers/training_provider.dart';
 import 'routine_screen.dart';
 
@@ -56,6 +58,15 @@ class _TrainingScreenState extends ConsumerState<TrainingScreen> {
   Widget build(BuildContext context) {
     final trainingState = ref.watch(trainingProvider);
     final trainingNotifier = ref.read(trainingProvider.notifier);
+    final settings = ref.watch(settingsProvider);
+
+    final today = DateTime.now();
+    final todayLogs = trainingState.logs
+        .where((l) =>
+            l.date.year == today.year &&
+            l.date.month == today.month &&
+            l.date.day == today.day)
+        .toList();
 
     return Scaffold(
       appBar: AppBar(
@@ -82,6 +93,13 @@ class _TrainingScreenState extends ConsumerState<TrainingScreen> {
                         SliverToBoxAdapter(
                           child: _buildOneRmCard(trainingState),
                         ),
+                        // AI advice card (today's logs only, shown when enabled)
+                        if (settings.trainingAdviceEnabled &&
+                            todayLogs.isNotEmpty)
+                          SliverToBoxAdapter(
+                            child: _buildTrainingAdviceCard(
+                                context, ref, todayLogs, trainingState.logs, settings),
+                          ),
                         SliverList(
                           delegate: SliverChildBuilderDelegate(
                             (context, index) {
@@ -104,6 +122,103 @@ class _TrainingScreenState extends ConsumerState<TrainingScreen> {
       floatingActionButton: FloatingActionButton(
         onPressed: () => _showAddTrainingDialog(context, ref),
         child: const Icon(Icons.add),
+      ),
+    );
+  }
+
+  Widget _buildTrainingAdviceCard(
+    BuildContext context,
+    WidgetRef ref,
+    List<TrainingLog> todayLogs,
+    List<TrainingLog> allLogs,
+    SettingsState settings,
+  ) {
+    final adviceState = ref.watch(trainingAdviceProvider);
+
+    return Card(
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.psychology, color: Colors.teal, size: 18),
+                const SizedBox(width: 8),
+                const Expanded(
+                  child: Text(
+                    'AIトレーニング評価',
+                    style: TextStyle(
+                        fontSize: 15, fontWeight: FontWeight.bold),
+                  ),
+                ),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: Colors.teal.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    '${settings.selectedProvider.label} · ${settings.adviceLevelLabel}',
+                    style:
+                        const TextStyle(fontSize: 11, color: Colors.teal),
+                  ),
+                ),
+                const SizedBox(width: 4),
+                adviceState.isLoading
+                    ? const SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : IconButton(
+                        icon: const Icon(Icons.refresh),
+                        tooltip: '今日のトレーニングを評価',
+                        onPressed: () => ref
+                            .read(trainingAdviceProvider.notifier)
+                            .fetchAdvice(
+                              todayLogs: todayLogs,
+                              allLogs: allLogs,
+                              date: DateTime.now(),
+                              adviceLevel: settings.adviceLevel,
+                              apiKey: settings.currentApiKey,
+                              provider: settings.selectedProvider,
+                            ),
+                      ),
+              ],
+            ),
+            if (adviceState.error != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                adviceState.error!,
+                style: const TextStyle(color: Colors.red, fontSize: 13),
+              ),
+            ],
+            if (adviceState.adviceText != null) ...[
+              const SizedBox(height: 8),
+              const Divider(),
+              const SizedBox(height: 4),
+              Text(
+                adviceState.adviceText!,
+                style: const TextStyle(fontSize: 13, height: 1.6),
+              ),
+            ],
+            if (adviceState.adviceText == null &&
+                adviceState.error == null &&
+                !adviceState.isLoading)
+              const Padding(
+                padding: EdgeInsets.only(top: 4),
+                child: Text(
+                  '↑ ボタンを押して今日のトレーニングを評価',
+                  style: TextStyle(color: Colors.grey, fontSize: 12),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }
