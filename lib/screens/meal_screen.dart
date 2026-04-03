@@ -19,9 +19,9 @@ import '../providers/preset_provider.dart';
 import '../providers/settings_provider.dart';
 import '../services/barcode_lookup_service.dart';
 import '../services/energy_goal_calculator.dart';
-import '../services/meal_image_analysis_service.dart';
 import '../services/export_service.dart';
 import '../services/food_search_service.dart';
+import '../services/meal_image_analysis_service.dart';
 import '../services/notification_service.dart';
 import '../widgets/nutrient_bar.dart';
 
