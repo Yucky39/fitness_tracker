@@ -3,7 +3,27 @@
     "allow": [
       "Bash(gh auth:*)",
       "Bash(git init:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(gh api:*)",
+      "Bash(git config:*)",
+      "Bash(gh repo:*)",
+      "Bash(flutter build:*)",
+      "Bash(vercel whoami:*)",
+      "Bash(git push:*)",
+      "Bash(flutter pub:*)",
+      "Bash(export PATH=\"$PATH\":\"$HOME/.pub-cache/bin\")",
+      "Bash(flutterfire --version)",
+      "Read(//Users/yucky/**)",
+      "Bash(export PATH=\"$PATH:$HOME/.pub-cache/bin\")",
+      "Bash(flutterfire configure:*)",
+      "Bash(flutter analyze:*)",
+      "Bash(pod install:*)",
+      "Bash(grep -r \"HealthKit\\\\|health_kit\\\\|Apple.*health\\\\|HealthStore\" /Users/yucky/Desktop/fitness_tracker/ios --include=*.swift --include=*.plist)",
+      "Bash(grep -r \"CYCLING\\\\|BIKE\\\\|cycling\\\\|bike\" ~/.pub-cache/hosted/pub.dev/health-*/lib/)"
+    ],
+    "additionalDirectories": [
+      "/Users/yucky"
     ]
   }
 }

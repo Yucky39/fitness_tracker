@@ -3,6 +3,10 @@
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <uses-permission android:name="android.permission.USE_EXACT_ALARM"/>
+    <!-- Health Connect (Android 14+) -->
+    <uses-permission android:name="android.permission.health.READ_EXERCISE"/>
+    <uses-permission android:name="android.permission.health.READ_DISTANCE"/>
+    <uses-permission android:name="android.permission.health.READ_TOTAL_CALORIES_BURNED"/>
     <application
         android:label="fitness_tracker"
         android:name="${applicationName}"
@@ -54,6 +58,11 @@
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
+        </intent>
+        <!-- Health Connect -->
+        <package android:name="com.google.android.apps.healthdata"/>
+        <intent>
+            <action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE"/>
         </intent>
     </queries>
 </manifest>

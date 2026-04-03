@@ -1,13 +1,21 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
+
+import 'firebase_options.dart';
+import 'providers/auth_provider.dart';
+import 'screens/auth_screen.dart';
 import 'screens/home_screen.dart';
 import 'services/notification_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
 
   // Initialize timezone
   tz.initializeTimeZones();
@@ -52,7 +60,25 @@ class FitnessTrackerApp extends StatelessWidget {
         fontFamily: 'Roboto',
       ),
       themeMode: ThemeMode.system,
-      home: const HomeScreen(),
+      home: const AuthGate(),
+    );
+  }
+}
+
+/// Watches Firebase auth state and routes to either AuthScreen or HomeScreen.
+class AuthGate extends ConsumerWidget {
+  const AuthGate({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final authState = ref.watch(authStateProvider);
+
+    return authState.when(
+      loading: () => const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      ),
+      error: (_, __) => const AuthScreen(),
+      data: (user) => user != null ? const HomeScreen() : const AuthScreen(),
     );
   }
 }
