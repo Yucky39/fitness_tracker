@@ -1,9 +1,11 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod/legacy.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 import '../models/food_item.dart';
 import '../services/database_service.dart';
 import '../services/sync_service.dart';
+import 'dashboard_provider.dart';
 
 class MealState {
   final List<FoodItem> todayItems;
@@ -67,9 +69,14 @@ class MealState {
 }
 
 class MealNotifier extends StateNotifier<MealState> {
-  MealNotifier() : super(MealState()) {
+  MealNotifier(this._ref) : super(MealState()) {
     _loadData();
   }
+
+  final Ref _ref;
+
+  Future<void> _refreshDashboard() =>
+      _ref.read(dashboardProvider.notifier).loadWeeklyData();
 
   Future<void> _loadData() async {
     state = state.copyWith(isLoading: true);
@@ -194,6 +201,7 @@ class MealNotifier extends StateNotifier<MealState> {
     SyncService().syncRecord('food_items', newItem.toMap());
     await _loadItemsForDate(state.selectedDate);
     await _loadRecentFoods();
+    await _refreshDashboard();
   }
 
   Future<void> updateFoodItem(FoodItem updated) async {
@@ -207,6 +215,7 @@ class MealNotifier extends StateNotifier<MealState> {
     SyncService().syncRecord('food_items', updated.toMap());
     await _loadItemsForDate(state.selectedDate);
     await _loadRecentFoods();
+    await _refreshDashboard();
   }
 
   Future<void> deleteFoodItem(String id) async {
@@ -215,9 +224,10 @@ class MealNotifier extends StateNotifier<MealState> {
     SyncService().deleteRecord('food_items', id);
     await _loadItemsForDate(state.selectedDate);
     await _loadRecentFoods();
+    await _refreshDashboard();
   }
 }
 
 final mealProvider = StateNotifierProvider<MealNotifier, MealState>((ref) {
-  return MealNotifier();
+  return MealNotifier(ref);
 });

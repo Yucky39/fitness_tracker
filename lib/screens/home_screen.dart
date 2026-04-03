@@ -1,20 +1,21 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../providers/home_tab_provider.dart';
 import '../services/auth_service.dart';
 import 'dashboard_screen.dart';
 import 'meal_screen.dart';
-import 'training_screen.dart';
 import 'progress_screen.dart';
+import 'training_screen.dart';
 
-class HomeScreen extends StatefulWidget {
+class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
 
   @override
-  State<HomeScreen> createState() => _HomeScreenState();
+  ConsumerState<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
-  int _selectedIndex = 0;
-
+class _HomeScreenState extends ConsumerState<HomeScreen> {
   static const List<Widget> _screens = [
     DashboardScreen(),
     MealScreen(),
@@ -48,6 +49,8 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final email = AuthService().userEmail ?? '';
+    final selectedIndex = ref.watch(homeTabIndexProvider);
+
     return Scaffold(
       appBar: AppBar(
         automaticallyImplyLeading: false,
@@ -82,10 +85,12 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
-      body: _screens[_selectedIndex],
+      body: _screens[selectedIndex],
       bottomNavigationBar: NavigationBar(
-        onDestinationSelected: (index) => setState(() => _selectedIndex = index),
-        selectedIndex: _selectedIndex,
+        onDestinationSelected: (index) {
+          ref.read(homeTabIndexProvider.notifier).state = index;
+        },
+        selectedIndex: selectedIndex,
         destinations: const [
           NavigationDestination(
             icon: Icon(Icons.dashboard_outlined),

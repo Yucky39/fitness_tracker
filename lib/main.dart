@@ -52,6 +52,13 @@ class FitnessTrackerApp extends StatelessWidget {
           brightness: Brightness.light,
         ),
         fontFamily: 'Roboto',
+        cardTheme: CardThemeData(
+          elevation: 0,
+          clipBehavior: Clip.antiAlias,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+        ),
       ),
       darkTheme: ThemeData(
         useMaterial3: true,
@@ -60,6 +67,13 @@ class FitnessTrackerApp extends StatelessWidget {
           brightness: Brightness.dark,
         ),
         fontFamily: 'Roboto',
+        cardTheme: CardThemeData(
+          elevation: 0,
+          clipBehavior: Clip.antiAlias,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+        ),
       ),
       themeMode: ThemeMode.system,
       home: const AuthGate(),
