@@ -1831,8 +1831,31 @@ class MealScreen extends ConsumerWidget {
     Navigator.pop(context); // close loading dialog
 
     if (result == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('バーコード「$barcode」の商品が見つかりませんでした')),
+      await showDialog(
+        context: context,
+        builder: (_) => _BarcodeManualRegisterDialog(
+          barcode: barcode,
+          onAdd: ({
+            required String name,
+            required int calories,
+            required double protein,
+            required double fat,
+            required double carbs,
+            required MealType mealType,
+          }) {
+            notifier.addFoodItem(
+              name: name,
+              calories: calories,
+              protein: protein,
+              fat: fat,
+              carbs: carbs,
+              sugar: 0,
+              fiber: 0,
+              sodium: 0,
+              mealType: mealType,
+            );
+          },
+        ),
       );
       return;
     }
@@ -2287,6 +2310,168 @@ class _BarcodeResultDialogState extends State<_BarcodeResultDialog> {
             );
             Navigator.pop(context);
           },
+          child: const Text('追加'),
+        ),
+      ],
+    );
+  }
+}
+
+// ── Barcode manual register dialog ────────────────────────────────────────
+
+class _BarcodeManualRegisterDialog extends StatefulWidget {
+  final String barcode;
+  final void Function({
+    required String name,
+    required int calories,
+    required double protein,
+    required double fat,
+    required double carbs,
+    required MealType mealType,
+  }) onAdd;
+
+  const _BarcodeManualRegisterDialog({
+    required this.barcode,
+    required this.onAdd,
+  });
+
+  @override
+  State<_BarcodeManualRegisterDialog> createState() =>
+      _BarcodeManualRegisterDialogState();
+}
+
+class _BarcodeManualRegisterDialogState
+    extends State<_BarcodeManualRegisterDialog> {
+  final _nameController = TextEditingController();
+  final _caloriesController = TextEditingController();
+  final _proteinController = TextEditingController();
+  final _fatController = TextEditingController();
+  final _carbsController = TextEditingController();
+  MealType _mealType = MealType.detectFromTime(DateTime.now());
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _caloriesController.dispose();
+    _proteinController.dispose();
+    _fatController.dispose();
+    _carbsController.dispose();
+    super.dispose();
+  }
+
+  bool get _canSubmit =>
+      _nameController.text.trim().isNotEmpty &&
+      (int.tryParse(_caloriesController.text) ?? -1) >= 0;
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('食品を手動で登録'),
+      content: SingleChildScrollView(
+        child: StatefulBuilder(
+          builder: (context, setDialogState) {
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'バーコード: ${widget.barcode}',
+                  style: const TextStyle(fontSize: 12, color: Colors.grey),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _nameController,
+                  decoration: const InputDecoration(labelText: '食品名 *'),
+                  onChanged: (_) => setDialogState(() {}),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _caloriesController,
+                  decoration: const InputDecoration(
+                    labelText: 'カロリー *',
+                    suffixText: 'kcal',
+                  ),
+                  keyboardType: TextInputType.number,
+                  onChanged: (_) => setDialogState(() {}),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _proteinController,
+                        decoration: const InputDecoration(
+                          labelText: 'タンパク質',
+                          suffixText: 'g',
+                        ),
+                        keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: TextField(
+                        controller: _fatController,
+                        decoration: const InputDecoration(
+                          labelText: '脂質',
+                          suffixText: 'g',
+                        ),
+                        keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: TextField(
+                        controller: _carbsController,
+                        decoration: const InputDecoration(
+                          labelText: '炭水化物',
+                          suffixText: 'g',
+                        ),
+                        keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                const Text('食事の種類',
+                    style: TextStyle(fontSize: 12, color: Colors.grey)),
+                const SizedBox(height: 6),
+                Wrap(
+                  spacing: 8,
+                  children: MealType.values.map((t) {
+                    return ChoiceChip(
+                      label: Text(t.label),
+                      selected: _mealType == t,
+                      onSelected: (_) => setState(() => _mealType = t),
+                    );
+                  }).toList(),
+                ),
+              ],
+            );
+          },
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('キャンセル'),
+        ),
+        TextButton(
+          onPressed: _canSubmit
+              ? () {
+                  widget.onAdd(
+                    name: _nameController.text.trim(),
+                    calories: int.tryParse(_caloriesController.text) ?? 0,
+                    protein: double.tryParse(_proteinController.text) ?? 0,
+                    fat: double.tryParse(_fatController.text) ?? 0,
+                    carbs: double.tryParse(_carbsController.text) ?? 0,
+                    mealType: _mealType,
+                  );
+                  Navigator.pop(context);
+                }
+              : null,
           child: const Text('追加'),
         ),
       ],
