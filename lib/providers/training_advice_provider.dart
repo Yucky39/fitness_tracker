@@ -4,87 +4,76 @@ import '../providers/settings_provider.dart';
 import '../services/training_advice_service.dart';
 
 class TrainingAdviceState {
-  final String? adviceText;
-  final bool isLoading;
-  final String? error;
+  /// 記録IDごとの評価テキスト（再取得で上書き）
+  final Map<String, String> adviceByLogId;
+  final String? loadingLogId;
+  final String? errorLogId;
+  final String? errorMessage;
 
   const TrainingAdviceState({
-    this.adviceText,
-    this.isLoading = false,
-    this.error,
+    this.adviceByLogId = const {},
+    this.loadingLogId,
+    this.errorLogId,
+    this.errorMessage,
   });
 
-  TrainingAdviceState copyWith({
-    String? adviceText,
-    bool? isLoading,
-    String? error,
-  }) =>
-      TrainingAdviceState(
-        adviceText: adviceText ?? this.adviceText,
-        isLoading: isLoading ?? this.isLoading,
-        error: error ?? this.error,
-      );
 }
 
 class TrainingAdviceNotifier extends StateNotifier<TrainingAdviceState> {
   TrainingAdviceNotifier() : super(const TrainingAdviceState());
 
-  Future<void> fetchAdvice({
-    required List<TrainingLog> todayLogs,
+  /// 1件の記録を評価。[allLogs] は日付降順を想定（同種目の直近比較用）。
+  Future<void> fetchAdviceForLog({
+    required TrainingLog log,
     required List<TrainingLog> allLogs,
-    required DateTime date,
     required String adviceLevel,
     required String apiKey,
     required AiProviderType provider,
+    String? model,
   }) async {
     if (apiKey.isEmpty) {
-      state = const TrainingAdviceState(
-        error: 'APIキーが設定されていません。設定画面から入力してください。',
-      );
-      return;
-    }
-    if (todayLogs.isEmpty) {
-      state = const TrainingAdviceState(
-        error: '今日のトレーニング記録がありません。',
+      state = TrainingAdviceState(
+        adviceByLogId: state.adviceByLogId,
+        errorLogId: log.id,
+        errorMessage: 'APIキーが設定されていません。設定画面から入力してください。',
       );
       return;
     }
 
-    state = const TrainingAdviceState(isLoading: true);
+    state = TrainingAdviceState(
+      adviceByLogId: state.adviceByLogId,
+      loadingLogId: log.id,
+    );
 
     try {
-      // Build history map: exercise -> past logs (excluding today, up to 5 most recent)
-      final today = DateTime(date.year, date.month, date.day);
-      final Map<String, List<TrainingLog>> historyByExercise = {};
+      final history = allLogs
+          .where((l) => l.id != log.id && l.exerciseName == log.exerciseName)
+          .take(5)
+          .toList();
 
-      for (final log in allLogs) {
-        final logDate =
-            DateTime(log.date.year, log.date.month, log.date.day);
-        if (logDate.isAtSameMomentAs(today)) continue; // skip today
-        historyByExercise
-            .putIfAbsent(log.exerciseName, () => [])
-            .add(log);
-      }
-      // Keep only the 5 most recent per exercise (allLogs is already DESC)
-      for (final key in historyByExercise.keys) {
-        if (historyByExercise[key]!.length > 5) {
-          historyByExercise[key] = historyByExercise[key]!.take(5).toList();
-        }
-      }
+      final historyByExercise = <String, List<TrainingLog>>{
+        log.exerciseName: history,
+      };
 
       final text = await TrainingAdviceService().getAdvice(
-        todayLogs: todayLogs,
+        focusLogs: [log],
         historyByExercise: historyByExercise,
-        date: date,
         adviceLevel: adviceLevel,
         apiKey: apiKey,
         provider: provider,
+        model: model,
       );
 
-      state = TrainingAdviceState(adviceText: text);
+      state = TrainingAdviceState(
+        adviceByLogId: {...state.adviceByLogId, log.id: text},
+      );
     } catch (e) {
       final msg = e.toString().replaceFirst('Exception: ', '');
-      state = TrainingAdviceState(error: msg);
+      state = TrainingAdviceState(
+        adviceByLogId: state.adviceByLogId,
+        errorLogId: log.id,
+        errorMessage: msg,
+      );
     }
   }
 

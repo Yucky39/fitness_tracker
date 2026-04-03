@@ -27,9 +27,57 @@ class _TrainingScreenState extends ConsumerState<TrainingScreen> {
   int _timerTotal = 0;
 
   @override
+  void initState() {
+    super.initState();
+    if (HealthService.isSupported) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _autoImportFromHealth();
+      });
+    }
+  }
+
+  @override
   void dispose() {
     _timer?.cancel();
     super.dispose();
+  }
+
+  Future<void> _autoImportFromHealth() async {
+    final granted = await HealthService.requestPermissions();
+    if (!granted || !mounted) return;
+
+    final workouts = await HealthService.fetchRecentWorkouts(days: 30);
+    if (workouts.isEmpty || !mounted) return;
+
+    final notifier = ref.read(trainingProvider.notifier);
+
+    final existingDates = ref
+        .read(trainingProvider)
+        .logs
+        .where((l) => l.note == 'ヘルスケアから取得')
+        .map((l) =>
+            '${l.exerciseName}_${DateFormat('yyyyMMddHHmm').format(l.date)}')
+        .toSet();
+
+    final newWorkouts = workouts.where((w) {
+      final key =
+          '${w.exerciseName}_${DateFormat('yyyyMMddHHmm').format(w.date)}';
+      return !existingDates.contains(key);
+    }).toList();
+
+    if (newWorkouts.isEmpty) return;
+
+    for (final w in newWorkouts) {
+      await notifier.addLogFromHealth(w);
+    }
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('ヘルスケアから ${newWorkouts.length} 件のワークアウトを取り込みました'),
+        ),
+      );
+    }
   }
 
   void _startIntervalTimer(int seconds) {
@@ -138,6 +186,7 @@ class _TrainingScreenState extends ConsumerState<TrainingScreen> {
     SettingsState settings,
   ) {
     final todayLogs = state.todayLogs;
+    final adviceState = ref.watch(trainingAdviceProvider);
 
     return CustomScrollView(
       slivers: [
@@ -148,16 +197,6 @@ class _TrainingScreenState extends ConsumerState<TrainingScreen> {
         SliverToBoxAdapter(
           child: _buildOneRmCard(state),
         ),
-        if (settings.trainingAdviceEnabled)
-          SliverToBoxAdapter(
-            child: _buildTrainingAdviceCard(
-              context,
-              ref,
-              todayLogs,
-              state.logs,
-              settings,
-            ),
-          ),
 
         SliverList(
           delegate: SliverChildBuilderDelegate(
@@ -199,6 +238,24 @@ class _TrainingScreenState extends ConsumerState<TrainingScreen> {
                 },
                 onIntervalTimer: log.interval > 0
                     ? () => _startIntervalTimer(log.interval)
+                    : null,
+                showAiAdvice: settings.trainingAdviceEnabled,
+                aiLoading: adviceState.loadingLogId == log.id,
+                aiAdvice: adviceState.adviceByLogId[log.id],
+                aiError: adviceState.errorLogId == log.id
+                    ? adviceState.errorMessage
+                    : null,
+                onRequestAiAdvice: settings.trainingAdviceEnabled
+                    ? () => ref
+                        .read(trainingAdviceProvider.notifier)
+                        .fetchAdviceForLog(
+                          log: log,
+                          allLogs: state.logs,
+                          adviceLevel: settings.adviceLevel,
+                          apiKey: settings.currentApiKey,
+                          provider: settings.selectedProvider,
+                          model: settings.currentModel,
+                        )
                     : null,
               );
             },
@@ -810,108 +867,6 @@ class _TrainingScreenState extends ConsumerState<TrainingScreen> {
     );
   }
 
-  Widget _buildTrainingAdviceCard(
-    BuildContext context,
-    WidgetRef ref,
-    List<TrainingLog> todayLogs,
-    List<TrainingLog> allLogs,
-    SettingsState settings,
-  ) {
-    final adviceState = ref.watch(trainingAdviceProvider);
-
-    return Card(
-      margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Icon(Icons.psychology, color: Colors.teal, size: 18),
-                const SizedBox(width: 8),
-                const Expanded(
-                  child: Text(
-                    'AIトレーニング評価',
-                    style:
-                        TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
-                  ),
-                ),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: Colors.teal.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    '${settings.selectedProvider.label} · ${settings.adviceLevelLabel}',
-                    style: const TextStyle(fontSize: 11, color: Colors.teal),
-                  ),
-                ),
-                const SizedBox(width: 4),
-                adviceState.isLoading
-                    ? const SizedBox(
-                        width: 24,
-                        height: 24,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : IconButton(
-                        icon: const Icon(Icons.refresh),
-                        tooltip: todayLogs.isEmpty
-                            ? '今日の記録がないため評価できません'
-                            : '今日のトレーニングを評価',
-                        onPressed: todayLogs.isEmpty
-                            ? null
-                            : () => ref
-                                .read(trainingAdviceProvider.notifier)
-                                .fetchAdvice(
-                                  todayLogs: todayLogs,
-                                  allLogs: allLogs,
-                                  date: DateTime.now(),
-                                  adviceLevel: settings.adviceLevel,
-                                  apiKey: settings.currentApiKey,
-                                  provider: settings.selectedProvider,
-                                ),
-                      ),
-              ],
-            ),
-            if (adviceState.error != null) ...[
-              const SizedBox(height: 8),
-              Text(
-                adviceState.error!,
-                style: const TextStyle(color: Colors.red, fontSize: 13),
-              ),
-            ],
-            if (adviceState.adviceText != null) ...[
-              const SizedBox(height: 8),
-              const Divider(),
-              const SizedBox(height: 4),
-              Text(
-                adviceState.adviceText!,
-                style: const TextStyle(fontSize: 13, height: 1.6),
-              ),
-            ],
-            if (adviceState.adviceText == null &&
-                adviceState.error == null &&
-                !adviceState.isLoading)
-              Padding(
-                padding: const EdgeInsets.only(top: 4),
-                child: Text(
-                  todayLogs.isEmpty
-                      ? '今日分の記録がありません。ヘルスケア連携の時刻は端末の「今日」とずれることがあります。'
-                      : '↑ ボタンを押して今日のトレーニングを評価',
-                  style: const TextStyle(color: Colors.grey, fontSize: 12),
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget _buildOneRmCard(TrainingState state) {
     final Map<String, double> bestOneRm = {};
     for (final log in state.logs) {
@@ -1175,6 +1130,11 @@ class _TrainingLogCard extends StatelessWidget {
   final VoidCallback onEdit;
   final VoidCallback onDelete;
   final VoidCallback? onIntervalTimer;
+  final bool showAiAdvice;
+  final bool aiLoading;
+  final String? aiAdvice;
+  final String? aiError;
+  final VoidCallback? onRequestAiAdvice;
 
   const _TrainingLogCard({
     required this.log,
@@ -1184,6 +1144,11 @@ class _TrainingLogCard extends StatelessWidget {
     required this.onEdit,
     required this.onDelete,
     this.onIntervalTimer,
+    this.showAiAdvice = false,
+    this.aiLoading = false,
+    this.aiAdvice,
+    this.aiError,
+    this.onRequestAiAdvice,
   });
 
   @override
@@ -1197,14 +1162,17 @@ class _TrainingLogCard extends StatelessWidget {
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(12),
-        onTap: onEdit,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          InkWell(
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+            onTap: onEdit,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
               // ── Header ──────────────────────────────────────────────
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -1363,9 +1331,59 @@ class _TrainingLogCard extends StatelessWidget {
                 DateFormat('yyyy/MM/dd HH:mm').format(log.date),
                 style: const TextStyle(fontSize: 11, color: Colors.grey),
               ),
-            ],
+                ],
+              ),
+            ),
           ),
-        ),
+          if (showAiAdvice && onRequestAiAdvice != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 0, 8, 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Divider(height: 1),
+                  const SizedBox(height: 8),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton.icon(
+                      onPressed: aiLoading ? null : onRequestAiAdvice,
+                      icon: aiLoading
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child:
+                                  CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.psychology_outlined, size: 20),
+                      label: Text(
+                        aiAdvice != null ? 'この記録を再評価' : 'この記録をAI評価',
+                        style: const TextStyle(fontSize: 13),
+                      ),
+                    ),
+                  ),
+                  if (aiError != null) ...[
+                    Text(
+                      aiError!,
+                      style: const TextStyle(
+                        color: Colors.red,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                  if (aiAdvice != null) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      aiAdvice!,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        height: 1.55,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+        ],
       ),
     );
   }

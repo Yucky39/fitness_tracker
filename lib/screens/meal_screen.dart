@@ -1167,7 +1167,7 @@ class MealScreen extends ConsumerWidget {
                       ),
                       const Expanded(
                         child: Text(
-                          'トレーニング画面でAI評価を表示する',
+                          '各トレーニング記録でAI評価ボタンを表示する',
                           style: TextStyle(fontSize: 13),
                         ),
                       ),
