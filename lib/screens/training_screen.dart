@@ -1,4 +1,5 @@
 import 'dart:async';
+
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -20,7 +21,6 @@ class TrainingScreen extends ConsumerStatefulWidget {
 }
 
 class _TrainingScreenState extends ConsumerState<TrainingScreen> {
-  // Interval timer state
   Timer? _timer;
   int _timerSeconds = 0;
   bool _timerRunning = false;
@@ -32,7 +32,7 @@ class _TrainingScreenState extends ConsumerState<TrainingScreen> {
     super.dispose();
   }
 
-  void _startTimer(int seconds) {
+  void _startIntervalTimer(int seconds) {
     _timer?.cancel();
     setState(() {
       _timerTotal = seconds;
@@ -49,7 +49,7 @@ class _TrainingScreenState extends ConsumerState<TrainingScreen> {
     });
   }
 
-  void _stopTimer() {
+  void _stopIntervalTimer() {
     _timer?.cancel();
     setState(() {
       _timerRunning = false;
@@ -61,19 +61,33 @@ class _TrainingScreenState extends ConsumerState<TrainingScreen> {
   Widget build(BuildContext context) {
     final trainingState = ref.watch(trainingProvider);
     final trainingNotifier = ref.read(trainingProvider.notifier);
-    final settings = ref.watch(settingsProvider);
     final bodyWeightKg = ref.watch(energyProfileProvider).weightKg;
+    final settings = ref.watch(settingsProvider);
     final effectiveBw = bodyWeightKg > 0
         ? bodyWeightKg
         : TrainingCalorieCalculator.defaultBodyWeightKg;
 
-    final today = DateTime.now();
-    final todayLogs = trainingState.logs
-        .where((l) =>
-            l.date.year == today.year &&
-            l.date.month == today.month &&
-            l.date.day == today.day)
-        .toList();
+    Widget bodyChild;
+    if (trainingState.isLoading) {
+      bodyChild = const Center(child: CircularProgressIndicator());
+    } else if (trainingState.logs.isEmpty) {
+      bodyChild = const Center(
+        child: Text(
+          'まだ記録がありません\n右下の + ボタンで追加できます',
+          textAlign: TextAlign.center,
+          style: TextStyle(color: Colors.grey),
+        ),
+      );
+    } else {
+      bodyChild = _buildBody(
+        context,
+        ref,
+        trainingState,
+        trainingNotifier,
+        effectiveBw,
+        settings,
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -84,7 +98,9 @@ class _TrainingScreenState extends ConsumerState<TrainingScreen> {
             tooltip: 'ルーティン管理',
             onPressed: () => Navigator.push(
               context,
-              MaterialPageRoute(builder: (_) => const RoutineScreen()),
+              MaterialPageRoute<void>(
+                builder: (_) => const RoutineScreen(),
+              ),
             ),
           ),
           if (HealthService.isSupported)
@@ -97,18 +113,8 @@ class _TrainingScreenState extends ConsumerState<TrainingScreen> {
       ),
       body: Stack(
         children: [
-          trainingState.isLoading
-              ? const Center(child: CircularProgressIndicator())
-              : trainingState.logs.isEmpty
-                  ? const Center(
-                      child: Text('まだ記録がありません\n右下の + ボタンで追加できます',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(color: Colors.grey)))
-                  : _buildBody(context, ref, trainingState, trainingNotifier,
-                      effectiveBw, settings, todayLogs),
-          // Interval timer overlay
-          if (_timerRunning || _timerSeconds > 0)
-            _buildTimerOverlay(),
+          bodyChild,
+          if (_timerRunning || _timerSeconds > 0) _buildTimerOverlay(),
         ],
       ),
       floatingActionButton: FloatingActionButton(
@@ -123,378 +129,6 @@ class _TrainingScreenState extends ConsumerState<TrainingScreen> {
     );
   }
 
-  Widget _buildTrainingAdviceCard(
-    BuildContext context,
-    WidgetRef ref,
-    List<TrainingLog> todayLogs,
-    List<TrainingLog> allLogs,
-    SettingsState settings,
-  ) {
-    final adviceState = ref.watch(trainingAdviceProvider);
-
-    return Card(
-      margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Icon(Icons.psychology, color: Colors.teal, size: 18),
-                const SizedBox(width: 8),
-                const Expanded(
-                  child: Text(
-                    'AIトレーニング評価',
-                    style: TextStyle(
-                        fontSize: 15, fontWeight: FontWeight.bold),
-                  ),
-                ),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: Colors.teal.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    '${settings.selectedProvider.label} · ${settings.adviceLevelLabel}',
-                    style:
-                        const TextStyle(fontSize: 11, color: Colors.teal),
-                  ),
-                ),
-                const SizedBox(width: 4),
-                adviceState.isLoading
-                    ? const SizedBox(
-                        width: 24,
-                        height: 24,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : IconButton(
-                        icon: const Icon(Icons.refresh),
-                        tooltip: '今日のトレーニングを評価',
-                        onPressed: () => ref
-                            .read(trainingAdviceProvider.notifier)
-                            .fetchAdvice(
-                              todayLogs: todayLogs,
-                              allLogs: allLogs,
-                              date: DateTime.now(),
-                              adviceLevel: settings.adviceLevel,
-                              apiKey: settings.currentApiKey,
-                              provider: settings.selectedProvider,
-                            ),
-                      ),
-              ],
-            ),
-            if (adviceState.error != null) ...[
-              const SizedBox(height: 8),
-              Text(
-                adviceState.error!,
-                style: const TextStyle(color: Colors.red, fontSize: 13),
-              ),
-            ],
-            if (adviceState.adviceText != null) ...[
-              const SizedBox(height: 8),
-              const Divider(),
-              const SizedBox(height: 4),
-              Text(
-                adviceState.adviceText!,
-                style: const TextStyle(fontSize: 13, height: 1.6),
-              ),
-            ],
-            if (adviceState.adviceText == null &&
-                adviceState.error == null &&
-                !adviceState.isLoading)
-              const Padding(
-                padding: EdgeInsets.only(top: 4),
-                child: Text(
-                  '↑ ボタンを押して今日のトレーニングを評価',
-                  style: TextStyle(color: Colors.grey, fontSize: 12),
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildOneRmCard(TrainingState state) {
-    // Group by exercise, find best estimated 1RM using Epley: w*(1+reps/30)
-    final Map<String, double> bestOneRm = {};
-    for (final log in state.logs) {
-      if (log.reps > 0 && log.weight > 0) {
-        final est = log.weight * (1 + log.reps / 30);
-        if (!bestOneRm.containsKey(log.exerciseName) ||
-            est > bestOneRm[log.exerciseName]!) {
-          bestOneRm[log.exerciseName] = est;
-        }
-      }
-    }
-    if (bestOneRm.isEmpty) return const SizedBox.shrink();
-
-    final sorted = bestOneRm.entries.toList()
-      ..sort((a, b) => b.value.compareTo(a.value));
-    final top = sorted.take(4).toList();
-
-    return Card(
-      margin: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: const [
-                Icon(Icons.emoji_events, color: Colors.amber, size: 18),
-                SizedBox(width: 6),
-                Text('推定1RM（エプリー式）',
-                    style: TextStyle(
-                        fontSize: 14, fontWeight: FontWeight.bold)),
-              ],
-            ),
-            const SizedBox(height: 10),
-            Wrap(
-              spacing: 12,
-              runSpacing: 8,
-              children: top.map((e) {
-                return GestureDetector(
-                  onTap: () => _showExerciseChart(context, e.key),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context)
-                          .colorScheme
-                          .primaryContainer
-                          .withOpacity(0.5),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(e.key,
-                            style: const TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600)),
-                        Text(
-                          '${e.value.toStringAsFixed(1)} kg',
-                          style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                              color: Theme.of(context).colorScheme.primary),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              }).toList(),
-            ),
-            const SizedBox(height: 4),
-            const Text('タップで重量推移グラフを表示',
-                style: TextStyle(fontSize: 10, color: Colors.grey)),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _showExerciseChart(BuildContext context, String exerciseName) {
-    final logs = ref
-        .read(trainingProvider)
-        .logs
-        .where((l) => l.exerciseName == exerciseName && l.weight > 0)
-        .toList()
-      ..sort((a, b) => a.date.compareTo(b.date));
-
-    if (logs.isEmpty) return;
-
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (_) => Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('$exerciseName - 重量推移',
-                style: const TextStyle(
-                    fontSize: 16, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 16),
-            SizedBox(
-              height: 200,
-              child: LineChart(
-                LineChartData(
-                  lineBarsData: [
-                    LineChartBarData(
-                      spots: logs.asMap().entries.map((e) {
-                        return FlSpot(
-                            e.key.toDouble(), e.value.weight);
-                      }).toList(),
-                      isCurved: true,
-                      color: Colors.teal,
-                      barWidth: 3,
-                      dotData: const FlDotData(show: true),
-                    ),
-                  ],
-                  titlesData: FlTitlesData(
-                    bottomTitles: AxisTitles(
-                      sideTitles: SideTitles(
-                        showTitles: true,
-                        interval: (logs.length / 4).ceilToDouble().clamp(1, logs.length.toDouble()),
-                        getTitlesWidget: (value, meta) {
-                          final i = value.toInt();
-                          if (i >= 0 && i < logs.length) {
-                            return Text(
-                              DateFormat('M/d').format(logs[i].date),
-                              style: const TextStyle(fontSize: 9),
-                            );
-                          }
-                          return const Text('');
-                        },
-                      ),
-                    ),
-                    leftTitles: const AxisTitles(
-                        sideTitles: SideTitles(
-                            showTitles: true, reservedSize: 36)),
-                    topTitles: const AxisTitles(
-                        sideTitles: SideTitles(showTitles: false)),
-                    rightTitles: const AxisTitles(
-                        sideTitles: SideTitles(showTitles: false)),
-                  ),
-                  gridData: const FlGridData(show: true),
-                  borderData: FlBorderData(show: true),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildLogItem(
-      BuildContext context, TrainingLog log, TrainingNotifier notifier) {
-    return Dismissible(
-      key: Key(log.id),
-      confirmDismiss: (_) async {
-        return await showDialog<bool>(
-              context: context,
-              builder: (_) => AlertDialog(
-                title: const Text('削除の確認'),
-                content: const Text('この記録を削除しますか？'),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(context, false),
-                    child: const Text('キャンセル'),
-                  ),
-                  TextButton(
-                    onPressed: () => Navigator.pop(context, true),
-                    child: const Text('削除'),
-                  ),
-                ],
-              ),
-            ) ??
-            false;
-      },
-      onDismissed: (_) => notifier.deleteLog(log.id),
-      background: Container(color: Colors.red),
-      child: Card(
-        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-        child: ListTile(
-          title: Text(log.exerciseName,
-              style: const TextStyle(fontWeight: FontWeight.w600)),
-          subtitle: Text(
-            '${log.weight}kg × ${log.reps}回 × ${log.sets}セット  '
-            'インターバル: ${log.interval}秒\n'
-            '${DateFormat('yyyy/MM/dd HH:mm').format(log.date)}'
-            '${log.note.isNotEmpty ? '\nメモ: ${log.note}' : ''}',
-          ),
-          isThreeLine: log.note.isNotEmpty,
-          trailing: log.interval > 0
-              ? IconButton(
-                  icon: const Icon(Icons.timer_outlined, color: Colors.teal),
-                  tooltip: 'インターバルタイマー開始',
-                  onPressed: () => _startTimer(log.interval),
-                )
-              : null,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTimerOverlay() {
-    final progress = _timerTotal > 0 ? _timerSeconds / _timerTotal : 0.0;
-    final mins = _timerSeconds ~/ 60;
-    final secs = _timerSeconds % 60;
-    final isDone = _timerSeconds == 0;
-
-    return Positioned(
-      bottom: 80,
-      left: 16,
-      right: 16,
-      child: Card(
-        elevation: 8,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        color: isDone ? Colors.green.shade50 : null,
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: [
-              SizedBox(
-                width: 56,
-                height: 56,
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    CircularProgressIndicator(
-                      value: progress,
-                      backgroundColor: Colors.grey.withOpacity(0.2),
-                      valueColor: AlwaysStoppedAnimation<Color>(
-                          isDone ? Colors.green : Colors.teal),
-                    ),
-                    Icon(
-                      isDone ? Icons.check : Icons.timer,
-                      color: isDone ? Colors.green : Colors.teal,
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      isDone ? '休憩終了！' : 'インターバル休憩中',
-                      style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: isDone ? Colors.green : null),
-                    ),
-                    if (!isDone)
-                      Text(
-                        '$mins:${secs.toString().padLeft(2, '0')}',
-                        style: const TextStyle(
-                            fontSize: 22, fontWeight: FontWeight.bold),
-                      ),
-                  ],
-                ),
-              ),
-              IconButton(
-                icon: const Icon(Icons.close),
-                onPressed: _stopTimer,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
   Widget _buildBody(
     BuildContext context,
     WidgetRef ref,
@@ -502,24 +136,29 @@ class _TrainingScreenState extends ConsumerState<TrainingScreen> {
     TrainingNotifier notifier,
     double bodyWeightKg,
     SettingsState settings,
-    List<TrainingLog> todayLogs,
   ) {
+    final todayLogs = state.todayLogs;
+
     return CustomScrollView(
       slivers: [
-        // ── Today summary ───────────────────────────────────────────────
         if (todayLogs.isNotEmpty)
           SliverToBoxAdapter(
             child: _buildTodaySummary(context, todayLogs, bodyWeightKg),
           ),
-
-        // ── AI advice card (today's logs only, shown when enabled) ─────
-        if (settings.trainingAdviceEnabled && todayLogs.isNotEmpty)
+        SliverToBoxAdapter(
+          child: _buildOneRmCard(state),
+        ),
+        if (settings.trainingAdviceEnabled)
           SliverToBoxAdapter(
             child: _buildTrainingAdviceCard(
-                context, ref, todayLogs, state.logs, settings),
+              context,
+              ref,
+              todayLogs,
+              state.logs,
+              settings,
+            ),
           ),
 
-        // ── Log list ────────────────────────────────────────────────────
         SliverList(
           delegate: SliverChildBuilderDelegate(
             (context, index) {
@@ -558,6 +197,9 @@ class _TrainingScreenState extends ConsumerState<TrainingScreen> {
                   );
                   if (ok == true) notifier.deleteLog(log.id);
                 },
+                onIntervalTimer: log.interval > 0
+                    ? () => _startIntervalTimer(log.interval)
+                    : null,
               );
             },
             childCount: state.logs.length,
@@ -810,9 +452,9 @@ class _TrainingScreenState extends ConsumerState<TrainingScreen> {
         .toSet()
         .toList()
       ..sort();
-    final suggestions = {
+    final suggestions = <String>{
       ...recentExerciseNames,
-      ...allExerciseNames
+      ...allExerciseNames,
     }.toList();
 
     showDialog(
@@ -1093,6 +735,7 @@ class _TrainingScreenState extends ConsumerState<TrainingScreen> {
               TextButton(
                 onPressed: () {
                   if (exerciseName.isEmpty) return;
+                  int? intervalToStart;
                   if (isCardio) {
                     final dist =
                         double.tryParse(distanceController.text) ?? 0;
@@ -1150,15 +793,360 @@ class _TrainingScreenState extends ConsumerState<TrainingScreen> {
                         interval: iv,
                         note: noteController.text,
                       );
+                      if (iv > 0) intervalToStart = iv;
                     }
                   }
                   Navigator.pop(context);
+                  if (intervalToStart != null) {
+                    _startIntervalTimer(intervalToStart);
+                  }
                 },
                 child: Text(isEdit ? '保存' : '記録'),
               ),
             ],
           );
         },
+      ),
+    );
+  }
+
+  Widget _buildTrainingAdviceCard(
+    BuildContext context,
+    WidgetRef ref,
+    List<TrainingLog> todayLogs,
+    List<TrainingLog> allLogs,
+    SettingsState settings,
+  ) {
+    final adviceState = ref.watch(trainingAdviceProvider);
+
+    return Card(
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.psychology, color: Colors.teal, size: 18),
+                const SizedBox(width: 8),
+                const Expanded(
+                  child: Text(
+                    'AIトレーニング評価',
+                    style:
+                        TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                  ),
+                ),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: Colors.teal.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    '${settings.selectedProvider.label} · ${settings.adviceLevelLabel}',
+                    style: const TextStyle(fontSize: 11, color: Colors.teal),
+                  ),
+                ),
+                const SizedBox(width: 4),
+                adviceState.isLoading
+                    ? const SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : IconButton(
+                        icon: const Icon(Icons.refresh),
+                        tooltip: todayLogs.isEmpty
+                            ? '今日の記録がないため評価できません'
+                            : '今日のトレーニングを評価',
+                        onPressed: todayLogs.isEmpty
+                            ? null
+                            : () => ref
+                                .read(trainingAdviceProvider.notifier)
+                                .fetchAdvice(
+                                  todayLogs: todayLogs,
+                                  allLogs: allLogs,
+                                  date: DateTime.now(),
+                                  adviceLevel: settings.adviceLevel,
+                                  apiKey: settings.currentApiKey,
+                                  provider: settings.selectedProvider,
+                                ),
+                      ),
+              ],
+            ),
+            if (adviceState.error != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                adviceState.error!,
+                style: const TextStyle(color: Colors.red, fontSize: 13),
+              ),
+            ],
+            if (adviceState.adviceText != null) ...[
+              const SizedBox(height: 8),
+              const Divider(),
+              const SizedBox(height: 4),
+              Text(
+                adviceState.adviceText!,
+                style: const TextStyle(fontSize: 13, height: 1.6),
+              ),
+            ],
+            if (adviceState.adviceText == null &&
+                adviceState.error == null &&
+                !adviceState.isLoading)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(
+                  todayLogs.isEmpty
+                      ? '今日分の記録がありません。ヘルスケア連携の時刻は端末の「今日」とずれることがあります。'
+                      : '↑ ボタンを押して今日のトレーニングを評価',
+                  style: const TextStyle(color: Colors.grey, fontSize: 12),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildOneRmCard(TrainingState state) {
+    final Map<String, double> bestOneRm = {};
+    for (final log in state.logs) {
+      if (log.reps > 0 && log.weight > 0) {
+        final est = log.weight * (1 + log.reps / 30);
+        if (!bestOneRm.containsKey(log.exerciseName) ||
+            est > bestOneRm[log.exerciseName]!) {
+          bestOneRm[log.exerciseName] = est;
+        }
+      }
+    }
+    if (bestOneRm.isEmpty) return const SizedBox.shrink();
+
+    final sorted = bestOneRm.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    final top = sorted.take(4).toList();
+
+    return Card(
+      margin: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Row(
+              children: [
+                Icon(Icons.emoji_events, color: Colors.amber, size: 18),
+                SizedBox(width: 6),
+                Text(
+                  '推定1RM（エプリー式）',
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 12,
+              runSpacing: 8,
+              children: top.map((e) {
+                return GestureDetector(
+                  onTap: () => _showExerciseChart(context, e.key),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context)
+                          .colorScheme
+                          .primaryContainer
+                          .withValues(alpha: 0.5),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          e.key,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        Text(
+                          '${e.value.toStringAsFixed(1)} kg',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              'タップで重量推移グラフを表示',
+              style: TextStyle(fontSize: 10, color: Colors.grey),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showExerciseChart(BuildContext context, String exerciseName) {
+    final logs = ref
+        .read(trainingProvider)
+        .logs
+        .where((l) => l.exerciseName == exerciseName && l.weight > 0)
+        .toList()
+      ..sort((a, b) => a.date.compareTo(b.date));
+
+    if (logs.isEmpty) return;
+
+    showModalBottomSheet<void>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '$exerciseName - 重量推移',
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              height: 200,
+              child: LineChart(
+                LineChartData(
+                  lineBarsData: [
+                    LineChartBarData(
+                      spots: logs.asMap().entries.map((e) {
+                        return FlSpot(e.key.toDouble(), e.value.weight);
+                      }).toList(),
+                      isCurved: true,
+                      color: Colors.teal,
+                      barWidth: 3,
+                      dotData: const FlDotData(show: true),
+                    ),
+                  ],
+                  titlesData: FlTitlesData(
+                    bottomTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        interval: (logs.length / 4)
+                            .ceilToDouble()
+                            .clamp(1, logs.length.toDouble()),
+                        getTitlesWidget: (value, meta) {
+                          final i = value.toInt();
+                          if (i >= 0 && i < logs.length) {
+                            return Text(
+                              DateFormat('M/d').format(logs[i].date),
+                              style: const TextStyle(fontSize: 9),
+                            );
+                          }
+                          return const Text('');
+                        },
+                      ),
+                    ),
+                    leftTitles: const AxisTitles(
+                      sideTitles:
+                          SideTitles(showTitles: true, reservedSize: 36),
+                    ),
+                    topTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false),
+                    ),
+                    rightTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false),
+                    ),
+                  ),
+                  gridData: const FlGridData(show: true),
+                  borderData: FlBorderData(show: true),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTimerOverlay() {
+    final progress = _timerTotal > 0 ? _timerSeconds / _timerTotal : 0.0;
+    final mins = _timerSeconds ~/ 60;
+    final secs = _timerSeconds % 60;
+    final isDone = _timerSeconds == 0;
+
+    return Positioned(
+      bottom: 80,
+      left: 16,
+      right: 16,
+      child: Card(
+        elevation: 8,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        color: isDone ? Colors.green.shade50 : null,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              SizedBox(
+                width: 56,
+                height: 56,
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    CircularProgressIndicator(
+                      value: progress,
+                      backgroundColor: Colors.grey.withValues(alpha: 0.2),
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        isDone ? Colors.green : Colors.teal,
+                      ),
+                    ),
+                    Icon(
+                      isDone ? Icons.check : Icons.timer,
+                      color: isDone ? Colors.green : Colors.teal,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      isDone ? '休憩終了！' : 'インターバル休憩中',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: isDone ? Colors.green : null,
+                      ),
+                    ),
+                    if (!isDone)
+                      Text(
+                        '$mins:${secs.toString().padLeft(2, '0')}',
+                        style: const TextStyle(
+                            fontSize: 22, fontWeight: FontWeight.bold),
+                      ),
+                  ],
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.close),
+                onPressed: _stopIntervalTimer,
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -1186,6 +1174,7 @@ class _TrainingLogCard extends StatelessWidget {
   final double bodyWeightKg;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
+  final VoidCallback? onIntervalTimer;
 
   const _TrainingLogCard({
     required this.log,
@@ -1194,6 +1183,7 @@ class _TrainingLogCard extends StatelessWidget {
     required this.bodyWeightKg,
     required this.onEdit,
     required this.onDelete,
+    this.onIntervalTimer,
   });
 
   @override
@@ -1260,6 +1250,13 @@ class _TrainingLogCard extends StatelessWidget {
                                   fontWeight: FontWeight.bold)),
                         ],
                       ),
+                    ),
+                  if (onIntervalTimer != null)
+                    IconButton(
+                      icon: const Icon(Icons.timer_outlined,
+                          color: Colors.teal, size: 22),
+                      tooltip: 'インターバルタイマー開始',
+                      onPressed: onIntervalTimer,
                     ),
                   PopupMenuButton<String>(
                     icon: const Icon(Icons.more_vert, size: 20),

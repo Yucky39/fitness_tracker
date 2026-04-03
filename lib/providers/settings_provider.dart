@@ -1,4 +1,4 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:riverpod/legacy.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -117,7 +117,7 @@ enum AiProviderType {
 }
 
 class SettingsState {
-  final String adviceLevel; // 'strict', 'normal', 'gentle'
+  final String adviceLevel;
   final AiProviderType selectedProvider;
   final String anthropicApiKey;
   final String openAiApiKey;
@@ -125,14 +125,12 @@ class SettingsState {
   final String selectedAnthropicModel;
   final String selectedOpenAiModel;
   final String selectedGeminiModel;
-  // Notification settings
   final bool mealReminderEnabled;
   final int mealReminderHour;
   final int mealReminderMinute;
   final bool workoutReminderEnabled;
   final int workoutReminderHour;
   final int workoutReminderMinute;
-  // Training AI advice toggle
   final bool trainingAdviceEnabled;
 
   const SettingsState({
@@ -153,7 +151,6 @@ class SettingsState {
     this.trainingAdviceEnabled = true,
   });
 
-  /// Returns the API key for the currently selected provider.
   String get currentApiKey {
     switch (selectedProvider) {
       case AiProviderType.anthropic:
@@ -165,7 +162,6 @@ class SettingsState {
     }
   }
 
-  /// Returns the selected model ID for the currently selected provider.
   String get currentModel {
     switch (selectedProvider) {
       case AiProviderType.anthropic:
@@ -177,7 +173,6 @@ class SettingsState {
     }
   }
 
-  /// Returns the display label for the current model.
   String get currentModelLabel {
     final models = selectedProvider.availableModels;
     return models.firstWhere(
@@ -212,7 +207,8 @@ class SettingsState {
         anthropicApiKey: anthropicApiKey ?? this.anthropicApiKey,
         openAiApiKey: openAiApiKey ?? this.openAiApiKey,
         geminiApiKey: geminiApiKey ?? this.geminiApiKey,
-        selectedAnthropicModel: selectedAnthropicModel ?? this.selectedAnthropicModel,
+        selectedAnthropicModel:
+            selectedAnthropicModel ?? this.selectedAnthropicModel,
         selectedOpenAiModel: selectedOpenAiModel ?? this.selectedOpenAiModel,
         selectedGeminiModel: selectedGeminiModel ?? this.selectedGeminiModel,
         mealReminderEnabled: mealReminderEnabled ?? this.mealReminderEnabled,
@@ -240,7 +236,6 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
   Future<void> _load() async {
     final prefs = await SharedPreferences.getInstance();
 
-    // Migrate API keys from SharedPreferences → secure storage if needed
     for (final provider in AiProviderType.values) {
       final inPrefs = prefs.getString(provider.storageKey) ?? '';
       if (inPrefs.isNotEmpty) {
@@ -253,7 +248,8 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
     }
 
     final anthropicKey =
-        await _secureStorage.read(key: AiProviderType.anthropic.storageKey) ?? '';
+        await _secureStorage.read(key: AiProviderType.anthropic.storageKey) ??
+            '';
     final openAiKey =
         await _secureStorage.read(key: AiProviderType.openai.storageKey) ?? '';
     final geminiKey =
@@ -267,12 +263,15 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
       anthropicApiKey: anthropicKey,
       openAiApiKey: openAiKey,
       geminiApiKey: geminiKey,
-      selectedAnthropicModel: prefs.getString(AiProviderType.anthropic.modelStorageKey)
-          ?? AiProviderType.anthropic.defaultModel,
-      selectedOpenAiModel: prefs.getString(AiProviderType.openai.modelStorageKey)
-          ?? AiProviderType.openai.defaultModel,
-      selectedGeminiModel: prefs.getString(AiProviderType.gemini.modelStorageKey)
-          ?? AiProviderType.gemini.defaultModel,
+      selectedAnthropicModel:
+          prefs.getString(AiProviderType.anthropic.modelStorageKey) ??
+              AiProviderType.anthropic.defaultModel,
+      selectedOpenAiModel:
+          prefs.getString(AiProviderType.openai.modelStorageKey) ??
+              AiProviderType.openai.defaultModel,
+      selectedGeminiModel:
+          prefs.getString(AiProviderType.gemini.modelStorageKey) ??
+              AiProviderType.gemini.defaultModel,
       mealReminderEnabled: prefs.getBool('mealReminderEnabled') ?? false,
       mealReminderHour: prefs.getInt('mealReminderHour') ?? 12,
       mealReminderMinute: prefs.getInt('mealReminderMinute') ?? 0,
@@ -280,37 +279,6 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
       workoutReminderHour: prefs.getInt('workoutReminderHour') ?? 18,
       workoutReminderMinute: prefs.getInt('workoutReminderMinute') ?? 0,
       trainingAdviceEnabled: prefs.getBool('trainingAdviceEnabled') ?? true,
-    );
-  }
-
-  Future<void> updateTrainingAdviceEnabled(bool enabled) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('trainingAdviceEnabled', enabled);
-    state = state.copyWith(trainingAdviceEnabled: enabled);
-  }
-
-  Future<void> updateNotificationSettings({
-    bool? mealEnabled,
-    int? mealHour,
-    int? mealMinute,
-    bool? workoutEnabled,
-    int? workoutHour,
-    int? workoutMinute,
-  }) async {
-    final prefs = await SharedPreferences.getInstance();
-    if (mealEnabled != null) await prefs.setBool('mealReminderEnabled', mealEnabled);
-    if (mealHour != null) await prefs.setInt('mealReminderHour', mealHour);
-    if (mealMinute != null) await prefs.setInt('mealReminderMinute', mealMinute);
-    if (workoutEnabled != null) await prefs.setBool('workoutReminderEnabled', workoutEnabled);
-    if (workoutHour != null) await prefs.setInt('workoutReminderHour', workoutHour);
-    if (workoutMinute != null) await prefs.setInt('workoutReminderMinute', workoutMinute);
-    state = state.copyWith(
-      mealReminderEnabled: mealEnabled,
-      mealReminderHour: mealHour,
-      mealReminderMinute: mealMinute,
-      workoutReminderEnabled: workoutEnabled,
-      workoutReminderHour: workoutHour,
-      workoutReminderMinute: workoutMinute,
     );
   }
 
@@ -349,6 +317,47 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
       case AiProviderType.gemini:
         state = state.copyWith(geminiApiKey: key);
     }
+  }
+
+  Future<void> updateTrainingAdviceEnabled(bool enabled) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('trainingAdviceEnabled', enabled);
+    state = state.copyWith(trainingAdviceEnabled: enabled);
+  }
+
+  Future<void> updateNotificationSettings({
+    bool? mealEnabled,
+    int? mealHour,
+    int? mealMinute,
+    bool? workoutEnabled,
+    int? workoutHour,
+    int? workoutMinute,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (mealEnabled != null) {
+      await prefs.setBool('mealReminderEnabled', mealEnabled);
+    }
+    if (mealHour != null) await prefs.setInt('mealReminderHour', mealHour);
+    if (mealMinute != null) {
+      await prefs.setInt('mealReminderMinute', mealMinute);
+    }
+    if (workoutEnabled != null) {
+      await prefs.setBool('workoutReminderEnabled', workoutEnabled);
+    }
+    if (workoutHour != null) {
+      await prefs.setInt('workoutReminderHour', workoutHour);
+    }
+    if (workoutMinute != null) {
+      await prefs.setInt('workoutReminderMinute', workoutMinute);
+    }
+    state = state.copyWith(
+      mealReminderEnabled: mealEnabled,
+      mealReminderHour: mealHour,
+      mealReminderMinute: mealMinute,
+      workoutReminderEnabled: workoutEnabled,
+      workoutReminderHour: workoutHour,
+      workoutReminderMinute: workoutMinute,
+    );
   }
 }
 

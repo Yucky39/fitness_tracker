@@ -4,6 +4,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:riverpod/legacy.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
@@ -1150,14 +1151,17 @@ class MealScreen extends ConsumerWidget {
                   const SizedBox(height: 20),
                   const Divider(),
                   const SizedBox(height: 8),
-                  const Text('トレーニングAIアドバイス', style: TextStyle(fontWeight: FontWeight.bold)),
+                  const Text('トレーニングAIアドバイス',
+                      style: TextStyle(fontWeight: FontWeight.bold)),
                   const SizedBox(height: 4),
                   Row(
                     children: [
                       Switch(
                         value: ref.read(settingsProvider).trainingAdviceEnabled,
                         onChanged: (v) {
-                          ref.read(settingsProvider.notifier).updateTrainingAdviceEnabled(v);
+                          ref
+                              .read(settingsProvider.notifier)
+                              .updateTrainingAdviceEnabled(v);
                           setDialogState(() {});
                         },
                       ),
@@ -1172,37 +1176,44 @@ class MealScreen extends ConsumerWidget {
                   const SizedBox(height: 12),
                   const Divider(),
                   const SizedBox(height: 8),
-                  const Text('リマインダー通知', style: TextStyle(fontWeight: FontWeight.bold)),
+                  const Text('リマインダー通知',
+                      style: TextStyle(fontWeight: FontWeight.bold)),
                   const SizedBox(height: 12),
                   _buildReminderRow(
-                    context, ref,
+                    context,
+                    ref,
                     label: '食事記録リマインダー',
                     enabled: ref.read(settingsProvider).mealReminderEnabled,
                     hour: ref.read(settingsProvider).mealReminderHour,
                     minute: ref.read(settingsProvider).mealReminderMinute,
                     onChanged: (enabled, hour, minute) async {
-                      await ref.read(settingsProvider.notifier).updateNotificationSettings(
-                        mealEnabled: enabled,
-                        mealHour: hour,
-                        mealMinute: minute,
-                      );
+                      await ref
+                          .read(settingsProvider.notifier)
+                          .updateNotificationSettings(
+                            mealEnabled: enabled,
+                            mealHour: hour,
+                            mealMinute: minute,
+                          );
                       await NotificationService().rescheduleFromSettings();
                       setDialogState(() {});
                     },
                   ),
                   const SizedBox(height: 8),
                   _buildReminderRow(
-                    context, ref,
+                    context,
+                    ref,
                     label: 'トレーニングリマインダー',
                     enabled: ref.read(settingsProvider).workoutReminderEnabled,
                     hour: ref.read(settingsProvider).workoutReminderHour,
                     minute: ref.read(settingsProvider).workoutReminderMinute,
                     onChanged: (enabled, hour, minute) async {
-                      await ref.read(settingsProvider.notifier).updateNotificationSettings(
-                        workoutEnabled: enabled,
-                        workoutHour: hour,
-                        workoutMinute: minute,
-                      );
+                      await ref
+                          .read(settingsProvider.notifier)
+                          .updateNotificationSettings(
+                            workoutEnabled: enabled,
+                            workoutHour: hour,
+                            workoutMinute: minute,
+                          );
                       await NotificationService().rescheduleFromSettings();
                       setDialogState(() {});
                     },
@@ -1210,7 +1221,8 @@ class MealScreen extends ConsumerWidget {
                   const SizedBox(height: 20),
                   const Divider(),
                   const SizedBox(height: 8),
-                  const Text('データ管理', style: TextStyle(fontWeight: FontWeight.bold)),
+                  const Text('データ管理',
+                      style: TextStyle(fontWeight: FontWeight.bold)),
                   const SizedBox(height: 12),
                   OutlinedButton.icon(
                     icon: const Icon(Icons.download),
@@ -1361,10 +1373,13 @@ class MealScreen extends ConsumerWidget {
     void fillFromSearch(FoodSearchResult result, int grams) {
       final ratio = grams / 100.0;
       nameController.text = result.name;
-      calorieController.text = (result.caloriesPer100g * ratio).round().toString();
-      proteinController.text = (result.proteinPer100g * ratio).toStringAsFixed(1);
+      calorieController.text =
+          (result.caloriesPer100g * ratio).round().toString();
+      proteinController.text =
+          (result.proteinPer100g * ratio).toStringAsFixed(1);
       fatController.text = (result.fatPer100g * ratio).toStringAsFixed(1);
-      carbsController.text = (result.carbsPer100g * ratio).toStringAsFixed(1);
+      carbsController.text =
+          (result.carbsPer100g * ratio).toStringAsFixed(1);
     }
 
     showDialog(
@@ -1431,18 +1446,20 @@ class MealScreen extends ConsumerWidget {
                     ),
                     const SizedBox(height: 12),
                   ],
-                  // Food DB search button
-                  OutlinedButton.icon(
-                    icon: const Icon(Icons.search, size: 16),
-                    label: const Text('食品データベースから検索'),
-                    onPressed: () => _showFoodSearchDialog(
-                      context,
-                      (result, grams) {
-                        setDialogState(() => fillFromSearch(result, grams));
-                      },
+
+                  if (!isEdit) ...[
+                    OutlinedButton.icon(
+                      icon: const Icon(Icons.search, size: 16),
+                      label: const Text('食品データベースから検索'),
+                      onPressed: () => _showFoodSearchDialog(
+                        context,
+                        (result, grams) {
+                          setDialogState(() => fillFromSearch(result, grams));
+                        },
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 8),
+                    const SizedBox(height: 8),
+                  ],
 
                   // ── Main fields ────────────────────────────────────────
                   TextField(
@@ -1592,12 +1609,13 @@ class MealScreen extends ConsumerWidget {
                               error = null;
                             });
                             try {
-                              final r = await service.search(searchController.text);
+                              final r =
+                                  await service.search(searchController.text);
                               setDialogState(() {
                                 results = r;
                                 isSearching = false;
                               });
-                            } catch (e) {
+                            } catch (_) {
                               setDialogState(() {
                                 error = '検索に失敗しました';
                                 isSearching = false;
@@ -1614,12 +1632,13 @@ class MealScreen extends ConsumerWidget {
                             error = null;
                           });
                           try {
-                            final r = await service.search(searchController.text);
+                            final r =
+                                await service.search(searchController.text);
                             setDialogState(() {
                               results = r;
                               isSearching = false;
                             });
-                          } catch (e) {
+                          } catch (_) {
                             setDialogState(() {
                               error = '検索に失敗しました';
                               isSearching = false;
@@ -1638,7 +1657,9 @@ class MealScreen extends ConsumerWidget {
                           controller: gramsController,
                           keyboardType: TextInputType.number,
                           decoration: const InputDecoration(
-                              suffix: Text('g'), isDense: true),
+                            suffix: Text('g'),
+                            isDense: true,
+                          ),
                         ),
                       ),
                     ],
@@ -1661,14 +1682,18 @@ class MealScreen extends ConsumerWidget {
                           final r = results[i];
                           return ListTile(
                             dense: true,
-                            title: Text(r.name,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis),
+                            title: Text(
+                              r.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                             subtitle: Text(
-                                '${r.caloriesPer100g}kcal/100g  '
-                                'P:${r.proteinPer100g.toStringAsFixed(1)}g'),
+                              '${r.caloriesPer100g}kcal/100g  '
+                              'P:${r.proteinPer100g.toStringAsFixed(1)}g',
+                            ),
                             onTap: () {
-                              final grams = int.tryParse(gramsController.text) ?? 100;
+                              final grams =
+                                  int.tryParse(gramsController.text) ?? 100;
                               onSelect(r, grams);
                               Navigator.pop(context);
                             },

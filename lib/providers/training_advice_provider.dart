@@ -1,4 +1,4 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:riverpod/legacy.dart';
 import '../models/training_log.dart';
 import '../providers/settings_provider.dart';
 import '../services/training_advice_service.dart';

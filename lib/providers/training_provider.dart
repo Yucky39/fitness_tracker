@@ -1,4 +1,4 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:riverpod/legacy.dart';
 import 'package:uuid/uuid.dart';
 import '../models/training_log.dart';
 import '../services/database_service.dart';
@@ -24,13 +24,12 @@ class TrainingState {
     );
   }
 
-  /// 今日のログ
+  /// 今日のログ（端末ローカルの暦日。UTC のまま保存された記録も toLocal() で揃える）
   List<TrainingLog> get todayLogs {
-    final now = DateTime.now();
+    final n = DateTime.now();
     return logs.where((l) {
-      return l.date.year == now.year &&
-          l.date.month == now.month &&
-          l.date.day == now.day;
+      final d = l.date.toLocal();
+      return d.year == n.year && d.month == n.month && d.day == n.day;
     }).toList();
   }
 }

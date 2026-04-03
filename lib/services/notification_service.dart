@@ -22,7 +22,7 @@ class NotificationService {
       android: androidSettings,
       iOS: darwinSettings,
     );
-    await _plugin.initialize(settings);
+    await _plugin.initialize(settings: settings);
     await _plugin
         .resolvePlatformSpecificImplementation<
             AndroidFlutterLocalNotificationsPlugin>()
@@ -56,18 +56,18 @@ class NotificationService {
     );
 
     await _plugin.zonedSchedule(
-      id,
-      title,
-      body,
-      scheduled,
-      details,
+      id: id,
+      scheduledDate: scheduled,
+      notificationDetails: details,
       androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+      title: title,
+      body: body,
       matchDateTimeComponents: DateTimeComponents.time,
     );
   }
 
   Future<void> cancelAll() => _plugin.cancelAll();
-  Future<void> cancel(int id) => _plugin.cancel(id);
+  Future<void> cancel(int id) => _plugin.cancel(id: id);
 
   Future<void> rescheduleFromSettings() async {
     final prefs = await SharedPreferences.getInstance();

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'dashboard_screen.dart';
 import '../services/auth_service.dart';
+import 'dashboard_screen.dart';
 import 'meal_screen.dart';
 import 'training_screen.dart';
 import 'progress_screen.dart';
@@ -21,12 +21,6 @@ class _HomeScreenState extends State<HomeScreen> {
     TrainingScreen(),
     ProgressScreen(),
   ];
-
-  void _onItemTapped(int index) {
-    setState(() {
-      _selectedIndex = index;
-    });
-  }
 
   Future<void> _signOut(BuildContext context) async {
     final confirmed = await showDialog<bool>(
@@ -65,8 +59,10 @@ class _HomeScreenState extends State<HomeScreen> {
             itemBuilder: (_) => [
               PopupMenuItem(
                 enabled: false,
-                child: Text(email,
-                    style: Theme.of(context).textTheme.bodySmall),
+                child: Text(
+                  email,
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
               ),
               const PopupMenuDivider(),
               const PopupMenuItem(
@@ -88,8 +84,7 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       body: _screens[_selectedIndex],
       bottomNavigationBar: NavigationBar(
-        onDestinationSelected: (index) =>
-            setState(() => _selectedIndex = index),
+        onDestinationSelected: (index) => setState(() => _selectedIndex = index),
         selectedIndex: _selectedIndex,
         destinations: const [
           NavigationDestination(

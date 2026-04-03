@@ -71,7 +71,8 @@ class HealthService {
       distanceKm: distanceKm,
       durationMinutes: durationMin,
       note: 'ヘルスケアから取得',
-      date: point.dateFrom,
+      // 一覧・「今日」判定が端末の暦日と一致するようローカル時刻で保存
+      date: point.dateFrom.toLocal(),
     );
   }
 
@@ -95,7 +96,8 @@ class HealthService {
         return 'エリプティカル';
       case HealthWorkoutActivityType.ROWING:
         return 'ローイングマシン';
-      case HealthWorkoutActivityType.AEROBICS:
+      case HealthWorkoutActivityType.CARDIO_DANCE:
+      case HealthWorkoutActivityType.STEP_TRAINING:
         return 'エアロビクス';
       default:
         return '有酸素運動';
