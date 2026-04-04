@@ -10,8 +10,10 @@ import '../providers/meal_provider.dart';
 import '../providers/progress_provider.dart';
 import '../providers/routine_provider.dart';
 import '../providers/settings_provider.dart';
+import '../providers/steps_provider.dart';
 import '../models/training_routine.dart';
 import '../providers/training_provider.dart';
+import '../services/health_service.dart';
 import '../services/training_calorie_calculator.dart';
 import 'routine_screen.dart';
 
@@ -33,10 +35,14 @@ class DashboardScreen extends ConsumerWidget {
     final energy = ref.watch(energyProfileProvider);
     final settings = ref.watch(settingsProvider);
 
+    final stepsState = ref.watch(stepsProvider);
+
     final intake = dashboardState.todayCalories;
     final goal = mealState.calorieGoal;
     final bodyW = energy.weightKg;
-    final burn = _todayBurn(trainingState, bodyW);
+    final trainingBurn = _todayBurn(trainingState, bodyW);
+    final stepsBurn = stepsState.burnedKcal.toDouble();
+    final burn = trainingBurn + stepsBurn;
     final remainingMeal = goal - intake;
     final remainingAfterExercise = goal - intake + burn;
 
@@ -67,7 +73,8 @@ class DashboardScreen extends ConsumerWidget {
                     scheme,
                     intake: intake,
                     goal: goal,
-                    burn: burn,
+                    trainingBurn: trainingBurn,
+                    stepsBurn: stepsBurn,
                     remainingMeal: remainingMeal,
                     remainingAfterExercise: remainingAfterExercise,
                     protein: dashboardState.todayProtein,
@@ -77,6 +84,8 @@ class DashboardScreen extends ConsumerWidget {
                     fatGoal: mealState.fatGoal,
                     carbsGoal: mealState.carbsGoal,
                   ),
+                  const SizedBox(height: 16),
+                  _buildStepsCard(context, scheme, ref, stepsState),
                   const SizedBox(height: 20),
                   Text(
                     'クイックアクセス',
@@ -140,6 +149,106 @@ class DashboardScreen extends ConsumerWidget {
     return sum;
   }
 
+  Widget _buildStepsCard(
+    BuildContext context,
+    ColorScheme scheme,
+    WidgetRef ref,
+    StepsState stepsState,
+  ) {
+    if (!HealthService.isSupported) return const SizedBox.shrink();
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Row(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: scheme.secondaryContainer,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(Icons.directions_walk_rounded,
+                  color: scheme.onSecondaryContainer),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('今日の歩数',
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          )),
+                  const SizedBox(height: 2),
+                  if (stepsState.isLoading)
+                    const SizedBox(
+                      height: 16,
+                      width: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  else if (!stepsState.permissionGranted)
+                    Text('連携ボタンをタップして歩数を取得',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: scheme.onSurfaceVariant,
+                            ))
+                  else ...[
+                    Text(
+                      '${_formatSteps(stepsState.steps)} 歩',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                    ),
+                    if (stepsState.burnedKcal > 0)
+                      Text(
+                        '推定消費 ${stepsState.burnedKcal} kcal',
+                        style:
+                            Theme.of(context).textTheme.bodySmall?.copyWith(
+                                  color: scheme.secondary,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                      ),
+                  ],
+                ],
+              ),
+            ),
+            if (stepsState.isLoading)
+              const SizedBox.shrink()
+            else if (!stepsState.permissionGranted)
+              FilledButton.tonal(
+                onPressed: () async {
+                  final ok =
+                      await ref.read(stepsProvider.notifier).requestAndFetch();
+                  if (!ok && context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                          content: Text('歩数へのアクセスが許可されていません')),
+                    );
+                  }
+                },
+                child: const Text('連携'),
+              )
+            else
+              IconButton(
+                icon: const Icon(Icons.refresh_rounded),
+                tooltip: '歩数を更新',
+                onPressed: () =>
+                    ref.read(stepsProvider.notifier).refresh(),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  static String _formatSteps(int steps) {
+    if (steps >= 10000) {
+      return '${(steps / 1000).toStringAsFixed(1)}k';
+    }
+    return steps.toString();
+  }
+
   Widget _buildHeroHeader(
     BuildContext context,
     ColorScheme scheme,
@@ -185,7 +294,8 @@ class DashboardScreen extends ConsumerWidget {
     ColorScheme scheme, {
     required int intake,
     required int goal,
-    required double burn,
+    required double trainingBurn,
+    required double stepsBurn,
     required int remainingMeal,
     required double remainingAfterExercise,
     required double protein,
@@ -297,9 +407,17 @@ class DashboardScreen extends ConsumerWidget {
                         context,
                         scheme,
                         '推定消費（トレ）',
-                        '${burn.round()} kcal',
+                        '${trainingBurn.round()} kcal',
                         scheme.onPrimaryContainer.withValues(alpha: 0.9),
                       ),
+                      if (stepsBurn > 0)
+                        _balanceLine(
+                          context,
+                          scheme,
+                          '推定消費（歩数）',
+                          '${stepsBurn.round()} kcal',
+                          scheme.onPrimaryContainer.withValues(alpha: 0.9),
+                        ),
                       const Divider(height: 20),
                       _balanceLine(
                         context,
