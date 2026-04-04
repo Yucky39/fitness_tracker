@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 import '../models/training_log.dart';
 import '../providers/energy_profile_provider.dart';
 import '../providers/settings_provider.dart';
+import '../providers/sleep_provider.dart';
 import '../providers/training_advice_provider.dart';
 import '../providers/training_provider.dart';
 import '../services/health_service.dart';
@@ -111,6 +112,7 @@ class _TrainingScreenState extends ConsumerState<TrainingScreen> {
     final trainingNotifier = ref.read(trainingProvider.notifier);
     final bodyWeightKg = ref.watch(energyProfileProvider).weightKg;
     final settings = ref.watch(settingsProvider);
+    final sleepState = ref.watch(sleepProvider);
     final effectiveBw = bodyWeightKg > 0
         ? bodyWeightKg
         : TrainingCalorieCalculator.defaultBodyWeightKg;
@@ -255,6 +257,7 @@ class _TrainingScreenState extends ConsumerState<TrainingScreen> {
                           apiKey: settings.currentApiKey,
                           provider: settings.selectedProvider,
                           model: settings.currentModel,
+                          sleepContext: sleepState.adviceContext,
                         )
                     : null,
               );

@@ -4,29 +4,93 @@ import 'package:uuid/uuid.dart';
 import '../models/training_log.dart';
 
 /// デバイスのヘルスケア情報（iOS HealthKit / Android Health Connect）から
-/// ワークアウトデータを取得して TrainingLog に変換するサービス。
+/// ワークアウト・睡眠データを取得するサービス。
 class HealthService {
   HealthService._();
 
   static final Health _health = Health();
 
-  static const List<HealthDataType> _types = [HealthDataType.WORKOUT];
-  static const List<HealthDataAccess> _permissions = [HealthDataAccess.READ];
+  static const List<HealthDataType> _workoutTypes = [HealthDataType.WORKOUT];
+  static const List<HealthDataType> _sleepTypes = [
+    HealthDataType.SLEEP_ASLEEP,
+    HealthDataType.SLEEP_IN_BED,
+  ];
+  static const List<HealthDataAccess> _readOnly = [HealthDataAccess.READ];
 
   /// iOS / Android のみ対応
   static bool get isSupported => Platform.isIOS || Platform.isAndroid;
 
-  /// ヘルスケアの読み取り権限をリクエストする。
-  /// 許可された場合 true を返す。
+  /// ワークアウトの読み取り権限をリクエストする。
   static Future<bool> requestPermissions() async {
     if (!isSupported) return false;
     try {
-      return await _health.requestAuthorization(_types,
-          permissions: _permissions);
+      return await _health.requestAuthorization(_workoutTypes,
+          permissions: _readOnly);
     } catch (_) {
       return false;
     }
   }
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // Sleep
+  // ──────────────────────────────────────────────────────────────────────────
+
+  /// 睡眠の読み取り権限がすでに付与されているか確認する。
+  static Future<bool> hasSleepPermission() async {
+    if (!isSupported) return false;
+    try {
+      final result =
+          await _health.hasPermissions(_sleepTypes, permissions: _readOnly);
+      return result ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// 睡眠の読み取り権限をリクエストする。
+  static Future<bool> requestSleepPermission() async {
+    if (!isSupported) return false;
+    try {
+      return await _health.requestAuthorization(_sleepTypes,
+          permissions: _readOnly);
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// 昨夜の睡眠時間（分）を返す。
+  ///
+  /// 「昨日の正午〜今日の正午」の範囲で SLEEP_ASLEEP データを合計する。
+  /// 取得失敗・権限なし・データなしの場合は null を返す。
+  static Future<int?> fetchLastNightSleepMinutes() async {
+    if (!isSupported) return null;
+    try {
+      final now = DateTime.now();
+      final todayNoon = DateTime(now.year, now.month, now.day, 12);
+      final yesterdayNoon = todayNoon.subtract(const Duration(days: 1));
+
+      final data = await _health.getHealthDataFromTypes(
+        startTime: yesterdayNoon,
+        endTime: todayNoon,
+        types: [HealthDataType.SLEEP_ASLEEP],
+      );
+
+      if (data.isEmpty) return null;
+
+      int totalMinutes = 0;
+      for (final point in data) {
+        totalMinutes +=
+            point.dateTo.difference(point.dateFrom).inMinutes;
+      }
+      return totalMinutes > 0 ? totalMinutes : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // Workouts
+  // ──────────────────────────────────────────────────────────────────────────
 
   /// 直近 [days] 日間のワークアウトを取得して TrainingLog リストに変換する。
   /// 権限がない場合や取得失敗時は空リストを返す。
@@ -39,7 +103,7 @@ class HealthService {
       final data = await _health.getHealthDataFromTypes(
         startTime: start,
         endTime: end,
-        types: _types,
+        types: _workoutTypes,
       );
 
       return data
@@ -71,8 +135,7 @@ class HealthService {
       distanceKm: distanceKm,
       durationMinutes: durationMin,
       note: 'ヘルスケアから取得',
-      // 一覧・「今日」判定が端末の暦日と一致するようローカル時刻で保存
-      date: point.dateFrom.toLocal(),
+      date: point.dateFrom,
     );
   }
 
@@ -96,8 +159,7 @@ class HealthService {
         return 'エリプティカル';
       case HealthWorkoutActivityType.ROWING:
         return 'ローイングマシン';
-      case HealthWorkoutActivityType.CARDIO_DANCE:
-      case HealthWorkoutActivityType.STEP_TRAINING:
+      case HealthWorkoutActivityType.AEROBICS:
         return 'エアロビクス';
       default:
         return '有酸素運動';

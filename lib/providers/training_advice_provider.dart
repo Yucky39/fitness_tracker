@@ -30,6 +30,7 @@ class TrainingAdviceNotifier extends StateNotifier<TrainingAdviceState> {
     required String apiKey,
     required AiProviderType provider,
     String? model,
+    String? sleepContext,
   }) async {
     if (apiKey.isEmpty) {
       state = TrainingAdviceState(
@@ -62,6 +63,7 @@ class TrainingAdviceNotifier extends StateNotifier<TrainingAdviceState> {
         apiKey: apiKey,
         provider: provider,
         model: model,
+        sleepContext: sleepContext,
       );
 
       state = TrainingAdviceState(
