@@ -136,6 +136,7 @@ class _TrainingScreenState extends ConsumerState<TrainingScreen> {
         trainingNotifier,
         effectiveBw,
         settings,
+        sleepState,
       );
     }
 
@@ -186,6 +187,7 @@ class _TrainingScreenState extends ConsumerState<TrainingScreen> {
     TrainingNotifier notifier,
     double bodyWeightKg,
     SettingsState settings,
+    SleepState sleepState,
   ) {
     final todayLogs = state.todayLogs;
     final adviceState = ref.watch(trainingAdviceProvider);

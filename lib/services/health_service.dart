@@ -4,7 +4,7 @@ import 'package:uuid/uuid.dart';
 import '../models/training_log.dart';
 
 /// デバイスのヘルスケア情報（iOS HealthKit / Android Health Connect）から
-/// ワークアウト・睡眠データを取得するサービス。
+/// ワークアウト・睡眠・歩数データを取得するサービス。
 class HealthService {
   HealthService._();
 
@@ -15,6 +15,7 @@ class HealthService {
     HealthDataType.SLEEP_ASLEEP,
     HealthDataType.SLEEP_IN_BED,
   ];
+  static const List<HealthDataType> _stepTypes = [HealthDataType.STEPS];
   static const List<HealthDataAccess> _readOnly = [HealthDataAccess.READ];
 
   /// iOS / Android のみ対応
@@ -83,6 +84,47 @@ class HealthService {
             point.dateTo.difference(point.dateFrom).inMinutes;
       }
       return totalMinutes > 0 ? totalMinutes : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // Steps
+  // ──────────────────────────────────────────────────────────────────────────
+
+  /// 歩数の読み取り権限がすでに付与されているか確認する。
+  static Future<bool> hasStepPermission() async {
+    if (!isSupported) return false;
+    try {
+      final result =
+          await _health.hasPermissions(_stepTypes, permissions: _readOnly);
+      return result ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// 歩数の読み取り権限をリクエストする。
+  static Future<bool> requestStepPermission() async {
+    if (!isSupported) return false;
+    try {
+      return await _health.requestAuthorization(_stepTypes,
+          permissions: _readOnly);
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// 今日 0:00〜現在の合計歩数を返す。
+  /// 権限がない／取得失敗時は null を返す。
+  static Future<int?> fetchTodaySteps() async {
+    if (!isSupported) return null;
+    try {
+      final now = DateTime.now();
+      final startOfDay = DateTime(now.year, now.month, now.day);
+      final steps = await _health.getTotalStepsInInterval(startOfDay, now);
+      return steps;
     } catch (_) {
       return null;
     }
@@ -159,7 +201,8 @@ class HealthService {
         return 'エリプティカル';
       case HealthWorkoutActivityType.ROWING:
         return 'ローイングマシン';
-      case HealthWorkoutActivityType.AEROBICS:
+      case HealthWorkoutActivityType.CARDIO_DANCE:
+      case HealthWorkoutActivityType.STEP_TRAINING:
         return 'エアロビクス';
       default:
         return '有酸素運動';
