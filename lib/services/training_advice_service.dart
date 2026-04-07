@@ -29,6 +29,7 @@ class TrainingAdviceService {
   static String _buildUserMessage({
     required List<TrainingLog> focusLogs,
     required Map<String, List<TrainingLog>> historyByExercise,
+    String? sleepContext,
   }) {
     final buffer = StringBuffer();
 
@@ -78,6 +79,14 @@ class TrainingAdviceService {
       buffer.writeln();
     }
 
+    if (sleepContext != null) {
+      buffer.writeln('【コンディション情報】');
+      buffer.writeln(sleepContext);
+      buffer.writeln(
+          '睡眠状態をトレーニングの質・強度設定・回復見込みへのアドバイスに反映してください。');
+      buffer.writeln();
+    }
+
     buffer.writeln(
       '上記のこの記録について、過去の傾向と比較しながら評価し、次に取り組むときの具体的なアドバイスを述べてください。',
     );
@@ -92,6 +101,7 @@ class TrainingAdviceService {
     required String apiKey,
     required AiProviderType provider,
     String? model,
+    String? sleepContext,
   }) {
     if (focusLogs.isEmpty) {
       throw Exception('評価対象の記録がありません。');
@@ -100,6 +110,7 @@ class TrainingAdviceService {
     final userMessage = _buildUserMessage(
       focusLogs: focusLogs,
       historyByExercise: historyByExercise,
+      sleepContext: sleepContext,
     );
     final resolvedModel = model ?? provider.defaultModel;
     switch (provider) {

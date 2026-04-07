@@ -1,3 +1,4 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod/legacy.dart';
 
 import '../providers/energy_profile_provider.dart';
@@ -54,6 +55,13 @@ class StepsNotifier extends StateNotifier<StepsState> {
       return;
     }
     await _fetchSteps(granted: true);
+  }
+
+  /// ホーム（ダッシュボード）を開いたとき・更新したときに呼ぶ。
+  /// 権限を再確認し、許可済みなら最新の歩数を取得する。
+  Future<void> syncOnDashboardVisible() async {
+    if (!state.isSupported) return;
+    await _autoFetch();
   }
 
   /// ユーザーが「歩数を連携」ボタンをタップしたときに呼ぶ

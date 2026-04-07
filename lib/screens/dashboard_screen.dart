@@ -10,6 +10,7 @@ import '../providers/meal_provider.dart';
 import '../providers/progress_provider.dart';
 import '../providers/routine_provider.dart';
 import '../providers/settings_provider.dart';
+import '../providers/sleep_provider.dart';
 import '../providers/steps_provider.dart';
 import '../models/training_routine.dart';
 import '../providers/training_provider.dart';
@@ -34,6 +35,7 @@ class DashboardScreen extends ConsumerWidget {
     final routineState = ref.watch(routineProvider);
     final energy = ref.watch(energyProfileProvider);
     final settings = ref.watch(settingsProvider);
+    final sleepState = ref.watch(sleepProvider);
 
     final stepsState = ref.watch(stepsProvider);
 
@@ -52,8 +54,13 @@ class DashboardScreen extends ConsumerWidget {
 
     void goTab(int i) => ref.read(homeTabIndexProvider.notifier).state = i;
 
-    Future<void> refresh() =>
-        ref.read(dashboardProvider.notifier).loadWeeklyData();
+    Future<void> refresh() async {
+      await Future.wait([
+        ref.read(dashboardProvider.notifier).loadWeeklyData(),
+        ref.read(sleepProvider.notifier).syncOnDashboardVisible(),
+        ref.read(stepsProvider.notifier).syncOnDashboardVisible(),
+      ]);
+    }
 
     return ColoredBox(
       color: scheme.surface,
@@ -84,7 +91,9 @@ class DashboardScreen extends ConsumerWidget {
                     fatGoal: mealState.fatGoal,
                     carbsGoal: mealState.carbsGoal,
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 12),
+                  _buildSleepCard(context, scheme, ref, sleepState),
+                  const SizedBox(height: 12),
                   _buildStepsCard(context, scheme, ref, stepsState),
                   const SizedBox(height: 20),
                   Text(
@@ -147,6 +156,139 @@ class DashboardScreen extends ConsumerWidget {
       sum += TrainingNotifier.estimateCalories(log, bodyWeightKg: w);
     }
     return sum;
+  }
+
+  Widget _buildSleepCard(
+    BuildContext context,
+    ColorScheme scheme,
+    WidgetRef ref,
+    SleepState sleepState,
+  ) {
+    if (!HealthService.isSupported) return const SizedBox.shrink();
+
+    final quality = sleepState.quality;
+    final Color qualityColor = switch (quality) {
+      SleepQuality.good => Colors.teal,
+      SleepQuality.fair => Colors.orange,
+      SleepQuality.poor => Colors.red,
+      SleepQuality.unknown => scheme.onSurfaceVariant,
+    };
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Row(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: scheme.tertiaryContainer,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(Icons.bedtime_rounded,
+                  color: scheme.onTertiaryContainer),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('昨夜の睡眠',
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          )),
+                  const SizedBox(height: 2),
+                  if (sleepState.isLoading)
+                    const SizedBox(
+                      height: 16,
+                      width: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  else if (!sleepState.permissionGranted)
+                    Text('連携ボタンをタップして睡眠時間を取得',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: scheme.onSurfaceVariant,
+                            ))
+                  else if (sleepState.sleepMinutes == null)
+                    Text('昨夜のデータがありません',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: scheme.onSurfaceVariant,
+                            ))
+                  else ...[
+                    Row(
+                      children: [
+                        Text(
+                          '${sleepState.hours}時間'
+                          '${sleepState.minutes > 0 ? '${sleepState.minutes}分' : ''}',
+                          style:
+                              Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: qualityColor.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            '${quality.emoji} ${quality.label}',
+                            style:
+                                Theme.of(context).textTheme.labelSmall?.copyWith(
+                                      color: qualityColor,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (quality == SleepQuality.poor)
+                      Text(
+                        '睡眠不足は食欲増加・筋回復低下につながります',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: Colors.red.shade400,
+                            ),
+                      )
+                    else if (quality == SleepQuality.fair)
+                      Text(
+                        '理想は7時間以上。今日のトレーニング強度を抑えめに',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: Colors.orange.shade700,
+                            ),
+                      ),
+                  ],
+                ],
+              ),
+            ),
+            if (sleepState.isLoading)
+              const SizedBox.shrink()
+            else if (!sleepState.permissionGranted)
+              FilledButton.tonal(
+                onPressed: () async {
+                  final ok =
+                      await ref.read(sleepProvider.notifier).requestAndFetch();
+                  if (!ok && context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                          content: Text('睡眠データへのアクセスが許可されていません')),
+                    );
+                  }
+                },
+                child: const Text('連携'),
+              )
+            else
+              IconButton(
+                icon: const Icon(Icons.refresh_rounded),
+                tooltip: '睡眠データを更新',
+                onPressed: () => ref.read(sleepProvider.notifier).refresh(),
+              ),
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _buildStepsCard(
