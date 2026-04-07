@@ -1,7 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../providers/home_tab_provider.dart';
+import '../providers/sleep_provider.dart';
+import '../providers/steps_provider.dart';
 import '../services/auth_service.dart';
 import 'dashboard_screen.dart';
 import 'meal_screen.dart';
@@ -89,6 +93,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       bottomNavigationBar: NavigationBar(
         onDestinationSelected: (index) {
           ref.read(homeTabIndexProvider.notifier).state = index;
+          if (index == 0) {
+            unawaited(ref.read(sleepProvider.notifier).syncOnDashboardVisible());
+            unawaited(ref.read(stepsProvider.notifier).syncOnDashboardVisible());
+          }
         },
         selectedIndex: selectedIndex,
         destinations: const [

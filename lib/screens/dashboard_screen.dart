@@ -54,8 +54,13 @@ class DashboardScreen extends ConsumerWidget {
 
     void goTab(int i) => ref.read(homeTabIndexProvider.notifier).state = i;
 
-    Future<void> refresh() =>
-        ref.read(dashboardProvider.notifier).loadWeeklyData();
+    Future<void> refresh() async {
+      await Future.wait([
+        ref.read(dashboardProvider.notifier).loadWeeklyData(),
+        ref.read(sleepProvider.notifier).syncOnDashboardVisible(),
+        ref.read(stepsProvider.notifier).syncOnDashboardVisible(),
+      ]);
+    }
 
     return ColoredBox(
       color: scheme.surface,

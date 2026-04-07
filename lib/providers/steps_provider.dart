@@ -57,6 +57,13 @@ class StepsNotifier extends StateNotifier<StepsState> {
     await _fetchSteps(granted: true);
   }
 
+  /// ホーム（ダッシュボード）を開いたとき・更新したときに呼ぶ。
+  /// 権限を再確認し、許可済みなら最新の歩数を取得する。
+  Future<void> syncOnDashboardVisible() async {
+    if (!state.isSupported) return;
+    await _autoFetch();
+  }
+
   /// ユーザーが「歩数を連携」ボタンをタップしたときに呼ぶ
   Future<bool> requestAndFetch() async {
     state = state.copyWith(isLoading: true);

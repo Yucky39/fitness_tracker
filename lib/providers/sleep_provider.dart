@@ -104,6 +104,13 @@ class SleepNotifier extends StateNotifier<SleepState> {
     await _fetchSleep(granted: true);
   }
 
+  /// ホーム（ダッシュボード）を開いたとき・更新したときに呼ぶ。
+  /// 権限を再確認し、許可済みなら最新の睡眠データを取得する。
+  Future<void> syncOnDashboardVisible() async {
+    if (!state.isSupported) return;
+    await _autoFetch();
+  }
+
   /// 「睡眠を連携」ボタンのタップ時に呼ぶ
   Future<bool> requestAndFetch() async {
     state = state.copyWith(isLoading: true);
