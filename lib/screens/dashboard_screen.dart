@@ -46,7 +46,8 @@ class DashboardScreen extends ConsumerWidget {
     final stepsBurn = stepsState.burnedKcal.toDouble();
     final burn = trainingBurn + stepsBurn;
     final remainingMeal = goal - intake;
-    final remainingAfterExercise = goal - intake + burn;
+    /// 摂取 − (推定消費トレ + 推定消費歩数)。運動を差し引いたあとのカロリー収支（ダイエット目線の可視化用）。
+    final calorieBalance = intake - burn;
 
     final todaysRoutines = routineState.routines
         .where((r) => r.weekdays.contains(DateTime.now().weekday))
@@ -83,7 +84,7 @@ class DashboardScreen extends ConsumerWidget {
                     trainingBurn: trainingBurn,
                     stepsBurn: stepsBurn,
                     remainingMeal: remainingMeal,
-                    remainingAfterExercise: remainingAfterExercise,
+                    calorieBalance: calorieBalance,
                     protein: dashboardState.todayProtein,
                     fat: dashboardState.todayFat,
                     carbs: dashboardState.todayCarbs,
@@ -445,7 +446,7 @@ class DashboardScreen extends ConsumerWidget {
     required double trainingBurn,
     required double stepsBurn,
     required int remainingMeal,
-    required double remainingAfterExercise,
+    required double calorieBalance,
     required double protein,
     required double fat,
     required double carbs,
@@ -455,6 +456,12 @@ class DashboardScreen extends ConsumerWidget {
   }) {
     final percent = goal > 0 ? (intake / goal).clamp(0.0, 1.0) : 0.0;
     final isOver = intake > goal;
+    final balanceRounded = calorieBalance.round();
+    final balanceColor = balanceRounded < 0
+        ? scheme.tertiary
+        : balanceRounded == 0
+            ? scheme.onPrimaryContainer.withValues(alpha: 0.85)
+            : scheme.error;
 
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -490,7 +497,15 @@ class DashboardScreen extends ConsumerWidget {
                     color: scheme.onPrimaryContainer,
                   ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 4),
+            Text(
+              '収支は「摂取 −（トレ推定 + 歩数推定）」で算出\n(安静時の代謝は含みません)',
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: scheme.onPrimaryContainer.withValues(alpha: 0.65),
+                    height: 1.35,
+                  ),
+            ),
+            const SizedBox(height: 12),
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -579,9 +594,11 @@ class DashboardScreen extends ConsumerWidget {
                       _balanceLine(
                         context,
                         scheme,
-                        '運動後の残りカロリー',
-                        '${remainingAfterExercise.round()} kcal',
-                        scheme.primary,
+                        'カロリー収支 \n(摂取−運動)',
+                        balanceRounded > 0
+                            ? '+$balanceRounded kcal'
+                            : '$balanceRounded kcal',
+                        balanceColor,
                       ),
                     ],
                   ),
@@ -599,11 +616,11 @@ class DashboardScreen extends ConsumerWidget {
                   ),
             ),
             const SizedBox(height: 8),
-            _macroRow(context, scheme, 'P',
+            _macroRow(context, scheme, 'タンパク質',
                 '${protein.toStringAsFixed(1)} / ${proteinGoal.toStringAsFixed(0)} g'),
-            _macroRow(context, scheme, 'F',
+            _macroRow(context, scheme, '脂質',
                 '${fat.toStringAsFixed(1)} / ${fatGoal.toStringAsFixed(0)} g'),
-            _macroRow(context, scheme, 'C',
+            _macroRow(context, scheme, '炭水化物',
                 '${carbs.toStringAsFixed(1)} / ${carbsGoal.toStringAsFixed(0)} g'),
           ],
         ),
