@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod/legacy.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
+import '../models/detailed_nutrients.dart';
 import '../models/food_item.dart';
 import '../models/micronutrients.dart';
 import '../services/database_service.dart';
@@ -62,6 +63,11 @@ class MealState {
   Micronutrients get totalMicronutrients => todayItems.fold<Micronutrients>(
         Micronutrients.zero,
         (sum, item) => sum + item.micronutrients,
+      );
+
+  DetailedNutrients get totalDetailedNutrients => todayItems.fold<DetailedNutrients>(
+        DetailedNutrients.zero,
+        (sum, item) => sum + item.detailedNutrients,
       );
 
   /// 食事タイプごとのカロリー合計（表示順は [MealType.values]）
@@ -134,6 +140,7 @@ class MealNotifier extends StateNotifier<MealState> {
     final recentFoods = <FoodItem>[];
     for (final map in maps) {
       final item = FoodItem.fromMap(map);
+      if (item.mealType == MealType.supplement) continue;
       if (!seen.contains(item.name) && recentFoods.length < 20) {
         seen.add(item.name);
         recentFoods.add(item);
@@ -178,6 +185,7 @@ class MealNotifier extends StateNotifier<MealState> {
     double fiber = 0.0,
     double sodium = 0.0,
     Micronutrients micronutrients = Micronutrients.zero,
+    DetailedNutrients detailedNutrients = DetailedNutrients.zero,
     MealType? mealType,
   }) async {
     final adapter = await DatabaseService().database;
@@ -194,6 +202,7 @@ class MealNotifier extends StateNotifier<MealState> {
       fiber: fiber,
       sodium: sodium,
       micronutrients: micronutrients,
+      detailedNutrients: detailedNutrients,
       mealType: mealType ?? MealType.detectFromTime(now),
       date: DateTime(
         selectedDate.year,

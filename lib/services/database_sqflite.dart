@@ -14,7 +14,7 @@ class SqfliteDatabaseAdapter implements DatabaseAdapter {
 
     _database = await openDatabase(
       path,
-      version: 9,
+      version: 10,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -71,6 +71,10 @@ class SqfliteDatabaseAdapter implements DatabaseAdapter {
       await db.execute(
           "ALTER TABLE food_items ADD COLUMN micronutrients_json TEXT");
     }
+    if (oldVersion < 10) {
+      await db.execute(
+          "ALTER TABLE food_items ADD COLUMN detailed_nutrients_json TEXT");
+    }
   }
 
   Future<void> _onCreate(Database db, int version) async {
@@ -86,6 +90,7 @@ class SqfliteDatabaseAdapter implements DatabaseAdapter {
         fiber REAL DEFAULT 0,
         sodium REAL DEFAULT 0,
         micronutrients_json TEXT,
+        detailed_nutrients_json TEXT,
         meal_type TEXT DEFAULT 'snack',
         date TEXT
       )

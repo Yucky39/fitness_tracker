@@ -20,6 +20,7 @@ import '../services/food_search_service.dart';
 import '../services/meal_image_analysis_service.dart';
 import '../widgets/nutrient_bar.dart';
 import '../widgets/recipe_preset_editor_sheet.dart';
+import '../widgets/supplement_entry_dialog.dart';
 
 // View-mode toggle: false = grouped list, true = timeline
 final _timelineViewProvider = StateProvider<bool>((ref) => false);
@@ -230,6 +231,32 @@ class MealScreen extends ConsumerWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           for (final line in state.totalMicronutrients.summaryLines())
+                            Text(line, style: const TextStyle(fontSize: 12)),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+            if (state.totalDetailedNutrients.hasAnyPositive) ...[
+              const SizedBox(height: 8),
+              ExpansionTile(
+                tilePadding: EdgeInsets.zero,
+                dense: true,
+                title: const Text(
+                  '詳細栄養：脂肪酸・アミノ酸（合計）',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                ),
+                children: [
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          for (final line in state.totalDetailedNutrients.summaryLines())
                             Text(line, style: const TextStyle(fontSize: 12)),
                         ],
                       ),
@@ -511,7 +538,7 @@ class MealScreen extends ConsumerWidget {
         Row(
           children: [
             Text(
-              '今日の食事 (${state.todayItems.length}品目)',
+              '今日の記録 (${state.todayItems.length}件)',
               style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
             ),
             const Spacer(),
@@ -613,12 +640,22 @@ class MealScreen extends ConsumerWidget {
               // Content
               Expanded(
                 child: GestureDetector(
-                  onTap: () => _showFoodDialog(
-                    context: context,
-                    mealState: state,
-                    notifier: notifier,
-                    existingItem: item,
-                  ),
+                  onTap: () {
+                    if (item.mealType == MealType.supplement) {
+                      showSupplementEntryDialog(
+                        context: context,
+                        notifier: notifier,
+                        existingItem: item,
+                      );
+                    } else {
+                      _showFoodDialog(
+                        context: context,
+                        mealState: state,
+                        notifier: notifier,
+                        existingItem: item,
+                      );
+                    }
+                  },
                   child: Padding(
                     padding: EdgeInsets.only(bottom: isLast ? 0 : 12, top: 4),
                     child: Card(
@@ -745,7 +782,12 @@ class MealScreen extends ConsumerWidget {
 
   Widget _buildFoodTile(
       BuildContext context, FoodItem item, MealState mealState, MealNotifier notifier) {
-    final hasMicro = item.sugar > 0 || item.fiber > 0 || item.sodium > 0;
+    final hasMicro = item.sugar > 0 ||
+        item.fiber > 0 ||
+        item.sodium > 0 ||
+        item.micronutrients.hasAnyPositive ||
+        item.detailedNutrients.hasAnyPositive;
+    final isSupplement = item.mealType == MealType.supplement;
     return Dismissible(
       key: Key(item.id),
       direction: DismissDirection.endToStart,
@@ -781,13 +823,26 @@ class MealScreen extends ConsumerWidget {
         child: Tooltip(
           message: 'タップして編集',
           child: ListTile(
-            onTap: () => _showFoodDialog(
-              context: context,
-              mealState: mealState,
-              notifier: notifier,
-              existingItem: item,
-            ),
-            title: Text(item.name),
+            onTap: () {
+              if (isSupplement) {
+                showSupplementEntryDialog(
+                  context: context,
+                  notifier: notifier,
+                  existingItem: item,
+                );
+              } else {
+                _showFoodDialog(
+                  context: context,
+                  mealState: mealState,
+                  notifier: notifier,
+                  existingItem: item,
+                );
+              }
+            },
+            leading: isSupplement
+                ? Icon(Icons.medication_outlined, color: Theme.of(context).colorScheme.primary, size: 22)
+                : null,
+            title: Text(isSupplement ? '[サプリ] ${item.name}' : item.name),
             subtitle: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -882,7 +937,9 @@ class MealScreen extends ConsumerWidget {
                   const SizedBox(height: 6),
                   Wrap(
                     spacing: 8,
-                    children: MealType.values.map((t) {
+                    children: MealType.values
+                        .where((t) => t != MealType.supplement)
+                        .map((t) {
                       final selected = selectedMealType == t;
                       return ChoiceChip(
                         label: Text(t.label),
@@ -1030,6 +1087,8 @@ class MealScreen extends ConsumerWidget {
                       sugar: sugar,
                       fiber: fiber,
                       sodium: sodium,
+                      micronutrients: existingItem.micronutrients,
+                      detailedNutrients: existingItem.detailedNutrients,
                       mealType: selectedMealType,
                     ));
                   } else {
@@ -1230,6 +1289,18 @@ class MealScreen extends ConsumerWidget {
                 },
               ),
               ListTile(
+                leading: const Icon(Icons.medication_outlined),
+                title: const Text('サプリメントを記録'),
+                subtitle: const Text('食事タイプとは別。MCT・アミノ酸など詳細も入力できます'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  showSupplementEntryDialog(
+                    context: context,
+                    notifier: notifier,
+                  );
+                },
+              ),
+              ListTile(
                 leading: const Icon(Icons.camera_alt),
                 title: const Text('写真で自動分析'),
                 subtitle: const Text('AIが食事内容を認識してPFC・栄養素を自動入力します'),
@@ -1412,6 +1483,7 @@ class MealScreen extends ConsumerWidget {
               fiber: item.fiber,
               sodium: item.sodium,
               micronutrients: item.micronutrients,
+              detailedNutrients: item.detailedNutrients,
               mealType: item.mealType,
             );
           }

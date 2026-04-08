@@ -1,10 +1,13 @@
+import 'detailed_nutrients.dart';
 import 'micronutrients.dart';
 
 enum MealType {
   breakfast('breakfast', '朝食'),
   lunch('lunch', '昼食'),
   dinner('dinner', '夕食'),
-  snack('snack', '間食');
+  snack('snack', '間食'),
+  /// 食事タイミングとは別カテゴリ（サプリメント）
+  supplement('supplement', 'サプリメント');
 
   const MealType(this.key, this.label);
   final String key;
@@ -35,6 +38,7 @@ class FoodItem {
   final double fiber;
   final double sodium;
   final Micronutrients micronutrients;
+  final DetailedNutrients detailedNutrients;
   final MealType mealType;
   final DateTime date;
 
@@ -49,6 +53,7 @@ class FoodItem {
     this.fiber = 0.0,
     this.sodium = 0.0,
     this.micronutrients = Micronutrients.zero,
+    this.detailedNutrients = DetailedNutrients.zero,
     required this.mealType,
     required this.date,
   });
@@ -64,6 +69,7 @@ class FoodItem {
     double? fiber,
     double? sodium,
     Micronutrients? micronutrients,
+    DetailedNutrients? detailedNutrients,
     MealType? mealType,
     DateTime? date,
   }) {
@@ -78,6 +84,7 @@ class FoodItem {
       fiber: fiber ?? this.fiber,
       sodium: sodium ?? this.sodium,
       micronutrients: micronutrients ?? this.micronutrients,
+      detailedNutrients: detailedNutrients ?? this.detailedNutrients,
       mealType: mealType ?? this.mealType,
       date: date ?? this.date,
     );
@@ -95,6 +102,7 @@ class FoodItem {
       'fiber': fiber,
       'sodium': sodium,
       'micronutrients_json': micronutrients.toJsonString(),
+      'detailed_nutrients_json': detailedNutrients.toJsonString(),
       'meal_type': mealType.key,
       'date': date.toIso8601String(),
     };
@@ -113,6 +121,8 @@ class FoodItem {
       sodium: (map['sodium'] as num?)?.toDouble() ?? 0.0,
       micronutrients: Micronutrients.fromJsonString(map['micronutrients_json'] as String?) ??
           Micronutrients.zero,
+      detailedNutrients: DetailedNutrients.fromJsonString(map['detailed_nutrients_json'] as String?) ??
+          DetailedNutrients.zero,
       mealType: MealType.fromKey(map['meal_type'] as String?),
       date: DateTime.parse(map['date'] as String),
     );

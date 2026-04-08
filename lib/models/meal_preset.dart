@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:uuid/uuid.dart';
+import 'detailed_nutrients.dart';
 import 'food_item.dart';
 import 'micronutrients.dart';
 import 'recipe_ingredient.dart';
@@ -15,6 +16,7 @@ class PresetItem {
   final double fiber;
   final double sodium;
   final Micronutrients micronutrients;
+  final DetailedNutrients detailedNutrients;
   final MealType mealType;
 
   const PresetItem({
@@ -27,6 +29,7 @@ class PresetItem {
     required this.fiber,
     required this.sodium,
     this.micronutrients = Micronutrients.zero,
+    this.detailedNutrients = DetailedNutrients.zero,
     required this.mealType,
   });
 
@@ -40,6 +43,7 @@ class PresetItem {
         'fiber': fiber,
         'sodium': sodium,
         'micronutrients': micronutrients.toMap(),
+        'detailed_nutrients': detailedNutrients.toMap(),
         'meal_type': mealType.key,
       };
 
@@ -57,6 +61,11 @@ class PresetItem {
                 Map<String, dynamic>.from(m['micronutrients'] as Map),
               )
             : Micronutrients.zero,
+        detailedNutrients: m['detailed_nutrients'] != null
+            ? DetailedNutrients.fromMap(
+                Map<String, dynamic>.from(m['detailed_nutrients'] as Map),
+              )
+            : DetailedNutrients.zero,
         mealType: MealType.fromKey(m['meal_type'] as String?),
       );
 
@@ -70,6 +79,7 @@ class PresetItem {
         fiber: item.fiber,
         sodium: item.sodium,
         micronutrients: item.micronutrients,
+        detailedNutrients: item.detailedNutrients,
         mealType: item.mealType,
       );
 }
@@ -169,6 +179,7 @@ class MealPreset {
       fiber: total.fiber,
       sodium: total.sodium,
       micronutrients: total.micronutrients,
+      detailedNutrients: DetailedNutrients.zero,
       mealType: mealType,
     );
     return MealPreset(

@@ -334,7 +334,9 @@ class _RecipePresetEditorSheetState extends State<RecipePresetEditorSheet> {
                     const SizedBox(height: 6),
                     Wrap(
                       spacing: 8,
-                      children: MealType.values.map((t) {
+                      children: MealType.values
+                          .where((t) => t != MealType.supplement)
+                          .map((t) {
                         return ChoiceChip(
                           label: Text(t.label),
                           selected: _mealType == t,
