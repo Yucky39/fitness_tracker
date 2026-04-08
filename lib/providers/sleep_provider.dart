@@ -112,14 +112,22 @@ class SleepNotifier extends StateNotifier<SleepState> {
   }
 
   /// 「睡眠を連携」ボタンのタップ時に呼ぶ
+  ///
+  /// iOS HealthKit では requestAuthorization の戻り値が信頼できない
+  /// （一度拒否後は false を返す）ため、戻り値に関わらずデータ取得を試みる。
+  /// データが取得できれば true、できなければ false を返す。
   Future<bool> requestAndFetch() async {
     state = state.copyWith(isLoading: true);
-    final granted = await HealthService.requestSleepPermission();
-    if (!granted) {
-      state = state.copyWith(isLoading: false, permissionGranted: false);
+    final authRequested = await HealthService.requestSleepPermission();
+    await _fetchSleep(granted: true);
+    // iOS HealthKit は権限拒否でも authRequested が true を返すことがある。
+    // データ取得を試みた結果で判定する:
+    // - データあり → 明らかに許可済み → true
+    // - データなし & authRequested=false → 拒否された可能性 → false
+    // - データなし & authRequested=true → 単純にデータなし → true
+    if (state.sleepMinutes == null && !authRequested) {
       return false;
     }
-    await _fetchSleep(granted: true);
     return true;
   }
 

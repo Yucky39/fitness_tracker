@@ -273,7 +273,13 @@ class DashboardScreen extends ConsumerWidget {
                   if (!ok && context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
-                          content: Text('睡眠データへのアクセスが許可されていません')),
+                        content: Text(
+                          '睡眠データを取得できませんでした。\n'
+                          'iPhoneの設定 > プライバシーとセキュリティ > ヘルスケア から'
+                          'アクセスを許可してください。',
+                        ),
+                        duration: Duration(seconds: 5),
+                      ),
                     );
                   }
                 },
