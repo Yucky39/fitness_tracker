@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'package:uuid/uuid.dart';
 import 'food_item.dart';
+import 'recipe_ingredient.dart';
+import '../services/recipe_nutrition_calculator.dart';
 
 class PresetItem {
   final String name;
@@ -62,36 +64,68 @@ class PresetItem {
       );
 }
 
+enum MealPresetKind {
+  /// 食事一覧から保存した複数品目
+  meal,
+  /// 食材・分量・調理法から計算したレシピ
+  recipe,
+}
+
 class MealPreset {
   final String id;
   final String name;
+  final MealPresetKind kind;
   final List<PresetItem> items;
+  final List<RecipeIngredientLine>? recipeLines;
   final DateTime createdAt;
 
   const MealPreset({
     required this.id,
     required this.name,
+    this.kind = MealPresetKind.meal,
     required this.items,
+    this.recipeLines,
     required this.createdAt,
   });
 
   int get totalCalories => items.fold(0, (s, i) => s + i.calories);
 
+  bool get isRecipe => kind == MealPresetKind.recipe;
+
   Map<String, dynamic> toMap() => {
         'id': id,
         'name': name,
+        'kind': kind.name,
         'items': jsonEncode(items.map((i) => i.toMap()).toList()),
+        'recipe_data': recipeLines != null
+            ? jsonEncode(recipeLines!.map((e) => e.toMap()).toList())
+            : null,
         'created_at': createdAt.toIso8601String(),
       };
 
   factory MealPreset.fromMap(Map<String, dynamic> m) {
     final rawItems = jsonDecode(m['items'] as String) as List<dynamic>;
+    final kindStr = m['kind'] as String? ?? MealPresetKind.meal.name;
+    final kind = MealPresetKind.values.firstWhere(
+      (e) => e.name == kindStr,
+      orElse: () => MealPresetKind.meal,
+    );
+    List<RecipeIngredientLine>? recipeLines;
+    final rawRecipe = m['recipe_data'];
+    if (rawRecipe != null && rawRecipe is String && rawRecipe.isNotEmpty) {
+      final list = jsonDecode(rawRecipe) as List<dynamic>;
+      recipeLines = list
+          .map((e) => RecipeIngredientLine.fromMap(e as Map<String, dynamic>))
+          .toList();
+    }
     return MealPreset(
       id: m['id'] as String,
       name: m['name'] as String,
+      kind: kind,
       items: rawItems
           .map((e) => PresetItem.fromMap(e as Map<String, dynamic>))
           .toList(),
+      recipeLines: recipeLines,
       createdAt: DateTime.parse(m['created_at'] as String),
     );
   }
@@ -103,7 +137,36 @@ class MealPreset {
       MealPreset(
         id: const Uuid().v4(),
         name: name,
+        kind: MealPresetKind.meal,
         items: items.map(PresetItem.fromFoodItem).toList(),
         createdAt: DateTime.now(),
       );
+
+  /// レシピ1件分として保存（日記に追加するときは [items] の1行を使う）
+  static MealPreset createRecipe({
+    required String name,
+    required List<RecipeIngredientLine> lines,
+    required MealType mealType,
+  }) {
+    final total = RecipeNutritionCalculator.computeTotal(lines);
+    final item = PresetItem(
+      name: name,
+      calories: total.calories,
+      protein: total.protein,
+      fat: total.fat,
+      carbs: total.carbs,
+      sugar: total.sugar,
+      fiber: total.fiber,
+      sodium: total.sodium,
+      mealType: mealType,
+    );
+    return MealPreset(
+      id: const Uuid().v4(),
+      name: name,
+      kind: MealPresetKind.recipe,
+      items: [item],
+      recipeLines: lines,
+      createdAt: DateTime.now(),
+    );
+  }
 }

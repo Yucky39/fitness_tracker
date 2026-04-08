@@ -19,6 +19,7 @@ import '../services/barcode_lookup_service.dart';
 import '../services/food_search_service.dart';
 import '../services/meal_image_analysis_service.dart';
 import '../widgets/nutrient_bar.dart';
+import '../widgets/recipe_preset_editor_sheet.dart';
 
 // View-mode toggle: false = grouped list, true = timeline
 final _timelineViewProvider = StateProvider<bool>((ref) => false);
@@ -514,12 +515,22 @@ class MealScreen extends ConsumerWidget {
 
         // Save preset button
         const SizedBox(height: 12),
-        Center(
-          child: OutlinedButton.icon(
-            icon: const Icon(Icons.bookmark_add, size: 18),
-            label: const Text('今日の食事をプリセット保存'),
-            onPressed: () => _showSavePresetDialog(context, ref, state.todayItems),
-          ),
+        Wrap(
+          alignment: WrapAlignment.center,
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            OutlinedButton.icon(
+              icon: const Icon(Icons.bookmark_add, size: 18),
+              label: const Text('今日の食事をプリセット保存'),
+              onPressed: () => _showSavePresetDialog(context, ref, state.todayItems),
+            ),
+            OutlinedButton.icon(
+              icon: const Icon(Icons.restaurant_menu, size: 18),
+              label: const Text('レシピを計算して保存'),
+              onPressed: () => _showRecipePresetEditor(context, ref),
+            ),
+          ],
         ),
       ],
     );
@@ -1046,8 +1057,8 @@ class MealScreen extends ConsumerWidget {
                         child: TextField(
                           controller: searchController,
                           decoration: const InputDecoration(
-                            labelText: '食品名（英語が精度高）',
-                            hintText: 'chicken breast, rice...',
+                            labelText: '食品名',
+                            hintText: '日本語可（国内DB・英語併用） rice...',
                           ),
                           onSubmitted: (_) async {
                             setDialogState(() {
@@ -1213,6 +1224,15 @@ class MealScreen extends ConsumerWidget {
                   _showPresetSheet(context, ref, notifier);
                 },
               ),
+              ListTile(
+                leading: const Icon(Icons.restaurant_menu),
+                title: const Text('自分のレシピを保存'),
+                subtitle: const Text('食材・分量・調理法から栄養を計算してプリセット化'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _showRecipePresetEditor(context, ref);
+                },
+              ),
             ],
           ),
         ),
@@ -1363,6 +1383,24 @@ class MealScreen extends ConsumerWidget {
             );
           }
         },
+      ),
+    );
+  }
+
+  void _showRecipePresetEditor(BuildContext context, WidgetRef ref) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(ctx).bottom),
+        child: RecipePresetEditorSheet(
+          onSave: (name, lines, mealType) {
+            ref.read(presetProvider.notifier).saveRecipePreset(name, lines, mealType);
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('レシピ「$name」をプリセットに保存しました')),
+            );
+          },
+        ),
       ),
     );
   }
@@ -1964,7 +2002,8 @@ class _PresetSheet extends ConsumerWidget {
               const Expanded(
                 child: Center(
                   child: Text(
-                    'プリセットがまだありません\n食事一覧の「プリセット保存」ボタンで追加できます',
+                    'プリセットがまだありません\n'
+                    '「今日の食事をプリセット保存」または「レシピを計算して保存」で追加できます',
                     textAlign: TextAlign.center,
                     style: TextStyle(color: Colors.grey),
                   ),
@@ -1977,11 +2016,14 @@ class _PresetSheet extends ConsumerWidget {
                   itemCount: presets.length,
                   itemBuilder: (ctx, i) {
                     final preset = presets[i];
+                    final subtitle = preset.isRecipe && preset.recipeLines != null
+                        ? '${preset.recipeLines!.length}材料・${preset.totalCalories} kcal（レシピ）'
+                        : '${preset.items.length}品目・${preset.totalCalories} kcal';
                     return ListTile(
-                      leading: const Icon(Icons.bookmark),
+                      leading: Icon(preset.isRecipe ? Icons.restaurant_menu : Icons.bookmark),
                       title: Text(preset.name),
                       subtitle: Text(
-                        '${preset.items.length}品目・${preset.totalCalories} kcal',
+                        subtitle,
                         style: const TextStyle(fontSize: 12),
                       ),
                       trailing: IconButton(
@@ -2016,7 +2058,10 @@ class _PresetSheet extends ConsumerWidget {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
                             content: Text(
-                                '「${preset.name}」の${preset.items.length}品目を追加しました'),
+                              preset.isRecipe
+                                  ? '「${preset.name}」（レシピ）を追加しました'
+                                  : '「${preset.name}」の${preset.items.length}品目を追加しました',
+                            ),
                           ),
                         );
                       },

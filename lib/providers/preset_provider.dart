@@ -1,6 +1,7 @@
 import 'package:riverpod/legacy.dart';
 import '../models/food_item.dart';
 import '../models/meal_preset.dart';
+import '../models/recipe_ingredient.dart';
 import '../services/database_service.dart';
 
 class PresetState {
@@ -24,6 +25,21 @@ class PresetNotifier extends StateNotifier<PresetState> {
 
   Future<void> savePreset(String name, List<FoodItem> items) async {
     final preset = MealPreset.create(name: name, items: items);
+    final adapter = await DatabaseService().database;
+    await adapter.insert('meal_presets', preset.toMap());
+    await _load();
+  }
+
+  Future<void> saveRecipePreset(
+    String name,
+    List<RecipeIngredientLine> lines,
+    MealType mealType,
+  ) async {
+    final preset = MealPreset.createRecipe(
+      name: name,
+      lines: lines,
+      mealType: mealType,
+    );
     final adapter = await DatabaseService().database;
     await adapter.insert('meal_presets', preset.toMap());
     await _load();

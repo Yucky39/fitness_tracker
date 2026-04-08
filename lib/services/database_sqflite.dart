@@ -14,7 +14,7 @@ class SqfliteDatabaseAdapter implements DatabaseAdapter {
 
     _database = await openDatabase(
       path,
-      version: 7,
+      version: 8,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -60,6 +60,12 @@ class SqfliteDatabaseAdapter implements DatabaseAdapter {
     if (oldVersion < 7) {
       await db.execute(
           "ALTER TABLE training_logs ADD COLUMN ai_advice TEXT");
+    }
+    if (oldVersion < 8) {
+      await db.execute(
+          "ALTER TABLE meal_presets ADD COLUMN kind TEXT DEFAULT 'meal'");
+      await db.execute(
+          "ALTER TABLE meal_presets ADD COLUMN recipe_data TEXT");
     }
   }
 
@@ -112,6 +118,8 @@ class SqfliteDatabaseAdapter implements DatabaseAdapter {
         id TEXT PRIMARY KEY,
         name TEXT,
         items TEXT,
+        kind TEXT DEFAULT 'meal',
+        recipe_data TEXT,
         created_at TEXT
       )
     ''');
