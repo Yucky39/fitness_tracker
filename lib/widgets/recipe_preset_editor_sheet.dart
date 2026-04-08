@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import '../models/food_item.dart';
+import '../models/micronutrients.dart';
 import '../models/recipe_ingredient.dart';
 import '../services/food_search_service.dart';
 import '../services/recipe_nutrition_calculator.dart';
@@ -7,6 +10,7 @@ import '../services/recipe_nutrition_calculator.dart';
 class _LineControllers {
   _LineControllers()
       : name = TextEditingController(),
+        nameFocus = FocusNode(),
         amount = TextEditingController(text: '100'),
         gramsPerPiece = TextEditingController(),
         calories = TextEditingController(),
@@ -15,9 +19,14 @@ class _LineControllers {
         carbs = TextEditingController(),
         sugar = TextEditingController(),
         fiber = TextEditingController(),
-        sodium = TextEditingController();
+        sodium = TextEditingController() {
+    for (final k in Micronutrients.zero.toMap().keys) {
+      microControllers[k] = TextEditingController();
+    }
+  }
 
   final TextEditingController name;
+  final FocusNode nameFocus;
   final TextEditingController amount;
   final TextEditingController gramsPerPiece;
   final TextEditingController calories;
@@ -27,11 +36,13 @@ class _LineControllers {
   final TextEditingController sugar;
   final TextEditingController fiber;
   final TextEditingController sodium;
+  final Map<String, TextEditingController> microControllers = {};
   RecipeQuantityUnit quantityUnit = RecipeQuantityUnit.gram;
   RecipeCookingMethod cooking = RecipeCookingMethod.raw;
 
   void dispose() {
     name.dispose();
+    nameFocus.dispose();
     amount.dispose();
     gramsPerPiece.dispose();
     calories.dispose();
@@ -41,6 +52,25 @@ class _LineControllers {
     sugar.dispose();
     fiber.dispose();
     sodium.dispose();
+    for (final c in microControllers.values) {
+      c.dispose();
+    }
+  }
+
+  void _setMicroFromModel(Micronutrients m) {
+    final map = m.toMap();
+    for (final e in map.entries) {
+      final c = microControllers[e.key];
+      if (c == null) continue;
+      final v = (e.value as num).toDouble();
+      c.text = v > 0 ? (v == v.roundToDouble() ? '${v.toInt()}' : v.toStringAsFixed(2)) : '';
+    }
+  }
+
+  void clearMicroFields() {
+    for (final c in microControllers.values) {
+      c.text = '';
+    }
   }
 
   RecipeIngredientLine? toLine() {
@@ -61,6 +91,12 @@ class _LineControllers {
     final su = double.tryParse(sugar.text) ?? 0;
     final fi = double.tryParse(fiber.text) ?? 0;
     final so = double.tryParse(sodium.text) ?? 0;
+    final microMap = <String, dynamic>{};
+    for (final e in microControllers.entries) {
+      final t = e.value.text.replaceAll(',', '').trim();
+      microMap[e.key] = double.tryParse(t) ?? 0.0;
+    }
+    final micro = Micronutrients.fromMap(microMap);
     return RecipeIngredientLine(
       name: n,
       grams: grams,
@@ -75,6 +111,7 @@ class _LineControllers {
         sugar: su,
         fiber: fi,
         sodium: so,
+        micronutrients: micro,
       ),
       cookingMethod: cooking,
     );
@@ -109,8 +146,17 @@ class _RecipePresetEditorSheetState extends State<RecipePresetEditorSheet> {
   MealType _mealType = MealType.detectFromTime(DateTime.now());
   final List<_LineControllers> _lines = [_LineControllers()];
 
+  final FoodSearchService _foodSearch = FoodSearchService();
+  Timer? _nameSearchDebounce;
+  int _nameSearchGeneration = 0;
+
+  int? _suggestionLineIndex;
+  List<FoodSearchResult> _nameSuggestions = [];
+  bool _nameSearchLoading = false;
+
   @override
   void dispose() {
+    _nameSearchDebounce?.cancel();
     _recipeNameController.dispose();
     for (final l in _lines) {
       l.dispose();
@@ -127,6 +173,15 @@ class _RecipePresetEditorSheetState extends State<RecipePresetEditorSheet> {
     setState(() {
       _lines[i].dispose();
       _lines.removeAt(i);
+      if (_suggestionLineIndex != null) {
+        if (_suggestionLineIndex == i) {
+          _suggestionLineIndex = null;
+          _nameSuggestions = [];
+          _nameSearchLoading = false;
+        } else if (_suggestionLineIndex! > i) {
+          _suggestionLineIndex = _suggestionLineIndex! - 1;
+        }
+      }
     });
   }
 
@@ -156,162 +211,67 @@ class _RecipePresetEditorSheetState extends State<RecipePresetEditorSheet> {
     }
   }
 
-  Future<void> _openSearch(int lineIndex) async {
-    final line = _lines[lineIndex];
-    final searchController = TextEditingController();
-    final quantityController = TextEditingController(text: line.amount.text);
-    final service = FoodSearchService();
-    List<FoodSearchResult> results = [];
-    var isSearching = false;
-    String? error;
+  void _onIngredientNameChanged(int lineIndex, String query) {
+    _nameSearchDebounce?.cancel();
+    _nameSearchGeneration++;
+    final gen = _nameSearchGeneration;
+    _suggestionLineIndex = lineIndex;
 
-    if (!mounted) return;
-    await showDialog<void>(
-      context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setDialogState) {
-          return AlertDialog(
-            title: const Text('食品検索（100gあたりの値）'),
-            content: SizedBox(
-              width: double.maxFinite,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text(
-                    '日本語は辞書で英語キーワードに変換してから検索します。'
-                    'ヒットしない場合は成分表ベースの目安が表示されることがあります。',
-                    style: TextStyle(fontSize: 11, color: Colors.grey),
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: searchController,
-                          decoration: const InputDecoration(
-                            labelText: 'キーワード',
-                            hintText: '例：卵、鶏むね肉、yogurt',
-                          ),
-                          onSubmitted: (_) async {
-                            setDialogState(() {
-                              isSearching = true;
-                              error = null;
-                            });
-                            try {
-                              final r = await service.search(searchController.text);
-                              setDialogState(() {
-                                results = r;
-                                isSearching = false;
-                              });
-                            } catch (_) {
-                              setDialogState(() {
-                                error = '検索に失敗しました';
-                                isSearching = false;
-                              });
-                            }
-                          },
-                        ),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.search),
-                        onPressed: () async {
-                          setDialogState(() {
-                            isSearching = true;
-                            error = null;
-                          });
-                          try {
-                            final r = await service.search(searchController.text);
-                            setDialogState(() {
-                              results = r;
-                              isSearching = false;
-                            });
-                          } catch (_) {
-                            setDialogState(() {
-                              error = '検索に失敗しました';
-                              isSearching = false;
-                            });
-                          }
-                        },
-                      ),
-                    ],
-                  ),
-                  Row(
-                    children: [
-                      const Text('この食材の分量 ', style: TextStyle(fontSize: 13)),
-                      SizedBox(
-                        width: 80,
-                        child: TextField(
-                          controller: quantityController,
-                          keyboardType: TextInputType.number,
-                          decoration: const InputDecoration(
-                            suffix: Text('g'),
-                            isDense: true,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  if (isSearching)
-                    const Padding(
-                      padding: EdgeInsets.all(16),
-                      child: CircularProgressIndicator(),
-                    )
-                  else if (error != null)
-                    Text(error!, style: const TextStyle(color: Colors.red))
-                  else if (results.isNotEmpty)
-                    ConstrainedBox(
-                      constraints: const BoxConstraints(maxHeight: 220),
-                      child: ListView.builder(
-                        shrinkWrap: true,
-                        itemCount: results.length,
-                        itemBuilder: (context, i) {
-                          final r = results[i];
-                          return ListTile(
-                            dense: true,
-                            title: Text(
-                              r.name,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            subtitle: Text(
-                              '${r.caloriesPer100g}kcal/100g',
-                              style: const TextStyle(fontSize: 11),
-                            ),
-                            onTap: () {
-                              final line = _lines[lineIndex];
-                              line.name.text = r.name;
-                              line.amount.text = quantityController.text;
-                              line.quantityUnit = RecipeQuantityUnit.gram;
-                              line.calories.text = '${r.caloriesPer100g}';
-                              line.protein.text = r.proteinPer100g.toStringAsFixed(1);
-                              line.fat.text = r.fatPer100g.toStringAsFixed(1);
-                              line.carbs.text = r.carbsPer100g.toStringAsFixed(1);
-                              line.sugar.text = '0';
-                              line.fiber.text = '0';
-                              line.sodium.text = '0';
-                              Navigator.pop(dialogContext);
-                              setState(() {});
-                            },
-                          );
-                        },
-                      ),
-                    ),
-                ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(dialogContext),
-                child: const Text('閉じる'),
-              ),
-            ],
-          );
-        },
-      ),
-    );
-    searchController.dispose();
-    quantityController.dispose();
+    final q = query.trim();
+    if (q.isEmpty) {
+      setState(() {
+        _nameSuggestions = [];
+        _nameSearchLoading = false;
+      });
+      return;
+    }
+
+    _nameSearchDebounce = Timer(const Duration(milliseconds: 420), () async {
+      if (!mounted || gen != _nameSearchGeneration) return;
+      setState(() {
+        _nameSearchLoading = true;
+        _nameSuggestions = [];
+      });
+      try {
+        final list = await _foodSearch.search(q);
+        if (!mounted || gen != _nameSearchGeneration) return;
+        setState(() {
+          _nameSuggestions = list;
+          _suggestionLineIndex = lineIndex;
+          _nameSearchLoading = false;
+        });
+      } catch (_) {
+        if (!mounted || gen != _nameSearchGeneration) return;
+        setState(() {
+          _nameSuggestions = [];
+          _nameSearchLoading = false;
+        });
+      }
+    });
+  }
+
+  void _applyNameSuggestion(int lineIndex, FoodSearchResult r) {
+    final line = _lines[lineIndex];
+    line.name.text = r.name;
+    line.quantityUnit = RecipeQuantityUnit.gram;
+    line.calories.text = '${r.caloriesPer100g}';
+    line.protein.text = r.proteinPer100g.toStringAsFixed(1);
+    line.fat.text = r.fatPer100g.toStringAsFixed(1);
+    line.carbs.text = r.carbsPer100g.toStringAsFixed(1);
+    line.sugar.text = '0';
+    line.fiber.text = '0';
+    line.sodium.text = '0';
+    if (r.micronutrients != null) {
+      line._setMicroFromModel(r.micronutrients!);
+    } else {
+      line.clearMicroFields();
+    }
+    _nameSearchGeneration++;
+    setState(() {
+      _nameSuggestions = [];
+      _nameSearchLoading = false;
+    });
+    line.nameFocus.unfocus();
   }
 
   @override
@@ -383,19 +343,24 @@ class _RecipePresetEditorSheetState extends State<RecipePresetEditorSheet> {
                       }).toList(),
                     ),
                     const SizedBox(height: 16),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text('食材', style: TextStyle(fontWeight: FontWeight.w600)),
-                        TextButton.icon(
+                    const Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text('食材', style: TextStyle(fontWeight: FontWeight.w600)),
+                    ),
+                    const SizedBox(height: 8),
+                    for (var i = 0; i < _lines.length; i++) _buildLineCard(context, i),
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4, bottom: 4),
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: TextButton.icon(
                           onPressed: _addLine,
                           icon: const Icon(Icons.add, size: 18),
                           label: const Text('行を追加'),
                         ),
-                      ],
+                      ),
                     ),
-                    for (var i = 0; i < _lines.length; i++) _buildLineCard(context, i),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 8),
                     Card(
                       child: Padding(
                         padding: const EdgeInsets.all(12),
@@ -422,6 +387,32 @@ class _RecipePresetEditorSheetState extends State<RecipePresetEditorSheet> {
                                   style: const TextStyle(fontSize: 12, color: Colors.grey),
                                 ),
                               ),
+                            if (preview.micronutrients.hasAnyPositive) ...[
+                              const SizedBox(height: 8),
+                              ExpansionTile(
+                                tilePadding: EdgeInsets.zero,
+                                dense: true,
+                                title: const Text(
+                                  'ビタミン・ミネラル（合計）',
+                                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                                ),
+                                children: [
+                                  Align(
+                                    alignment: Alignment.centerLeft,
+                                    child: Padding(
+                                      padding: const EdgeInsets.only(bottom: 8),
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          for (final s in preview.micronutrients.summaryLines())
+                                            Text(s, style: const TextStyle(fontSize: 12)),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
                           ],
                         ),
                       ),
@@ -475,13 +466,33 @@ class _RecipePresetEditorSheetState extends State<RecipePresetEditorSheet> {
               children: [
                 Expanded(
                   flex: 3,
-                  child: TextField(
-                    controller: line.name,
-                    decoration: const InputDecoration(
-                      labelText: '名前',
-                      isDense: true,
+                  child: Focus(
+                    onFocusChange: (hasFocus) {
+                      if (!hasFocus) {
+                        Future.delayed(const Duration(milliseconds: 280), () {
+                          if (!mounted) return;
+                          if (_suggestionLineIndex == i && !line.nameFocus.hasFocus) {
+                            setState(() {
+                              _nameSuggestions = [];
+                              _nameSearchLoading = false;
+                            });
+                          }
+                        });
+                      }
+                    },
+                    child: TextField(
+                      controller: line.name,
+                      focusNode: line.nameFocus,
+                      decoration: const InputDecoration(
+                        labelText: '名前（入力で食品検索）',
+                        hintText: 'キーワードを入力',
+                        isDense: true,
+                      ),
+                      onChanged: (v) {
+                        setState(() {});
+                        _onIngredientNameChanged(i, v);
+                      },
                     ),
-                    onChanged: (_) => setState(() {}),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -498,6 +509,49 @@ class _RecipePresetEditorSheetState extends State<RecipePresetEditorSheet> {
                 ),
               ],
             ),
+            if (_suggestionLineIndex == i &&
+                (_nameSearchLoading || _nameSuggestions.isNotEmpty)) ...[
+              const SizedBox(height: 6),
+              Material(
+                elevation: 3,
+                borderRadius: BorderRadius.circular(8),
+                clipBehavior: Clip.antiAlias,
+                child: _nameSearchLoading && _nameSuggestions.isEmpty
+                    ? const SizedBox(
+                        height: 52,
+                        child: Center(child: CircularProgressIndicator.adaptive()),
+                      )
+                    : ConstrainedBox(
+                        constraints: const BoxConstraints(maxHeight: 220),
+                        child: ListView.builder(
+                          padding: EdgeInsets.zero,
+                          shrinkWrap: true,
+                          itemCount: _nameSuggestions.length,
+                          itemBuilder: (ctx, j) {
+                            final r = _nameSuggestions[j];
+                            return ListTile(
+                              dense: true,
+                              title: Text(
+                                r.name,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(fontSize: 13),
+                              ),
+                              subtitle: Text(
+                                [
+                                  '${r.caloriesPer100g}kcal/100g',
+                                  if (r.dataSourceLabel != null) r.dataSourceLabel!,
+                                ].join('\n'),
+                                style: const TextStyle(fontSize: 9),
+                                maxLines: 4,
+                              ),
+                              onTap: () => _applyNameSuggestion(i, r),
+                            );
+                          },
+                        ),
+                      ),
+              ),
+            ],
             const SizedBox(height: 6),
             InputDecorator(
               decoration: const InputDecoration(
@@ -559,15 +613,6 @@ class _RecipePresetEditorSheetState extends State<RecipePresetEditorSheet> {
                   style: TextStyle(fontSize: 11, color: Colors.orange),
                 ),
               ),
-            const SizedBox(height: 6),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: OutlinedButton.icon(
-                onPressed: () => _openSearch(i),
-                icon: const Icon(Icons.search, size: 16),
-                label: const Text('食品検索で100g値を入れる', style: TextStyle(fontSize: 12)),
-              ),
-            ),
             const SizedBox(height: 6),
             const Text('100gあたり', style: TextStyle(fontSize: 11, color: Colors.grey)),
             const SizedBox(height: 4),
@@ -638,6 +683,41 @@ class _RecipePresetEditorSheetState extends State<RecipePresetEditorSheet> {
                     keyboardType: TextInputType.number,
                     onChanged: (_) => setState(() {}),
                   ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            ExpansionTile(
+              tilePadding: EdgeInsets.zero,
+              dense: true,
+              title: const Text(
+                'ビタミン・ミネラル（100g・任意）',
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+              ),
+              children: [
+                LayoutBuilder(
+                  builder: (ctx, c) {
+                    final w = (c.maxWidth - 8) / 2;
+                    return Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        for (final f in Micronutrients.editorFields)
+                          SizedBox(
+                            width: w.clamp(120, 400),
+                            child: TextField(
+                              controller: line.microControllers[f.key],
+                              decoration: InputDecoration(
+                                labelText: '${f.label} (${f.unit})',
+                                isDense: true,
+                              ),
+                              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                              onChanged: (_) => setState(() {}),
+                            ),
+                          ),
+                      ],
+                    );
+                  },
                 ),
               ],
             ),

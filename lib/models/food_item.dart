@@ -1,3 +1,5 @@
+import 'micronutrients.dart';
+
 enum MealType {
   breakfast('breakfast', '朝食'),
   lunch('lunch', '昼食'),
@@ -32,6 +34,7 @@ class FoodItem {
   final double sugar;
   final double fiber;
   final double sodium;
+  final Micronutrients micronutrients;
   final MealType mealType;
   final DateTime date;
 
@@ -45,6 +48,7 @@ class FoodItem {
     this.sugar = 0.0,
     this.fiber = 0.0,
     this.sodium = 0.0,
+    this.micronutrients = Micronutrients.zero,
     required this.mealType,
     required this.date,
   });
@@ -59,6 +63,7 @@ class FoodItem {
     double? sugar,
     double? fiber,
     double? sodium,
+    Micronutrients? micronutrients,
     MealType? mealType,
     DateTime? date,
   }) {
@@ -72,6 +77,7 @@ class FoodItem {
       sugar: sugar ?? this.sugar,
       fiber: fiber ?? this.fiber,
       sodium: sodium ?? this.sodium,
+      micronutrients: micronutrients ?? this.micronutrients,
       mealType: mealType ?? this.mealType,
       date: date ?? this.date,
     );
@@ -88,6 +94,7 @@ class FoodItem {
       'sugar': sugar,
       'fiber': fiber,
       'sodium': sodium,
+      'micronutrients_json': micronutrients.toJsonString(),
       'meal_type': mealType.key,
       'date': date.toIso8601String(),
     };
@@ -104,6 +111,8 @@ class FoodItem {
       sugar: (map['sugar'] as num?)?.toDouble() ?? 0.0,
       fiber: (map['fiber'] as num?)?.toDouble() ?? 0.0,
       sodium: (map['sodium'] as num?)?.toDouble() ?? 0.0,
+      micronutrients: Micronutrients.fromJsonString(map['micronutrients_json'] as String?) ??
+          Micronutrients.zero,
       mealType: MealType.fromKey(map['meal_type'] as String?),
       date: DateTime.parse(map['date'] as String),
     );

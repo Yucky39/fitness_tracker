@@ -89,6 +89,7 @@ class JapaneseFoodFallbackNutrition {
         proteinPer100g: row.p,
         fatPer100g: row.f,
         carbsPer100g: row.c,
+        dataSourceLabel: '日本食品標準成分表に基づくアプリ内目安',
       );
 }
 

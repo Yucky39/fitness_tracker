@@ -1,3 +1,4 @@
+import '../models/micronutrients.dart';
 import '../models/recipe_ingredient.dart';
 
 /// 1行ぶんの計算結果
@@ -9,6 +10,7 @@ class LineNutritionTotals {
   final double sugar;
   final double fiber;
   final double sodium;
+  final Micronutrients micronutrients;
 
   const LineNutritionTotals({
     required this.calories,
@@ -18,6 +20,7 @@ class LineNutritionTotals {
     required this.sugar,
     required this.fiber,
     required this.sodium,
+    this.micronutrients = Micronutrients.zero,
   });
 }
 
@@ -30,6 +33,7 @@ class RecipeNutritionTotals {
   final double sugar;
   final double fiber;
   final double sodium;
+  final Micronutrients micronutrients;
 
   const RecipeNutritionTotals({
     required this.calories,
@@ -39,6 +43,7 @@ class RecipeNutritionTotals {
     required this.sugar,
     required this.fiber,
     required this.sodium,
+    this.micronutrients = Micronutrients.zero,
   });
 
   static const zero = RecipeNutritionTotals(
@@ -49,6 +54,7 @@ class RecipeNutritionTotals {
     sugar: 0,
     fiber: 0,
     sodium: 0,
+    micronutrients: Micronutrients.zero,
   );
 }
 
@@ -66,6 +72,7 @@ class RecipeNutritionCalculator {
         sugar: 0,
         fiber: 0,
         sodium: 0,
+        micronutrients: Micronutrients.zero,
       );
     }
 
@@ -80,6 +87,7 @@ class RecipeNutritionCalculator {
     var sugar = p.sugar * r;
     var fiber = p.fiber * r;
     var sodium = p.sodium * r;
+    final micro = p.micronutrients.scale(r);
 
     cal *= m.calorieFactor;
     fat *= m.fatFactor;
@@ -96,6 +104,7 @@ class RecipeNutritionCalculator {
       sugar: sugar,
       fiber: fiber,
       sodium: sodium,
+      micronutrients: micro,
     );
   }
 
@@ -108,6 +117,7 @@ class RecipeNutritionCalculator {
     var sugar = 0.0;
     var fiber = 0.0;
     var sodium = 0.0;
+    var micro = Micronutrients.zero;
     for (final line in lines) {
       final o = computeLine(line);
       totalCal += o.calories;
@@ -117,6 +127,7 @@ class RecipeNutritionCalculator {
       sugar += o.sugar;
       fiber += o.fiber;
       sodium += o.sodium;
+      micro = micro + o.micronutrients;
     }
     return RecipeNutritionTotals(
       calories: totalCal,
@@ -126,6 +137,7 @@ class RecipeNutritionCalculator {
       sugar: sugar,
       fiber: fiber,
       sodium: sodium,
+      micronutrients: micro,
     );
   }
 }

@@ -3,6 +3,7 @@ import 'package:riverpod/legacy.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 import '../models/food_item.dart';
+import '../models/micronutrients.dart';
 import '../services/database_service.dart';
 import '../services/sync_service.dart';
 import 'dashboard_provider.dart';
@@ -57,6 +58,11 @@ class MealState {
   double get totalSugar => todayItems.fold(0.0, (sum, item) => sum + item.sugar);
   double get totalFiber => todayItems.fold(0.0, (sum, item) => sum + item.fiber);
   double get totalSodium => todayItems.fold(0.0, (sum, item) => sum + item.sodium);
+
+  Micronutrients get totalMicronutrients => todayItems.fold<Micronutrients>(
+        Micronutrients.zero,
+        (sum, item) => sum + item.micronutrients,
+      );
 
   /// 食事タイプごとのカロリー合計（表示順は [MealType.values]）
   Map<MealType, int> get caloriesByMealType {
@@ -171,6 +177,7 @@ class MealNotifier extends StateNotifier<MealState> {
     double sugar = 0.0,
     double fiber = 0.0,
     double sodium = 0.0,
+    Micronutrients micronutrients = Micronutrients.zero,
     MealType? mealType,
   }) async {
     final adapter = await DatabaseService().database;
@@ -186,6 +193,7 @@ class MealNotifier extends StateNotifier<MealState> {
       sugar: sugar,
       fiber: fiber,
       sodium: sodium,
+      micronutrients: micronutrients,
       mealType: mealType ?? MealType.detectFromTime(now),
       date: DateTime(
         selectedDate.year,

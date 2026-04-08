@@ -1,3 +1,5 @@
+import 'micronutrients.dart';
+
 /// 分量の単位（内部ではグラムに換算して栄養計算する）
 enum RecipeQuantityUnit {
   /// グラム
@@ -62,6 +64,7 @@ class NutritionPer100g {
   final double sugar;
   final double fiber;
   final double sodium;
+  final Micronutrients micronutrients;
 
   const NutritionPer100g({
     required this.calories,
@@ -71,6 +74,7 @@ class NutritionPer100g {
     this.sugar = 0,
     this.fiber = 0,
     this.sodium = 0,
+    this.micronutrients = Micronutrients.zero,
   });
 
   Map<String, dynamic> toMap() => {
@@ -81,6 +85,7 @@ class NutritionPer100g {
         'sugar': sugar,
         'fiber': fiber,
         'sodium': sodium,
+        'micronutrients': micronutrients.toMap(),
       };
 
   factory NutritionPer100g.fromMap(Map<String, dynamic> m) => NutritionPer100g(
@@ -91,6 +96,11 @@ class NutritionPer100g {
         sugar: (m['sugar'] as num?)?.toDouble() ?? 0,
         fiber: (m['fiber'] as num?)?.toDouble() ?? 0,
         sodium: (m['sodium'] as num?)?.toDouble() ?? 0,
+        micronutrients: m['micronutrients'] != null
+            ? Micronutrients.fromMap(
+                Map<String, dynamic>.from(m['micronutrients'] as Map),
+              )
+            : Micronutrients.zero,
       );
 }
 

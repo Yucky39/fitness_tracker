@@ -211,6 +211,33 @@ class MealScreen extends ConsumerWidget {
                 ],
               ),
             ],
+            if (state.totalMicronutrients.hasAnyPositive) ...[
+              const SizedBox(height: 12),
+              const Divider(height: 1),
+              ExpansionTile(
+                tilePadding: EdgeInsets.zero,
+                dense: true,
+                title: const Text(
+                  'ビタミン・ミネラル（合計）',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                ),
+                children: [
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          for (final line in state.totalMicronutrients.summaryLines())
+                            Text(line, style: const TextStyle(fontSize: 12)),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ],
         ),
       ),
@@ -1058,7 +1085,7 @@ class MealScreen extends ConsumerWidget {
                           controller: searchController,
                           decoration: const InputDecoration(
                             labelText: '食品名',
-                            hintText: '日本語可（国内DB・英語併用） rice...',
+                            hintText: '日本語可（文科省成分DBを優先）',
                           ),
                           onSubmitted: (_) async {
                             setDialogState(() {
@@ -1145,8 +1172,13 @@ class MealScreen extends ConsumerWidget {
                               overflow: TextOverflow.ellipsis,
                             ),
                             subtitle: Text(
-                              '${r.caloriesPer100g}kcal/100g  '
-                              'P:${r.proteinPer100g.toStringAsFixed(1)}g',
+                              [
+                                '${r.caloriesPer100g}kcal/100g  '
+                                    'P:${r.proteinPer100g.toStringAsFixed(1)}g',
+                                if (r.dataSourceLabel != null) r.dataSourceLabel!,
+                              ].join('\n'),
+                              style: const TextStyle(fontSize: 10),
+                              maxLines: 4,
                             ),
                             onTap: () {
                               final grams =
@@ -1379,6 +1411,7 @@ class MealScreen extends ConsumerWidget {
               sugar: item.sugar,
               fiber: item.fiber,
               sodium: item.sodium,
+              micronutrients: item.micronutrients,
               mealType: item.mealType,
             );
           }

@@ -4,6 +4,8 @@ import 'package:http/http.dart' as http;
 import '../data/japanese_food_fallback_nutrition.dart';
 import '../data/japanese_food_search_hints.dart';
 import '../models/food_search_result.dart';
+import '../models/micronutrients.dart';
+import 'mext_food_search_service.dart';
 
 export '../models/food_search_result.dart';
 
@@ -25,12 +27,18 @@ class FoodSearchService {
     return false;
   }
 
-  /// search.pl は `json=1` や `fields=` の組み合わせで 503 になることがあるため、
-  /// `json=true` + `action=process` + `search_simple=1` のみ使用する（fields は付けない）。
-  /// 日本語クエリはサーバ側が不安定なため、辞書で英語に寄せた語を先に検索する。
+  /// 1) 文部科学省 食品成分データベース（日本食品標準成分表 八訂）
+  /// 2) Open Food Facts（補助）
+  /// 3) アプリ内の成分表ベース目安
   Future<List<FoodSearchResult>> search(String query) async {
     final q = query.trim();
     if (q.isEmpty) return [];
+
+    final mext = await MextFoodSearchService().search(q);
+    if (mext.isNotEmpty) {
+      if (mext.length > 24) return mext.sublist(0, 24);
+      return mext;
+    }
 
     final searchTerms = _buildSearchTerms(q);
     final futures = searchTerms
@@ -124,12 +132,45 @@ class FoodSearchService {
       return null;
     }
 
+    final micro = _micronutrientsFromOffNutriments(n);
+
     return FoodSearchResult(
       name: name.trim(),
       caloriesPer100g: cal.round(),
       proteinPer100g: protein,
       fatPer100g: fat,
       carbsPer100g: carbs,
+      dataSourceLabel: 'Open Food Facts',
+      micronutrients: micro.hasAnyPositive ? micro : null,
+    );
+  }
+
+  /// Open Food Facts の nutriments（100g 基準）から取り込める分をマッピング
+  Micronutrients _micronutrientsFromOffNutriments(Map<String, dynamic> n) {
+    double g(String k) => _num(n[k]);
+    final folate = g('folates_100g') > 0
+        ? g('folates_100g')
+        : (g('folate_100g') > 0 ? g('folate_100g') : g('vitamin-b9_100g'));
+    return Micronutrients(
+      vitaminAUg: g('vitamin-a_100g'),
+      vitaminDUg: g('vitamin-d_100g'),
+      vitaminEMg: g('vitamin-e_100g'),
+      vitaminKUg: g('vitamin-k_100g'),
+      vitaminB1Mg: g('vitamin-b1_100g'),
+      vitaminB2Mg: g('vitamin-b2_100g'),
+      niacinMg: g('niacin_100g'),
+      vitaminB6Mg: g('vitamin-b6_100g'),
+      vitaminB12Ug: g('vitamin-b12_100g'),
+      folateUg: folate,
+      vitaminCMg: g('vitamin-c_100g'),
+      calciumMg: g('calcium_100g'),
+      ironMg: g('iron_100g'),
+      zincMg: g('zinc_100g'),
+      magnesiumMg: g('magnesium_100g'),
+      phosphorusMg: g('phosphorus_100g'),
+      potassiumMg: g('potassium_100g'),
+      copperMg: g('copper_100g'),
+      manganeseMg: g('manganese_100g'),
     );
   }
 
