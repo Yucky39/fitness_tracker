@@ -94,13 +94,10 @@ class SleepNotifier extends StateNotifier<SleepState> {
     }
   }
 
-  /// 起動時：権限確認 → 許可済みなら自動取得
+  /// 起動時・ダッシュボード表示時：権限を自動リクエストしてデータ取得。
+  /// iOS では既に決定済みの場合ダイアログは表示されない。
   Future<void> _autoFetch() async {
-    final granted = await HealthService.hasSleepPermission();
-    if (!granted) {
-      state = state.copyWith(permissionGranted: false);
-      return;
-    }
+    await HealthService.requestSleepPermission(); // 権限なければリクエスト、済みならスキップ
     await _fetchSleep(granted: true);
   }
 

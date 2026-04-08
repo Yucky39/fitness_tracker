@@ -30,6 +30,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    // ダッシュボード初期表示時に睡眠・歩数を自動同期
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(ref.read(sleepProvider.notifier).syncOnDashboardVisible());
+      unawaited(ref.read(stepsProvider.notifier).syncOnDashboardVisible());
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     final selectedIndex = ref.watch(homeTabIndexProvider);
 
