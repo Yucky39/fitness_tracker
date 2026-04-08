@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../models/training_log.dart';
@@ -154,12 +155,6 @@ class _TrainingScreenState extends ConsumerState<TrainingScreen> {
               ),
             ),
           ),
-          if (HealthService.isSupported)
-            IconButton(
-              icon: const Icon(Icons.health_and_safety_outlined),
-              tooltip: 'ヘルスケアから取り込む',
-              onPressed: () => _importFromHealth(context, ref, trainingNotifier),
-            ),
         ],
       ),
       body: Stack(
@@ -357,116 +352,6 @@ class _TrainingScreenState extends ConsumerState<TrainingScreen> {
               style: const TextStyle(color: Colors.white54, fontSize: 10)),
       ],
     );
-  }
-
-  // ── HealthKit / Health Connect import ────────────────────────────────────
-
-  Future<void> _importFromHealth(
-    BuildContext context,
-    WidgetRef ref,
-    TrainingNotifier notifier,
-  ) async {
-    final granted = await HealthService.requestPermissions();
-    if (!context.mounted) return;
-
-    if (!granted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('ヘルスケアへのアクセスが許可されていません')),
-      );
-      return;
-    }
-
-    final workouts = await HealthService.fetchRecentWorkouts(days: 30);
-    if (!context.mounted) return;
-
-    if (workouts.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('直近30日間にワークアウト記録がありません')),
-      );
-      return;
-    }
-
-    // 既存ログの日時セットを構築（重複インポート防止）
-    final existingDates = ref
-        .read(trainingProvider)
-        .logs
-        .where((l) => l.note == 'ヘルスケアから取得')
-        .map((l) =>
-            '${l.exerciseName}_${DateFormat('yyyyMMddHHmm').format(l.date)}')
-        .toSet();
-
-    final newWorkouts = workouts.where((w) {
-      final key =
-          '${w.exerciseName}_${DateFormat('yyyyMMddHHmm').format(w.date)}';
-      return !existingDates.contains(key);
-    }).toList();
-
-    if (!context.mounted) return;
-
-    if (newWorkouts.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('新しいワークアウト記録はありません（すでに取り込み済み）')),
-      );
-      return;
-    }
-
-    // 確認ダイアログ
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('ヘルスケアから取り込む'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('${newWorkouts.length} 件のワークアウトが見つかりました。取り込みますか？'),
-            const SizedBox(height: 12),
-            ...newWorkouts.take(5).map((w) => Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 2),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.directions_run, size: 14,
-                          color: Colors.teal),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: Text(
-                          '${w.exerciseName}  '
-                          '${w.durationMinutes}分'
-                          '${w.distanceKm > 0 ? '  ${w.distanceKm.toStringAsFixed(1)}km' : ''}'
-                          '  ${DateFormat('M/d').format(w.date)}',
-                          style: const TextStyle(fontSize: 12),
-                        ),
-                      ),
-                    ],
-                  ),
-                )),
-            if (newWorkouts.length > 5)
-              Text('…他 ${newWorkouts.length - 5} 件',
-                  style: const TextStyle(fontSize: 12, color: Colors.grey)),
-          ],
-        ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('キャンセル')),
-          TextButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('取り込む')),
-        ],
-      ),
-    );
-
-    if (ok != true || !context.mounted) return;
-
-    for (final w in newWorkouts) {
-      await notifier.addLogFromHealth(w);
-    }
-
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${newWorkouts.length} 件を取り込みました')),
-      );
-    }
   }
 
   // ── Add / Edit dialog ────────────────────────────────────────────────────
@@ -1428,10 +1313,29 @@ class _TrainingLogCardState extends State<_TrainingLogCard> {
               ),
             ),
             if (_adviceExpanded) ...[
-              const SizedBox(height: 4),
-              Text(
-                aiAdvice,
-                style: const TextStyle(fontSize: 13, height: 1.55),
+              const SizedBox(height: 6),
+              MarkdownBody(
+                data: aiAdvice,
+                // 長い番号付きリストでも高さ計算が安定する（baseline だとスクロール内で欠けることがある）
+                listItemCrossAxisAlignment:
+                    MarkdownListItemCrossAxisAlignment.start,
+                styleSheet: MarkdownStyleSheet.fromTheme(Theme.of(context)).copyWith(
+                  p: const TextStyle(fontSize: 13, height: 1.6),
+                  h3: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    height: 1.8,
+                  ),
+                  strong: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  horizontalRuleDecoration: BoxDecoration(
+                    border: Border(
+                      top: BorderSide(color: Colors.grey.shade300, width: 1),
+                    ),
+                  ),
+                ),
               ),
               const SizedBox(height: 8),
               TextButton.icon(

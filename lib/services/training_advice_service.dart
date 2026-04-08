@@ -5,7 +5,8 @@ import '../models/training_log.dart';
 import '../providers/settings_provider.dart';
 
 class TrainingAdviceService {
-  static const _maxTokens = 1536;
+  /// 出力が途中で切れないよう、十分な余裕を持たせる（プロンプトが長い場合も同様）。
+  static const _maxTokens = 4096;
 
   static String _systemPrompt(String level) {
     const base = 'あなたは経験豊富なパーソナルトレーナーです。'

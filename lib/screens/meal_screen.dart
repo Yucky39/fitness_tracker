@@ -377,7 +377,9 @@ class MealScreen extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // 長いモデル名と同一行に置かない（横幅が潰れてタイトルが縦書きになるのを防ぐ）
             Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 const Icon(Icons.psychology, color: Colors.teal),
                 const SizedBox(width: 8),
@@ -385,44 +387,48 @@ class MealScreen extends ConsumerWidget {
                   child: Text(
                     'AIアドバイス',
                     style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: Colors.teal.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12),
+                if (adviceState.isLoading)
+                  const SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                else
+                  IconButton(
+                    icon: const Icon(Icons.refresh),
+                    tooltip: adviceState.adviceText != null ? '再取得（更新）' : 'アドバイスを取得',
+                    onPressed: () => ref.read(adviceProvider.notifier).fetchAdvice(
+                          items: mealState.todayItems,
+                          date: mealState.selectedDate,
+                          calorieGoal: mealState.calorieGoal,
+                          proteinGoal: mealState.proteinGoal,
+                          fatGoal: mealState.fatGoal,
+                          carbsGoal: mealState.carbsGoal,
+                          adviceLevel: settings.adviceLevel,
+                          apiKey: settings.currentApiKey,
+                          provider: settings.selectedProvider,
+                          model: settings.currentModel,
+                          forceRefresh: true,
+                        ),
                   ),
-                  child: Text(
-                    '${settings.selectedProvider.label} · ${settings.currentModelLabel} · ${settings.adviceLevelLabel}',
-                    style: const TextStyle(fontSize: 12, color: Colors.teal),
-                  ),
-                ),
-                const SizedBox(width: 4),
-                adviceState.isLoading
-                    ? const SizedBox(
-                        width: 24,
-                        height: 24,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : IconButton(
-                        icon: const Icon(Icons.refresh),
-                        tooltip: adviceState.adviceText != null ? '再取得（更新）' : 'アドバイスを取得',
-                        onPressed: () => ref.read(adviceProvider.notifier).fetchAdvice(
-                              items: mealState.todayItems,
-                              date: mealState.selectedDate,
-                              calorieGoal: mealState.calorieGoal,
-                              proteinGoal: mealState.proteinGoal,
-                              fatGoal: mealState.fatGoal,
-                              carbsGoal: mealState.carbsGoal,
-                              adviceLevel: settings.adviceLevel,
-                              apiKey: settings.currentApiKey,
-                              provider: settings.selectedProvider,
-                              model: settings.currentModel,
-                              forceRefresh: true,
-                            ),
-                      ),
               ],
+            ),
+            const SizedBox(height: 8),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.teal.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                '${settings.selectedProvider.label} · ${settings.currentModelLabel} · ${settings.adviceLevelLabel}',
+                style: const TextStyle(fontSize: 12, color: Colors.teal, height: 1.35),
+              ),
             ),
             if (adviceState.error != null) ...[
               const SizedBox(height: 8),
