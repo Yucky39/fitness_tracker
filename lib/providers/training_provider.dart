@@ -109,6 +109,22 @@ class TrainingNotifier extends StateNotifier<TrainingState> {
     await _loadLogs();
   }
 
+  /// AI評価テキストのみを更新（DB部分更新 + インメモリ反映）
+  Future<void> updateLogAdvice(String logId, String advice) async {
+    final adapter = await DatabaseService().database;
+    await adapter.update(
+      'training_logs',
+      {'ai_advice': advice},
+      where: 'id = ?',
+      whereArgs: [logId],
+    );
+    state = state.copyWith(
+      logs: state.logs
+          .map((l) => l.id == logId ? l.copyWith(aiAdvice: advice) : l)
+          .toList(),
+    );
+  }
+
   /// 指定種目の直近ログ（編集対象以外）
   TrainingLog? getPreviousLog(String exerciseName, {String? excludeId}) {
     try {

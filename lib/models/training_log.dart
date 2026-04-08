@@ -29,6 +29,8 @@ class TrainingLog {
   final int durationMinutes;
   final String note;
   final DateTime date;
+  /// AI評価テキスト（一度解析したものを永続保存）
+  final String? aiAdvice;
 
   TrainingLog({
     required this.id,
@@ -42,6 +44,7 @@ class TrainingLog {
     this.durationMinutes = 0,
     required this.note,
     required this.date,
+    this.aiAdvice,
   });
 
   TrainingLog copyWith({
@@ -56,6 +59,7 @@ class TrainingLog {
     int? durationMinutes,
     String? note,
     DateTime? date,
+    String? aiAdvice,
   }) =>
       TrainingLog(
         id: id ?? this.id,
@@ -69,6 +73,7 @@ class TrainingLog {
         durationMinutes: durationMinutes ?? this.durationMinutes,
         note: note ?? this.note,
         date: date ?? this.date,
+        aiAdvice: aiAdvice ?? this.aiAdvice,
       );
 
   /// 総ボリューム (kg)  例: 100kg × 10rep × 3set = 3000kg（筋トレのみ）
@@ -94,6 +99,7 @@ class TrainingLog {
       'duration_minutes': durationMinutes,
       'note': note,
       'date': date.toIso8601String(),
+      'ai_advice': aiAdvice,
     };
   }
 
@@ -110,6 +116,7 @@ class TrainingLog {
       durationMinutes: map['duration_minutes'] as int? ?? 0,
       note: map['note'] as String,
       date: DateTime.parse(map['date'] as String),
+      aiAdvice: map['ai_advice'] as String?,
     );
   }
 }

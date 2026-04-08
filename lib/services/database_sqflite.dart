@@ -14,7 +14,7 @@ class SqfliteDatabaseAdapter implements DatabaseAdapter {
 
     _database = await openDatabase(
       path,
-      version: 6,
+      version: 7,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -56,6 +56,10 @@ class SqfliteDatabaseAdapter implements DatabaseAdapter {
           note TEXT
         )
       ''');
+    }
+    if (oldVersion < 7) {
+      await db.execute(
+          "ALTER TABLE training_logs ADD COLUMN ai_advice TEXT");
     }
   }
 

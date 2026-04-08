@@ -1,10 +1,12 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod/legacy.dart';
 import '../models/training_log.dart';
 import '../providers/settings_provider.dart';
+import '../providers/training_provider.dart';
 import '../services/training_advice_service.dart';
 
 class TrainingAdviceState {
-  /// 記録IDごとの評価テキスト（再取得で上書き）
+  /// 記録IDごとの評価テキスト（セッション中のインメモリキャッシュ）
   final Map<String, String> adviceByLogId;
   final String? loadingLogId;
   final String? errorLogId;
@@ -16,13 +18,15 @@ class TrainingAdviceState {
     this.errorLogId,
     this.errorMessage,
   });
-
 }
 
 class TrainingAdviceNotifier extends StateNotifier<TrainingAdviceState> {
-  TrainingAdviceNotifier() : super(const TrainingAdviceState());
+  final Ref _ref;
+
+  TrainingAdviceNotifier(this._ref) : super(const TrainingAdviceState());
 
   /// 1件の記録を評価。[allLogs] は日付降順を想定（同種目の直近比較用）。
+  /// 評価完了後は DB に永続保存する。
   Future<void> fetchAdviceForLog({
     required TrainingLog log,
     required List<TrainingLog> allLogs,
@@ -66,9 +70,13 @@ class TrainingAdviceNotifier extends StateNotifier<TrainingAdviceState> {
         sleepContext: sleepContext,
       );
 
+      // インメモリに反映
       state = TrainingAdviceState(
         adviceByLogId: {...state.adviceByLogId, log.id: text},
       );
+
+      // DB に永続保存
+      await _ref.read(trainingProvider.notifier).updateLogAdvice(log.id, text);
     } catch (e) {
       final msg = e.toString().replaceFirst('Exception: ', '');
       state = TrainingAdviceState(
@@ -84,4 +92,4 @@ class TrainingAdviceNotifier extends StateNotifier<TrainingAdviceState> {
 
 final trainingAdviceProvider =
     StateNotifierProvider<TrainingAdviceNotifier, TrainingAdviceState>(
-        (_) => TrainingAdviceNotifier());
+        (ref) => TrainingAdviceNotifier(ref));

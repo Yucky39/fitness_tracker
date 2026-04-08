@@ -122,7 +122,7 @@ class WebDatabaseAdapter implements DatabaseAdapter {
     int count = 0;
     for (var i = 0; i < rows.length; i++) {
       if (targetIds.contains(rows[i]['id'])) {
-        rows[i] = Map<String, dynamic>.from(values);
+        rows[i] = {...rows[i], ...Map<String, dynamic>.from(values)};
         count++;
       }
     }

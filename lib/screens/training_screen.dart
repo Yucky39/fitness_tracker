@@ -245,7 +245,7 @@ class _TrainingScreenState extends ConsumerState<TrainingScreen> {
                     : null,
                 showAiAdvice: settings.trainingAdviceEnabled,
                 aiLoading: adviceState.loadingLogId == log.id,
-                aiAdvice: adviceState.adviceByLogId[log.id],
+                aiAdvice: adviceState.adviceByLogId[log.id] ?? log.aiAdvice,
                 aiError: adviceState.errorLogId == log.id
                     ? adviceState.errorMessage
                     : null,
@@ -1127,7 +1127,7 @@ class _TrainingScreenState extends ConsumerState<TrainingScreen> {
 
 // ── Training log card ──────────────────────────────────────────────────────
 
-class _TrainingLogCard extends StatelessWidget {
+class _TrainingLogCard extends StatefulWidget {
   final TrainingLog log;
   final bool isPr;
   final double estimatedKcal;
@@ -1157,7 +1157,34 @@ class _TrainingLogCard extends StatelessWidget {
   });
 
   @override
+  State<_TrainingLogCard> createState() => _TrainingLogCardState();
+}
+
+class _TrainingLogCardState extends State<_TrainingLogCard> {
+  bool _adviceExpanded = false;
+
+  @override
+  void didUpdateWidget(_TrainingLogCard old) {
+    super.didUpdateWidget(old);
+    // 新たに解析結果が届いたら自動展開
+    if (old.aiAdvice == null && widget.aiAdvice != null) {
+      setState(() => _adviceExpanded = true);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final log = widget.log;
+    final isPr = widget.isPr;
+    final estimatedKcal = widget.estimatedKcal;
+    final onEdit = widget.onEdit;
+    final onDelete = widget.onDelete;
+    final onIntervalTimer = widget.onIntervalTimer;
+    final showAiAdvice = widget.showAiAdvice;
+    final aiLoading = widget.aiLoading;
+    final aiAdvice = widget.aiAdvice;
+    final aiError = widget.aiError;
+    final onRequestAiAdvice = widget.onRequestAiAdvice;
     final isCardio = log.exerciseType == ExerciseType.cardio;
     final oneRm =
         isCardio ? 0.0 : TrainingNotifier.oneRepMax(log.weight, log.reps);
@@ -1341,51 +1368,117 @@ class _TrainingLogCard extends StatelessWidget {
             ),
           ),
           if (showAiAdvice && onRequestAiAdvice != null)
+            _buildAiAdviceSection(
+              context,
+              aiAdvice: aiAdvice,
+              aiLoading: aiLoading,
+              aiError: aiError,
+              onRequestAiAdvice: onRequestAiAdvice,
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAiAdviceSection(
+    BuildContext context, {
+    required String? aiAdvice,
+    required bool aiLoading,
+    required String? aiError,
+    required VoidCallback onRequestAiAdvice,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(14, 0, 8, 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Divider(height: 1),
+          const SizedBox(height: 4),
+
+          // ── 評価済みの場合: 折り畳みヘッダー ──
+          if (aiAdvice != null) ...[
+            InkWell(
+              onTap: () => setState(() => _adviceExpanded = !_adviceExpanded),
+              borderRadius: BorderRadius.circular(6),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                child: Row(
+                  children: [
+                    const Icon(Icons.psychology, size: 18, color: Colors.teal),
+                    const SizedBox(width: 6),
+                    const Expanded(
+                      child: Text(
+                        'AI評価済み',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.teal,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                    Icon(
+                      _adviceExpanded
+                          ? Icons.expand_less
+                          : Icons.expand_more,
+                      size: 20,
+                      color: Colors.teal,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            if (_adviceExpanded) ...[
+              const SizedBox(height: 4),
+              Text(
+                aiAdvice,
+                style: const TextStyle(fontSize: 13, height: 1.55),
+              ),
+              const SizedBox(height: 8),
+              TextButton.icon(
+                onPressed: aiLoading ? null : onRequestAiAdvice,
+                icon: aiLoading
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.refresh, size: 18),
+                label: const Text('再評価', style: TextStyle(fontSize: 13)),
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  foregroundColor: Colors.grey[600],
+                ),
+              ),
+            ],
+          ],
+
+          // ── 未評価の場合: 評価ボタン ──
+          if (aiAdvice == null) ...[
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: aiLoading ? null : onRequestAiAdvice,
+                icon: aiLoading
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.psychology_outlined, size: 20),
+                label: const Text(
+                  'この記録をAI評価',
+                  style: TextStyle(fontSize: 13),
+                ),
+              ),
+            ),
+          ],
+
+          if (aiError != null)
             Padding(
-              padding: const EdgeInsets.fromLTRB(14, 0, 8, 12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Divider(height: 1),
-                  const SizedBox(height: 8),
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: TextButton.icon(
-                      onPressed: aiLoading ? null : onRequestAiAdvice,
-                      icon: aiLoading
-                          ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child:
-                                  CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.psychology_outlined, size: 20),
-                      label: Text(
-                        aiAdvice != null ? 'この記録を再評価' : 'この記録をAI評価',
-                        style: const TextStyle(fontSize: 13),
-                      ),
-                    ),
-                  ),
-                  if (aiError != null) ...[
-                    Text(
-                      aiError!,
-                      style: const TextStyle(
-                        color: Colors.red,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
-                  if (aiAdvice != null) ...[
-                    const SizedBox(height: 6),
-                    Text(
-                      aiAdvice!,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        height: 1.55,
-                      ),
-                    ),
-                  ],
-                ],
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                aiError,
+                style: const TextStyle(color: Colors.red, fontSize: 12),
               ),
             ),
         ],
