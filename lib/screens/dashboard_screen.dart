@@ -3,10 +3,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../models/period_summary.dart';
 import '../providers/dashboard_provider.dart';
 import '../providers/energy_profile_provider.dart';
 import '../providers/home_tab_provider.dart';
 import '../providers/meal_provider.dart';
+import '../providers/period_summary_provider.dart';
 import '../providers/progress_provider.dart';
 import '../providers/routine_provider.dart';
 import '../providers/settings_provider.dart';
@@ -58,6 +60,7 @@ class DashboardScreen extends ConsumerWidget {
     Future<void> refresh() async {
       await Future.wait([
         ref.read(dashboardProvider.notifier).loadWeeklyData(),
+        ref.read(periodSummaryProvider.notifier).load(),
         ref.read(sleepProvider.notifier).syncOnDashboardVisible(),
         ref.read(stepsProvider.notifier).syncOnDashboardVisible(),
       ]);
@@ -96,6 +99,8 @@ class DashboardScreen extends ConsumerWidget {
                   _buildSleepCard(context, scheme, ref, sleepState),
                   const SizedBox(height: 12),
                   _buildStepsCard(context, scheme, ref, stepsState),
+                  const SizedBox(height: 12),
+                  _buildPeriodSummarySection(context, scheme, ref),
                   const SizedBox(height: 20),
                   Text(
                     'クイックアクセス',
@@ -1006,6 +1011,251 @@ class DashboardScreen extends ConsumerWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildPeriodSummarySection(
+    BuildContext context,
+    ColorScheme scheme,
+    WidgetRef ref,
+  ) {
+    final ps = ref.watch(periodSummaryProvider);
+    final summary = ps.summary;
+    final ev = summary?.evaluation;
+
+    return Card(
+      elevation: 0,
+      color: scheme.surfaceContainerHigh,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+        side: BorderSide(
+          color: scheme.outlineVariant.withValues(alpha: 0.45),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.insights_rounded, color: scheme.primary),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    '期間サマリ',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '食事・トレ・体重記録をもとに、目標との距離感をざっくり評価します',
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                    height: 1.35,
+                  ),
+            ),
+            const SizedBox(height: 14),
+            SegmentedButton<SummaryPeriodKind>(
+              segments: const [
+                ButtonSegment(
+                  value: SummaryPeriodKind.week,
+                  label: Text('1週間'),
+                ),
+                ButtonSegment(
+                  value: SummaryPeriodKind.month,
+                  label: Text('1ヶ月'),
+                ),
+                ButtonSegment(
+                  value: SummaryPeriodKind.quarter,
+                  label: Text('3ヶ月'),
+                ),
+              ],
+              selected: {ps.preset},
+              onSelectionChanged: (Set<SummaryPeriodKind> next) {
+                ref
+                    .read(periodSummaryProvider.notifier)
+                    .setPreset(next.first);
+              },
+            ),
+            const SizedBox(height: 16),
+            if (ps.isLoading)
+              const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(20),
+                  child: CircularProgressIndicator(),
+                ),
+              )
+            else if (summary != null && ev != null) ...[
+              if (ev.score > 0 && ev.grade != '—')
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 56,
+                      height: 56,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: scheme.primaryContainer,
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Text(
+                        ev.grade,
+                        style: Theme.of(context)
+                            .textTheme
+                            .headlineSmall
+                            ?.copyWith(
+                              fontWeight: FontWeight.w900,
+                              color: scheme.onPrimaryContainer,
+                            ),
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '総合 ${ev.score} 点',
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleSmall
+                                ?.copyWith(
+                                  fontWeight: FontWeight.w800,
+                                ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            ev.headline,
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodyMedium
+                                ?.copyWith(
+                                  color: scheme.onSurfaceVariant,
+                                ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                )
+              else
+                Text(
+                  ev.headline,
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                ),
+              const SizedBox(height: 8),
+              Text(
+                '${DateFormat('M/d', 'ja').format(summary.rangeStart)} 〜 '
+                '${DateFormat('M/d', 'ja').format(summary.rangeEnd)} · '
+                '${summary.kind.label}',
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                    ),
+              ),
+              if (summary.hasAnyData) ...[
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    _periodStatChip(
+                      context,
+                      scheme,
+                      '平均摂取',
+                      '${summary.avgDailyCalories.round()} kcal/日',
+                    ),
+                    _periodStatChip(
+                      context,
+                      scheme,
+                      'トレ記録',
+                      '${summary.trainingLogCount} 件',
+                    ),
+                    if (summary.trainingEstimatedKcal > 0)
+                      _periodStatChip(
+                        context,
+                        scheme,
+                        '推定消費',
+                        '${summary.trainingEstimatedKcal.round()} kcal',
+                      ),
+                  ],
+                ),
+              ],
+              const SizedBox(height: 12),
+              ...ev.bullets.map(
+                (line) => Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.only(top: 6),
+                        child: Icon(
+                          Icons.circle,
+                          size: 6,
+                          color: scheme.primary,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          line,
+                          style:
+                              Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    height: 1.45,
+                                  ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  static Widget _periodStatChip(
+    BuildContext context,
+    ColorScheme scheme,
+    String label,
+    String value,
+  ) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: scheme.outlineVariant.withValues(alpha: 0.35),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            label,
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: scheme.onSurfaceVariant,
+                ),
+          ),
+          Text(
+            value,
+            style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+          ),
+        ],
       ),
     );
   }

@@ -19,6 +19,9 @@ class MealState {
   final double carbsGoal;
   final bool isLoading;
 
+  /// 食事の追加・更新・削除のたびに増やす。日付変更だけでは増やさない（サマリ再計算のトリガー用）。
+  final int mealDataEpoch;
+
   MealState({
     this.todayItems = const [],
     this.recentFoods = const [],
@@ -28,6 +31,7 @@ class MealState {
     this.fatGoal = 60,
     this.carbsGoal = 200,
     this.isLoading = true,
+    this.mealDataEpoch = 0,
   }) : selectedDate = selectedDate ?? DateTime.now();
 
   MealState copyWith({
@@ -39,6 +43,7 @@ class MealState {
     double? fatGoal,
     double? carbsGoal,
     bool? isLoading,
+    int? mealDataEpoch,
   }) {
     return MealState(
       todayItems: todayItems ?? this.todayItems,
@@ -49,6 +54,7 @@ class MealState {
       fatGoal: fatGoal ?? this.fatGoal,
       carbsGoal: carbsGoal ?? this.carbsGoal,
       isLoading: isLoading ?? this.isLoading,
+      mealDataEpoch: mealDataEpoch ?? this.mealDataEpoch,
     );
   }
 
@@ -87,8 +93,13 @@ class MealNotifier extends StateNotifier<MealState> {
 
   final Ref _ref;
 
-  Future<void> _refreshDashboard() =>
-      _ref.read(dashboardProvider.notifier).loadWeeklyData();
+  void _invalidateDashboard() {
+    _ref.invalidate(dashboardProvider);
+  }
+
+  void _bumpMealDataEpoch() {
+    state = state.copyWith(mealDataEpoch: state.mealDataEpoch + 1);
+  }
 
   Future<void> _loadData() async {
     state = state.copyWith(isLoading: true);
@@ -173,6 +184,7 @@ class MealNotifier extends StateNotifier<MealState> {
       fatGoal: fat,
       carbsGoal: carbs,
     );
+    _bumpMealDataEpoch();
   }
 
   Future<void> addFoodItem({
@@ -218,7 +230,8 @@ class MealNotifier extends StateNotifier<MealState> {
     SyncService().syncRecord('food_items', newItem.toMap());
     await _loadItemsForDate(state.selectedDate);
     await _loadRecentFoods();
-    await _refreshDashboard();
+    _bumpMealDataEpoch();
+    _invalidateDashboard();
   }
 
   Future<void> updateFoodItem(FoodItem updated) async {
@@ -232,7 +245,8 @@ class MealNotifier extends StateNotifier<MealState> {
     SyncService().syncRecord('food_items', updated.toMap());
     await _loadItemsForDate(state.selectedDate);
     await _loadRecentFoods();
-    await _refreshDashboard();
+    _bumpMealDataEpoch();
+    _invalidateDashboard();
   }
 
   Future<void> deleteFoodItem(String id) async {
@@ -241,7 +255,8 @@ class MealNotifier extends StateNotifier<MealState> {
     SyncService().deleteRecord('food_items', id);
     await _loadItemsForDate(state.selectedDate);
     await _loadRecentFoods();
-    await _refreshDashboard();
+    _bumpMealDataEpoch();
+    _invalidateDashboard();
   }
 }
 
