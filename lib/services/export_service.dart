@@ -54,11 +54,13 @@ class ExportService {
 
   String _buildTrainingCsv(List<TrainingLog> logs) {
     final sb = StringBuffer();
-    sb.writeln('日付,種目,重量(kg),回数,セット数,インターバル(秒),メモ');
+    sb.writeln(
+        '日付,種目,重量(kg),回数,セット数,インターバル(秒),RPE(1-10),メモ');
     for (final log in logs) {
       final date = DateFormat('yyyy/MM/dd HH:mm').format(log.date);
+      final rpe = log.rpe?.toString() ?? '';
       sb.writeln(
-          '$date,${log.exerciseName},${log.weight},${log.reps},${log.sets},${log.interval},"${log.note}"');
+          '$date,${log.exerciseName},${log.weight},${log.reps},${log.sets},${log.interval},$rpe,"${log.note}"');
     }
     return sb.toString();
   }

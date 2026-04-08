@@ -200,6 +200,7 @@ class HealthService {
       interval: 0,
       distanceKm: distanceKm,
       durationMinutes: durationMin,
+      rpe: null,
       note: 'ヘルスケアから取得',
       date: point.dateFrom,
     );

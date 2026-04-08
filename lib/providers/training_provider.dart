@@ -61,6 +61,7 @@ class TrainingNotifier extends StateNotifier<TrainingState> {
     required int interval,
     double distanceKm = 0,
     int durationMinutes = 0,
+    int? rpe,
     required String note,
   }) async {
     final adapter = await DatabaseService().database;
@@ -74,6 +75,7 @@ class TrainingNotifier extends StateNotifier<TrainingState> {
       interval: interval,
       distanceKm: distanceKm,
       durationMinutes: durationMinutes,
+      rpe: rpe,
       note: note,
       date: DateTime.now(),
     );

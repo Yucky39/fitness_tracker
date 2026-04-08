@@ -9,9 +9,12 @@ class TrainingAdviceService {
   static const _maxTokens = 4096;
 
   static String _systemPrompt(String level) {
-    const base = 'あなたは経験豊富なパーソナルトレーナーです。'
-        '提示された1件のトレーニング記録と同種目の過去履歴を踏まえ、日本語で具体的な評価とアドバイスを提供してください。'
-        '有酸素ではペース・距離・時間のバランス、筋トレでは重量・回数・ボリュームやPRの観点に触れ、次のセッションへの目安を示してください。';
+    const base = 'あなたは経験豊富なパーソナルトレーナーであり、運動生理学の基礎に通じています。'
+        '提示された1件のトレーニング記録と同種目の過去履歴、および直近の負荷の要約を踏まえ、日本語で具体的な評価とアドバイスを提供してください。'
+        '有酸素ではペース・距離・時間のバランス、筋トレでは重量・回数・ボリュームやPRの観点に触れ、次のセッションへの目安を示してください。'
+        '主観的運動強度（RPE: 1〜10）が記録されている場合は、内部負荷の目安として扱い、外部負荷（重量・時間など）と食い違う場合はフォーム・疲労・コンディションの観点から考察してください。'
+        '直近のトレーニング頻度・ボリュームと照らし、過負荷や回復不足の可能性、周期化（軽い日・中程度・高負荷の配分）に触れてください。'
+        '負担を軽減するための休息の取り方、睡眠・栄養・水分の一般的な留意点、および種目に応じたストレッチやモビリティ（対象となる筋群、静止ストレッチは各15〜60秒程度・反復の目安など）を、医療診断ではなく一般的なエクササイズ指針として簡潔に含めてください。';
     final modifiers = {
       'strict': '弱点や改善点を遠慮なく指摘し、強度・ボリュームの具体的な改善を提示してください。',
       'normal': '良い点と改善点のバランスよく、実践しやすい次のステップを提案してください。',
@@ -26,11 +29,79 @@ class TrainingAdviceService {
     return '$min:${sec.toString().padLeft(2, '0')}/km';
   }
 
+  /// 評価対象日を含む直近7日間の記録から、頻度・負荷の要約文を作る（AIの文脈用）。
+  static String? buildWeeklyLoadContext(
+    List<TrainingLog> allLogs,
+    DateTime focusDate,
+  ) {
+    final anchor = focusDate.toLocal();
+    final end = DateTime(anchor.year, anchor.month, anchor.day, 23, 59, 59, 999);
+    final start =
+        DateTime(anchor.year, anchor.month, anchor.day)
+            .subtract(const Duration(days: 6));
+
+    final inWindow = allLogs.where((l) {
+      final d = l.date.toLocal();
+      return !d.isBefore(start) && !d.isAfter(end);
+    }).toList();
+
+    if (inWindow.isEmpty) return null;
+
+    final daysByKey = <String>{};
+    for (final l in inWindow) {
+      final d = l.date.toLocal();
+      daysByKey.add('${d.year}-${d.month}-${d.day}');
+    }
+    final trainingDays = daysByKey.length;
+
+    var strengthSets = 0;
+    var cardioMinutes = 0;
+    var totalVolumeKg = 0.0;
+    final rpes = <int>[];
+    for (final l in inWindow) {
+      if (l.exerciseType == ExerciseType.cardio) {
+        cardioMinutes += l.durationMinutes;
+      } else {
+        strengthSets += l.sets;
+        totalVolumeKg += l.totalVolume;
+      }
+      if (l.rpe != null) rpes.add(l.rpe!);
+    }
+
+    final fromLabel = DateFormat('M/d').format(start);
+    final toLabel = DateFormat('M/d').format(anchor);
+    final buffer = StringBuffer();
+    buffer.writeln('【直近7日間のトレーニング負荷（$fromLabel〜$toLabel）】');
+    buffer.writeln('トレーニングがあった日数: $trainingDays 日');
+    buffer.writeln('筋トレ種目の合計セット数: $strengthSets');
+    if (totalVolumeKg >= 1000) {
+      buffer.writeln(
+          '総ボリューム目安: ${(totalVolumeKg / 1000).toStringAsFixed(1)} t（kg×回×セットの合計）');
+    } else {
+      buffer.writeln('総ボリューム目安: ${totalVolumeKg.round()} kg');
+    }
+    buffer.writeln('有酸素の合計時間: $cardioMinutes 分');
+    buffer.writeln('この期間の記録件数: ${inWindow.length} 件');
+    if (rpes.isNotEmpty) {
+      final sum = rpes.fold<int>(0, (a, b) => a + b);
+      final avg = sum / rpes.length;
+      buffer.writeln(
+          'RPEの平均: ${avg.toStringAsFixed(1)}（1〜10。未記録の記録は平均から除外）');
+      buffer.writeln('RPEが記録されている件数: ${rpes.length} / ${inWindow.length}');
+    } else {
+      buffer.writeln('この期間のRPE記録はありません。');
+    }
+    buffer.writeln(
+        '上記の負荷・頻度と今回の記録を照らし、運動科学の観点（過負荷、回復、適切な強度の設定）から言及してください。');
+    return buffer.toString();
+  }
+
   /// [focusLogs] は通常1件。プロンプト用テキストを組み立てる。
   static String _buildUserMessage({
     required List<TrainingLog> focusLogs,
     required Map<String, List<TrainingLog>> historyByExercise,
     String? sleepContext,
+    String? weeklyLoadContext,
   }) {
     final buffer = StringBuffer();
 
@@ -57,6 +128,11 @@ class TrainingAdviceService {
           '（推定1RM: ${oneRm.toStringAsFixed(1)} kg）',
         );
       }
+      if (log.rpe != null) {
+        buffer.writeln('  RPE（主観的運動強度 1〜10）: ${log.rpe}');
+      } else {
+        buffer.writeln('  RPE: 未記録');
+      }
       if (log.note.isNotEmpty) {
         buffer.writeln('  メモ: ${log.note}');
       }
@@ -65,11 +141,12 @@ class TrainingAdviceService {
       if (history.isNotEmpty) {
         final pastWeights = history
             .map((l) {
+              final rpePart = l.rpe != null ? ' RPE${l.rpe}' : '';
               if (l.exerciseType == ExerciseType.cardio) {
-                return '${l.distanceKm.toStringAsFixed(1)}km・${l.durationMinutes}分'
+                return '${l.distanceKm.toStringAsFixed(1)}km・${l.durationMinutes}分$rpePart'
                     ' (${DateFormat('M/d').format(l.date.toLocal())})';
               }
-              return '${l.weight}kg×${l.reps}×${l.sets}'
+              return '${l.weight}kg×${l.reps}×${l.sets}$rpePart'
                   ' (${DateFormat('M/d').format(l.date.toLocal())})';
             })
             .join(' / ');
@@ -77,6 +154,11 @@ class TrainingAdviceService {
       } else {
         buffer.writeln('  同種目の過去記録: なし（初回または比較データなし）');
       }
+      buffer.writeln();
+    }
+
+    if (weeklyLoadContext != null && weeklyLoadContext.isNotEmpty) {
+      buffer.writeln(weeklyLoadContext);
       buffer.writeln();
     }
 
@@ -103,6 +185,7 @@ class TrainingAdviceService {
     required AiProviderType provider,
     String? model,
     String? sleepContext,
+    String? weeklyLoadContext,
   }) {
     if (focusLogs.isEmpty) {
       throw Exception('評価対象の記録がありません。');
@@ -112,6 +195,7 @@ class TrainingAdviceService {
       focusLogs: focusLogs,
       historyByExercise: historyByExercise,
       sleepContext: sleepContext,
+      weeklyLoadContext: weeklyLoadContext,
     );
     final resolvedModel = model ?? provider.defaultModel;
     switch (provider) {

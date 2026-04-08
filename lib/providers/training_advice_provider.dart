@@ -60,6 +60,9 @@ class TrainingAdviceNotifier extends StateNotifier<TrainingAdviceState> {
         log.exerciseName: history,
       };
 
+      final weeklyLoadContext =
+          TrainingAdviceService.buildWeeklyLoadContext(allLogs, log.date);
+
       final text = await TrainingAdviceService().getAdvice(
         focusLogs: [log],
         historyByExercise: historyByExercise,
@@ -68,6 +71,7 @@ class TrainingAdviceNotifier extends StateNotifier<TrainingAdviceState> {
         provider: provider,
         model: model,
         sleepContext: sleepContext,
+        weeklyLoadContext: weeklyLoadContext,
       );
 
       // インメモリに反映

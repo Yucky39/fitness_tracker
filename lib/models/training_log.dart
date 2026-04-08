@@ -27,6 +27,8 @@ class TrainingLog {
   final double distanceKm;
   /// 有酸素種目：運動時間 (分)。筋トレ種目では 0。
   final int durationMinutes;
+  /// 主観的運動強度 (RPE)。Borg CR-10 風の 1〜10。未入力は null。
+  final int? rpe;
   final String note;
   final DateTime date;
   /// AI評価テキスト（一度解析したものを永続保存）
@@ -42,6 +44,7 @@ class TrainingLog {
     required this.interval,
     this.distanceKm = 0,
     this.durationMinutes = 0,
+    this.rpe,
     required this.note,
     required this.date,
     this.aiAdvice,
@@ -57,6 +60,8 @@ class TrainingLog {
     int? interval,
     double? distanceKm,
     int? durationMinutes,
+    int? rpe,
+    bool clearRpe = false,
     String? note,
     DateTime? date,
     String? aiAdvice,
@@ -71,6 +76,7 @@ class TrainingLog {
         interval: interval ?? this.interval,
         distanceKm: distanceKm ?? this.distanceKm,
         durationMinutes: durationMinutes ?? this.durationMinutes,
+        rpe: clearRpe ? null : (rpe ?? this.rpe),
         note: note ?? this.note,
         date: date ?? this.date,
         aiAdvice: aiAdvice ?? this.aiAdvice,
@@ -97,6 +103,7 @@ class TrainingLog {
       'interval': interval,
       'distance_km': distanceKm,
       'duration_minutes': durationMinutes,
+      'rpe': rpe,
       'note': note,
       'date': date.toIso8601String(),
       'ai_advice': aiAdvice,
@@ -114,6 +121,7 @@ class TrainingLog {
       interval: map['interval'] as int,
       distanceKm: (map['distance_km'] as num? ?? 0).toDouble(),
       durationMinutes: map['duration_minutes'] as int? ?? 0,
+      rpe: map['rpe'] as int?,
       note: map['note'] as String,
       date: DateTime.parse(map['date'] as String),
       aiAdvice: map['ai_advice'] as String?,

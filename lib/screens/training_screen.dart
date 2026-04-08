@@ -385,6 +385,9 @@ class _TrainingScreenState extends ConsumerState<TrainingScreen> {
     final noteController =
         TextEditingController(text: isEdit ? existingLog.note : '');
 
+    var recordRpe = existingLog?.rpe != null;
+    var rpeSlider = (existingLog?.rpe ?? 7).toDouble();
+
     String exerciseName = existingLog?.exerciseName ?? '';
     ExerciseType exerciseType =
         existingLog?.exerciseType ?? ExerciseType.freeWeight;
@@ -460,6 +463,10 @@ class _TrainingScreenState extends ConsumerState<TrainingScreen> {
                   intervalController.text = prev.interval.toString();
                 }
                 exerciseType = prev.exerciseType;
+                if (prev.rpe != null) {
+                  recordRpe = true;
+                  rpeSlider = prev.rpe!.toDouble();
+                }
                 updatePreview();
               });
             } else {
@@ -553,8 +560,10 @@ class _TrainingScreenState extends ConsumerState<TrainingScreen> {
                               previousLog!.exerciseType == ExerciseType.cardio
                                   ? '前回: ${previousLog!.durationMinutes}分'
                                     '${previousLog!.distanceKm > 0 ? '  ${previousLog!.distanceKm.toStringAsFixed(1)}km' : ''}'
+                                    '${previousLog!.rpe != null ? '  RPE ${previousLog!.rpe}' : ''}'
                                     '  (${DateFormat('M/d').format(previousLog!.date)})'
                                   : '前回: ${previousLog!.weight}kg × ${previousLog!.reps}回 × ${previousLog!.sets}セット'
+                                    '${previousLog!.rpe != null ? '  RPE ${previousLog!.rpe}' : ''}'
                                     '  (${DateFormat('M/d').format(previousLog!.date)})',
                               style: const TextStyle(
                                   fontSize: 12, color: Colors.blue),
@@ -652,6 +661,46 @@ class _TrainingScreenState extends ConsumerState<TrainingScreen> {
                     ),
                   ],
 
+                  const SizedBox(height: 8),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('RPEを記録（主観的運動強度 1〜10）'),
+                    subtitle: const Text(
+                      'そのセット・セッションのきつさ。有酸素・筋トレどちらにも使えます。',
+                      style: TextStyle(fontSize: 11),
+                    ),
+                    value: recordRpe,
+                    onChanged: (v) => setState(() => recordRpe = v),
+                  ),
+                  if (recordRpe) ...[
+                    Row(
+                      children: [
+                        Text(
+                          rpeSlider.round().toString(),
+                          style: const TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        const Expanded(
+                          child: Text(
+                            '1=非常に楽 … 10=限界に近い',
+                            style: TextStyle(fontSize: 11, color: Colors.grey),
+                          ),
+                        ),
+                      ],
+                    ),
+                    Slider(
+                      value: rpeSlider.clamp(1, 10),
+                      min: 1,
+                      max: 10,
+                      divisions: 9,
+                      label: rpeSlider.round().toString(),
+                      onChanged: (v) => setState(() => rpeSlider = v),
+                    ),
+                  ],
+
                   TextField(
                     controller: noteController,
                     decoration: const InputDecoration(labelText: 'メモ'),
@@ -698,6 +747,8 @@ class _TrainingScreenState extends ConsumerState<TrainingScreen> {
                         interval: 0,
                         distanceKm: dist,
                         durationMinutes: dur,
+                        rpe: recordRpe ? rpeSlider.round() : null,
+                        clearRpe: !recordRpe,
                         note: noteController.text,
                       ));
                     } else {
@@ -710,6 +761,7 @@ class _TrainingScreenState extends ConsumerState<TrainingScreen> {
                         interval: 0,
                         distanceKm: dist,
                         durationMinutes: dur,
+                        rpe: recordRpe ? rpeSlider.round() : null,
                         note: noteController.text,
                       );
                     }
@@ -728,6 +780,8 @@ class _TrainingScreenState extends ConsumerState<TrainingScreen> {
                         interval: iv,
                         distanceKm: 0,
                         durationMinutes: 0,
+                        rpe: recordRpe ? rpeSlider.round() : null,
+                        clearRpe: !recordRpe,
                         note: noteController.text,
                       ));
                     } else {
@@ -738,6 +792,7 @@ class _TrainingScreenState extends ConsumerState<TrainingScreen> {
                         reps: r,
                         sets: s,
                         interval: iv,
+                        rpe: recordRpe ? rpeSlider.round() : null,
                         note: noteController.text,
                       );
                       if (iv > 0) intervalToStart = iv;
@@ -1186,6 +1241,8 @@ class _TrainingLogCardState extends State<_TrainingLogCard> {
                     if (log.paceMinPerKm != null)
                       _metricText(
                           _formatPace(log.paceMinPerKm!), 'ペース/km'),
+                    if (log.rpe != null)
+                      _metricText('${log.rpe}', 'RPE'),
                   ],
                 )
               else
@@ -1204,6 +1261,8 @@ class _TrainingLogCardState extends State<_TrainingLogCard> {
                     _metricText('${log.sets} set', 'セット'),
                     if (log.interval > 0)
                       _metricText('${log.interval} 秒', 'インターバル'),
+                    if (log.rpe != null)
+                      _metricText('${log.rpe}', 'RPE'),
                   ],
                 ),
               const SizedBox(height: 8),
