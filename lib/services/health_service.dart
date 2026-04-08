@@ -21,12 +21,19 @@ class HealthService {
   /// iOS / Android のみ対応
   static bool get isSupported => Platform.isIOS || Platform.isAndroid;
 
-  /// ワークアウトの読み取り権限をリクエストする。
+  /// ワークアウト・睡眠・歩数の読み取り権限を一括リクエストする。
+  /// iOS HealthKit はここで宣言した型だけが設定画面に表示される。
   static Future<bool> requestPermissions() async {
     if (!isSupported) return false;
     try {
-      return await _health.requestAuthorization(_workoutTypes,
-          permissions: _readOnly);
+      return await _health.requestAuthorization(
+        [..._workoutTypes, ..._sleepTypes, ..._stepTypes],
+        permissions: [
+          ..._readOnly,
+          ..._readOnly,
+          ..._readOnly,
+        ],
+      );
     } catch (_) {
       return false;
     }
@@ -61,7 +68,9 @@ class HealthService {
 
   /// 昨夜の睡眠時間（分）を返す。
   ///
-  /// 「昨日の正午〜今日の正午」の範囲で SLEEP_ASLEEP データを合計する。
+  /// 「昨日の正午〜今日の正午」の範囲でクエリする。
+  /// まず SLEEP_ASLEEP（実際の睡眠段階データ）を試み、
+  /// データがなければ SLEEP_IN_BED（就寝時間全体）にフォールバックする。
   /// 取得失敗・権限なし・データなしの場合は null を返す。
   static Future<int?> fetchLastNightSleepMinutes() async {
     if (!isSupported) return null;
@@ -70,20 +79,35 @@ class HealthService {
       final todayNoon = DateTime(now.year, now.month, now.day, 12);
       final yesterdayNoon = todayNoon.subtract(const Duration(days: 1));
 
-      final data = await _health.getHealthDataFromTypes(
+      // まず SLEEP_ASLEEP（実睡眠ステージ）を試みる
+      final asleepData = await _health.getHealthDataFromTypes(
         startTime: yesterdayNoon,
         endTime: todayNoon,
         types: [HealthDataType.SLEEP_ASLEEP],
       );
 
-      if (data.isEmpty) return null;
-
-      int totalMinutes = 0;
-      for (final point in data) {
-        totalMinutes +=
-            point.dateTo.difference(point.dateFrom).inMinutes;
+      if (asleepData.isNotEmpty) {
+        int total = 0;
+        for (final point in asleepData) {
+          total += point.dateTo.difference(point.dateFrom).inMinutes;
+        }
+        if (total > 0) return total;
       }
-      return totalMinutes > 0 ? totalMinutes : null;
+
+      // フォールバック: SLEEP_IN_BED（全就寝時間）
+      final inBedData = await _health.getHealthDataFromTypes(
+        startTime: yesterdayNoon,
+        endTime: todayNoon,
+        types: [HealthDataType.SLEEP_IN_BED],
+      );
+
+      if (inBedData.isEmpty) return null;
+
+      int total = 0;
+      for (final point in inBedData) {
+        total += point.dateTo.difference(point.dateFrom).inMinutes;
+      }
+      return total > 0 ? total : null;
     } catch (_) {
       return null;
     }

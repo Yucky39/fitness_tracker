@@ -29,7 +29,7 @@
 	<key>NSCameraUsageDescription</key>
 	<string>食事の写真を撮影して栄養素を自動分析するために使用します。</string>
 	<key>NSHealthShareUsageDescription</key>
-	<string>ランニングやウォーキングなどのワークアウト記録をトレーニングログに取り込むために使用します。</string>
+	<string>ワークアウト・歩数・睡眠データをフィットネストラッカーに取り込むために使用します。</string>
 	<key>NSHealthUpdateUsageDescription</key>
 	<string>フィットネスデータをヘルスケアアプリに書き込むために使用します。</string>
 	<key>NSMicrophoneUsageDescription</key>
