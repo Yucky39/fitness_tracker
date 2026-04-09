@@ -124,6 +124,32 @@ class TrainingPlanNotifier extends StateNotifier<TrainingPlanState> {
     await adapter.insert('training_plans', plan.toMap());
   }
 
+  /// AIプラン内の各種目の「実施済み」チェックを更新する
+  Future<void> setExerciseCompleted(
+    String planId,
+    int dayIndex,
+    int exerciseIndex,
+    bool completed,
+  ) async {
+    final idx = state.plans.indexWhere((p) => p.id == planId);
+    if (idx < 0) return;
+    final updated = state.plans[idx].withExerciseCompletion(
+      dayIndex,
+      exerciseIndex,
+      completed,
+    );
+    final adapter = await DatabaseService().database;
+    await adapter.update(
+      'training_plans',
+      updated.toMap(),
+      where: 'id = ?',
+      whereArgs: [planId],
+    );
+    final newPlans = List<TrainingPlan>.from(state.plans);
+    newPlans[idx] = updated;
+    state = state.copyWith(plans: newPlans);
+  }
+
   Future<void> deletePlan(String id) async {
     final adapter = await DatabaseService().database;
     await adapter.delete('training_plans', where: 'id = ?', whereArgs: [id]);

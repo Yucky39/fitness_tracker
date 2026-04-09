@@ -150,6 +150,8 @@ class TrainingPlanExercise {
   final double? suggestedWeightKg;
   final int restSeconds;
   final String? note;
+  /// ユーザーがその種目を実施済みとマークしたか（AIプランの達成トラッキング）
+  final bool completed;
 
   const TrainingPlanExercise({
     required this.name,
@@ -159,7 +161,30 @@ class TrainingPlanExercise {
     this.suggestedWeightKg,
     required this.restSeconds,
     this.note,
+    this.completed = false,
   });
+
+  TrainingPlanExercise copyWith({
+    String? name,
+    ExerciseType? type,
+    int? sets,
+    String? repRange,
+    double? suggestedWeightKg,
+    int? restSeconds,
+    String? note,
+    bool? completed,
+  }) {
+    return TrainingPlanExercise(
+      name: name ?? this.name,
+      type: type ?? this.type,
+      sets: sets ?? this.sets,
+      repRange: repRange ?? this.repRange,
+      suggestedWeightKg: suggestedWeightKg ?? this.suggestedWeightKg,
+      restSeconds: restSeconds ?? this.restSeconds,
+      note: note ?? this.note,
+      completed: completed ?? this.completed,
+    );
+  }
 
   Map<String, dynamic> toMap() => {
         'name': name,
@@ -169,6 +194,7 @@ class TrainingPlanExercise {
         'suggested_weight_kg': suggestedWeightKg,
         'rest_seconds': restSeconds,
         'note': note,
+        'completed': completed,
       };
 
   factory TrainingPlanExercise.fromMap(Map<String, dynamic> m) {
@@ -188,6 +214,7 @@ class TrainingPlanExercise {
       suggestedWeightKg: (m['suggested_weight_kg'] as num?)?.toDouble(),
       restSeconds: (m['rest_seconds'] as num?)?.toInt() ?? 90,
       note: m['note'] as String?,
+      completed: m['completed'] as bool? ?? false,
     );
   }
 }
@@ -256,6 +283,52 @@ class TrainingPlan {
         'overview': overview,
         'created_at': createdAt.toIso8601String(),
       };
+
+  /// プラン全体の種目数
+  int get totalExerciseCount =>
+      days.fold<int>(0, (sum, d) => sum + d.exercises.length);
+
+  /// 完了マークされた種目数
+  int get completedExerciseCount => days.fold<int>(
+        0,
+        (sum, d) => sum + d.exercises.where((e) => e.completed).length,
+      );
+
+  /// 0.0〜1.0（種目が0件のときは 0）
+  double get completionRatio =>
+      totalExerciseCount == 0 ? 0 : completedExerciseCount / totalExerciseCount;
+
+  /// 指定種目の完了状態だけを差し替えたコピー（DB更新用）
+  TrainingPlan withExerciseCompletion(
+    int dayIndex,
+    int exerciseIndex,
+    bool value,
+  ) {
+    if (dayIndex < 0 || dayIndex >= days.length) return this;
+    final day = days[dayIndex];
+    if (exerciseIndex < 0 || exerciseIndex >= day.exercises.length) {
+      return this;
+    }
+    final newExercises = List<TrainingPlanExercise>.from(day.exercises);
+    newExercises[exerciseIndex] =
+        newExercises[exerciseIndex].copyWith(completed: value);
+    final newDays = List<TrainingPlanDay>.from(days);
+    newDays[dayIndex] =
+        TrainingPlanDay(label: day.label, exercises: newExercises);
+    return TrainingPlan(
+      id: id,
+      name: name,
+      goal: goal,
+      targetMuscles: targetMuscles,
+      cutStyle: cutStyle,
+      daysPerWeek: daysPerWeek,
+      intensity: intensity,
+      equipment: equipment,
+      days: newDays,
+      overview: overview,
+      createdAt: createdAt,
+    );
+  }
 
   factory TrainingPlan.fromMap(Map<String, dynamic> m) {
     final muscleRaw =

@@ -439,7 +439,15 @@ class _TrainingPlanScreenState extends ConsumerState<TrainingPlanScreen> {
   }
 
   // ─── 生成結果画面 ─────────────────────────────────────────────────
-  Widget _buildResultView(BuildContext context, TrainingPlan plan) {
+  Widget _buildResultView(BuildContext context, TrainingPlan initial) {
+    final plans = ref.watch(trainingPlanProvider).plans;
+    TrainingPlan plan = initial;
+    for (final p in plans) {
+      if (p.id == initial.id) {
+        plan = p;
+        break;
+      }
+    }
     return Scaffold(
       appBar: AppBar(
         title: Text(plan.name),
@@ -464,6 +472,10 @@ class _TrainingPlanScreenState extends ConsumerState<TrainingPlanScreen> {
             ],
           ),
           const SizedBox(height: 12),
+          if (plan.totalExerciseCount > 0) ...[
+            _PlanCompletionCard(plan: plan),
+            const SizedBox(height: 12),
+          ],
           // 概要
           if (plan.overview != null && plan.overview!.isNotEmpty)
             Card(
@@ -496,7 +508,11 @@ class _TrainingPlanScreenState extends ConsumerState<TrainingPlanScreen> {
           ...plan.days.asMap().entries.map((entry) {
             final idx = entry.key;
             final day = entry.value;
-            return _PlanDayCard(day: day, dayIndex: idx);
+            return _PlanDayCard(
+              planId: plan.id,
+              day: day,
+              dayIndex: idx,
+            );
           }),
           const SizedBox(height: 80),
         ],
@@ -971,10 +987,74 @@ class _SummaryRow extends StatelessWidget {
   }
 }
 
+/// プラン全体の達成度（種目チェックの集計）を表示
+class _PlanCompletionCard extends StatelessWidget {
+  final TrainingPlan plan;
+  const _PlanCompletionCard({required this.plan});
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final pct = (plan.completionRatio * 100).round();
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.track_changes, size: 22, color: scheme.primary),
+                const SizedBox(width: 8),
+                Text(
+                  'プラン達成度',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                    color: scheme.primary,
+                  ),
+                ),
+                const Spacer(),
+                Text(
+                  '$pct%',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 20,
+                    color: scheme.primary,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '${plan.completedExerciseCount} / ${plan.totalExerciseCount} 種目を実施済み',
+              style: TextStyle(fontSize: 13, color: Colors.grey[700]),
+            ),
+            const SizedBox(height: 12),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(6),
+              child: LinearProgressIndicator(
+                value: plan.completionRatio.clamp(0.0, 1.0),
+                minHeight: 10,
+                backgroundColor: scheme.surfaceContainerHighest,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _PlanDayCard extends StatefulWidget {
+  final String planId;
   final TrainingPlanDay day;
   final int dayIndex;
-  const _PlanDayCard({required this.day, required this.dayIndex});
+  const _PlanDayCard({
+    required this.planId,
+    required this.day,
+    required this.dayIndex,
+  });
 
   @override
   State<_PlanDayCard> createState() => _PlanDayCardState();
@@ -1001,7 +1081,10 @@ class _PlanDayCardState extends State<_PlanDayCard> {
             ),
             title: Text(widget.day.label,
                 style: const TextStyle(fontWeight: FontWeight.bold)),
-            subtitle: Text('${widget.day.exercises.length} 種目'),
+            subtitle: Text(
+              '${widget.day.exercises.length} 種目 · '
+              '${widget.day.exercises.where((e) => e.completed).length} 完了',
+            ),
             trailing: Icon(
                 _expanded ? Icons.expand_less : Icons.expand_more),
             onTap: () => setState(() => _expanded = !_expanded),
@@ -1012,7 +1095,16 @@ class _PlanDayCardState extends State<_PlanDayCard> {
                   const EdgeInsets.fromLTRB(12, 0, 12, 12),
               child: Column(
                 children: widget.day.exercises
-                    .map((e) => _ExerciseRow(exercise: e))
+                    .asMap()
+                    .entries
+                    .map(
+                      (e) => _ExerciseRow(
+                        planId: widget.planId,
+                        dayIndex: widget.dayIndex,
+                        exerciseIndex: e.key,
+                        exercise: e.value,
+                      ),
+                    )
                     .toList(),
               ),
             ),
@@ -1022,65 +1114,107 @@ class _PlanDayCardState extends State<_PlanDayCard> {
   }
 }
 
-class _ExerciseRow extends StatelessWidget {
+class _ExerciseRow extends ConsumerWidget {
+  final String planId;
+  final int dayIndex;
+  final int exerciseIndex;
   final TrainingPlanExercise exercise;
-  const _ExerciseRow({required this.exercise});
+  const _ExerciseRow({
+    required this.planId,
+    required this.dayIndex,
+    required this.exerciseIndex,
+    required this.exercise,
+  });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final scheme = Theme.of(context).colorScheme;
+    final done = exercise.completed;
+
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(10),
+      padding: const EdgeInsets.fromLTRB(4, 8, 10, 8),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.5),
+        color: scheme.surfaceContainerHighest.withValues(alpha: 0.55),
         borderRadius: BorderRadius.circular(8),
       ),
-      child: Column(
+      child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(exercise.name,
-                    style: const TextStyle(fontWeight: FontWeight.bold)),
-              ),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: Theme.of(context)
-                      .colorScheme
-                      .secondaryContainer,
-                  borderRadius: BorderRadius.circular(4),
+          Checkbox(
+            value: done,
+            onChanged: (v) {
+              if (v == null) return;
+              ref.read(trainingPlanProvider.notifier).setExerciseCompleted(
+                    planId,
+                    dayIndex,
+                    exerciseIndex,
+                    v,
+                  );
+            },
+          ),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        exercise.name,
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          decoration:
+                              done ? TextDecoration.lineThrough : null,
+                          color: done ? Colors.grey : null,
+                        ),
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: scheme.secondaryContainer,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(exercise.type.label,
+                          style: const TextStyle(fontSize: 11)),
+                    ),
+                  ],
                 ),
-                child: Text(exercise.type.label,
-                    style: const TextStyle(fontSize: 11)),
-              ),
-            ],
+                const SizedBox(height: 6),
+                Wrap(
+                  spacing: 12,
+                  children: [
+                    _StatChip(
+                        icon: Icons.repeat,
+                        label:
+                            '${exercise.sets}セット × ${exercise.repRange}回'),
+                    if (exercise.suggestedWeightKg != null)
+                      _StatChip(
+                          icon: Icons.fitness_center,
+                          label:
+                              '目安 ${exercise.suggestedWeightKg!.toStringAsFixed(1)}kg'),
+                    _StatChip(
+                        icon: Icons.timer_outlined,
+                        label: '休憩 ${exercise.restSeconds}秒'),
+                  ],
+                ),
+                if (exercise.note != null && exercise.note!.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    exercise.note!,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey[600],
+                      decoration:
+                          done ? TextDecoration.lineThrough : null,
+                    ),
+                  ),
+                ],
+              ],
+            ),
           ),
-          const SizedBox(height: 6),
-          Wrap(
-            spacing: 12,
-            children: [
-              _StatChip(
-                  icon: Icons.repeat,
-                  label: '${exercise.sets}セット × ${exercise.repRange}回'),
-              if (exercise.suggestedWeightKg != null)
-                _StatChip(
-                    icon: Icons.fitness_center,
-                    label:
-                        '目安 ${exercise.suggestedWeightKg!.toStringAsFixed(1)}kg'),
-              _StatChip(
-                  icon: Icons.timer_outlined,
-                  label: '休憩 ${exercise.restSeconds}秒'),
-            ],
-          ),
-          if (exercise.note != null && exercise.note!.isNotEmpty) ...[
-            const SizedBox(height: 4),
-            Text(exercise.note!,
-                style: TextStyle(
-                    fontSize: 12, color: Colors.grey[600])),
-          ],
         ],
       ),
     );
@@ -1125,12 +1259,20 @@ class _PlanListTileState extends State<_PlanListTile> {
       child: Column(
         children: [
           ListTile(
+            isThreeLine: plan.totalExerciseCount > 0,
             leading: Text(plan.goal.emoji,
                 style: const TextStyle(fontSize: 24)),
             title: Text(plan.name,
                 style: const TextStyle(fontWeight: FontWeight.bold)),
-            subtitle: Text(
-                '${plan.goal.label} · 週${plan.daysPerWeek}日 · ${plan.intensity.label}'),
+            subtitle: plan.totalExerciseCount > 0
+                ? Text(
+                    '${plan.goal.label} · 週${plan.daysPerWeek}日 · ${plan.intensity.label}\n'
+                    '達成 ${plan.completedExerciseCount}/${plan.totalExerciseCount} 種目 '
+                    '(${(plan.completionRatio * 100).round()}%)',
+                  )
+                : Text(
+                    '${plan.goal.label} · 週${plan.daysPerWeek}日 · ${plan.intensity.label}',
+                  ),
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -1142,6 +1284,11 @@ class _PlanListTileState extends State<_PlanListTile> {
             onTap: () => setState(() => _expanded = !_expanded),
           ),
           if (_expanded) ...[
+            if (plan.totalExerciseCount > 0)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+                child: _PlanCompletionCard(plan: plan),
+              ),
             if (plan.overview != null && plan.overview!.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
@@ -1149,8 +1296,11 @@ class _PlanListTileState extends State<_PlanListTile> {
                     style: TextStyle(
                         fontSize: 13, color: Colors.grey[600])),
               ),
-            ...plan.days.asMap().entries.map((e) =>
-                _PlanDayCard(day: e.value, dayIndex: e.key)),
+            ...plan.days.asMap().entries.map((e) => _PlanDayCard(
+                  planId: plan.id,
+                  day: e.value,
+                  dayIndex: e.key,
+                )),
             Padding(
               padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
               child: Row(
