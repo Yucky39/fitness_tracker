@@ -14,6 +14,7 @@ import '../providers/training_provider.dart';
 import '../services/health_service.dart';
 import '../services/training_calorie_calculator.dart';
 import 'routine_screen.dart';
+import 'training_plan_screen.dart';
 
 class TrainingScreen extends ConsumerStatefulWidget {
   const TrainingScreen({super.key});
@@ -145,6 +146,16 @@ class _TrainingScreenState extends ConsumerState<TrainingScreen> {
       appBar: AppBar(
         title: const Text('トレーニング記録'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.auto_awesome),
+            tooltip: 'AIプラン作成',
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute<void>(
+                builder: (_) => const TrainingPlanScreen(),
+              ),
+            ),
+          ),
           IconButton(
             icon: const Icon(Icons.calendar_month),
             tooltip: 'ルーティン管理',

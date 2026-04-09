@@ -14,7 +14,7 @@ class SqfliteDatabaseAdapter implements DatabaseAdapter {
 
     _database = await openDatabase(
       path,
-      version: 11,
+      version: 14,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -78,6 +78,29 @@ class SqfliteDatabaseAdapter implements DatabaseAdapter {
     if (oldVersion < 11) {
       await db.execute(
           "ALTER TABLE training_logs ADD COLUMN rpe INTEGER");
+    }
+    if (oldVersion < 12) {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS training_plans(
+          id TEXT PRIMARY KEY,
+          name TEXT,
+          goal TEXT,
+          target_muscles TEXT,
+          days_per_week INTEGER,
+          intensity TEXT,
+          plan_days TEXT,
+          overview TEXT,
+          created_at TEXT
+        )
+      ''');
+    }
+    if (oldVersion < 13) {
+      await db.execute(
+          "ALTER TABLE training_plans ADD COLUMN cut_style TEXT");
+    }
+    if (oldVersion < 14) {
+      await db.execute(
+          "ALTER TABLE training_plans ADD COLUMN equipment TEXT DEFAULT 'fullGym'");
     }
   }
 
@@ -146,6 +169,22 @@ class SqfliteDatabaseAdapter implements DatabaseAdapter {
         name TEXT,
         weekdays TEXT,
         note TEXT
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE training_plans(
+        id TEXT PRIMARY KEY,
+        name TEXT,
+        goal TEXT,
+        target_muscles TEXT,
+        cut_style TEXT,
+        days_per_week INTEGER,
+        intensity TEXT,
+        equipment TEXT DEFAULT 'fullGym',
+        plan_days TEXT,
+        overview TEXT,
+        created_at TEXT
       )
     ''');
   }
