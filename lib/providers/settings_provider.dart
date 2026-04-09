@@ -132,6 +132,7 @@ class SettingsState {
   final int workoutReminderHour;
   final int workoutReminderMinute;
   final bool trainingAdviceEnabled;
+  final bool communityFoodContributeEnabled;
 
   const SettingsState({
     this.adviceLevel = 'normal',
@@ -149,6 +150,7 @@ class SettingsState {
     this.workoutReminderHour = 18,
     this.workoutReminderMinute = 0,
     this.trainingAdviceEnabled = true,
+    this.communityFoodContributeEnabled = true,
   });
 
   String get currentApiKey {
@@ -200,6 +202,7 @@ class SettingsState {
     int? workoutReminderHour,
     int? workoutReminderMinute,
     bool? trainingAdviceEnabled,
+    bool? communityFoodContributeEnabled,
   }) =>
       SettingsState(
         adviceLevel: adviceLevel ?? this.adviceLevel,
@@ -221,6 +224,8 @@ class SettingsState {
             workoutReminderMinute ?? this.workoutReminderMinute,
         trainingAdviceEnabled:
             trainingAdviceEnabled ?? this.trainingAdviceEnabled,
+        communityFoodContributeEnabled:
+            communityFoodContributeEnabled ?? this.communityFoodContributeEnabled,
       );
 }
 
@@ -279,6 +284,8 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
       workoutReminderHour: prefs.getInt('workoutReminderHour') ?? 18,
       workoutReminderMinute: prefs.getInt('workoutReminderMinute') ?? 0,
       trainingAdviceEnabled: prefs.getBool('trainingAdviceEnabled') ?? true,
+      communityFoodContributeEnabled:
+          prefs.getBool('communityFoodContributeEnabled') ?? true,
     );
   }
 
@@ -323,6 +330,12 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('trainingAdviceEnabled', enabled);
     state = state.copyWith(trainingAdviceEnabled: enabled);
+  }
+
+  Future<void> updateCommunityFoodContributeEnabled(bool enabled) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('communityFoodContributeEnabled', enabled);
+    state = state.copyWith(communityFoodContributeEnabled: enabled);
   }
 
   Future<void> updateNotificationSettings({

@@ -8,6 +8,8 @@ import 'package:riverpod/legacy.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:uuid/uuid.dart';
+import '../models/community_food_entry.dart';
 import '../models/food_item.dart';
 import '../models/meal_preset.dart';
 import '../providers/advice_provider.dart';
@@ -15,7 +17,9 @@ import '../providers/meal_provider.dart';
 import '../providers/nutrition_trend_provider.dart';
 import '../providers/preset_provider.dart';
 import '../providers/settings_provider.dart';
+import '../services/auth_service.dart';
 import '../services/barcode_lookup_service.dart';
+import '../services/community_food_service.dart';
 import '../services/food_search_service.dart';
 import '../services/meal_image_analysis_service.dart';
 import '../widgets/nutrient_bar.dart';
@@ -557,13 +561,13 @@ class MealScreen extends ConsumerWidget {
         ),
 
         if (isTimeline) ...[
-          _buildTimelineView(context, state, notifier),
+          _buildTimelineView(context, ref, state, notifier),
         ] else ...[
           for (final type in MealType.values)
             if (grouped.containsKey(type)) ...[
               _buildMealTypeHeader(type, grouped[type]!),
               for (final item in grouped[type]!)
-                _buildFoodTile(context, item, state, notifier),
+                _buildFoodTile(context, ref, item, state, notifier),
             ],
         ],
 
@@ -593,7 +597,7 @@ class MealScreen extends ConsumerWidget {
   // ── Timeline view ──────────────────────────────────────────────────────────
 
   Widget _buildTimelineView(
-      BuildContext context, MealState state, MealNotifier notifier) {
+      BuildContext context, WidgetRef ref, MealState state, MealNotifier notifier) {
     final sorted = List<FoodItem>.from(state.todayItems)
       ..sort((a, b) => a.date.compareTo(b.date));
 
@@ -650,6 +654,7 @@ class MealScreen extends ConsumerWidget {
                     } else {
                       _showFoodDialog(
                         context: context,
+                        ref: ref,
                         mealState: state,
                         notifier: notifier,
                         existingItem: item,
@@ -781,7 +786,7 @@ class MealScreen extends ConsumerWidget {
   }
 
   Widget _buildFoodTile(
-      BuildContext context, FoodItem item, MealState mealState, MealNotifier notifier) {
+      BuildContext context, WidgetRef ref, FoodItem item, MealState mealState, MealNotifier notifier) {
     final hasMicro = item.sugar > 0 ||
         item.fiber > 0 ||
         item.sodium > 0 ||
@@ -833,6 +838,7 @@ class MealScreen extends ConsumerWidget {
               } else {
                 _showFoodDialog(
                   context: context,
+                  ref: ref,
                   mealState: mealState,
                   notifier: notifier,
                   existingItem: item,
@@ -879,6 +885,7 @@ class MealScreen extends ConsumerWidget {
 
   void _showFoodDialog({
     required BuildContext context,
+    required WidgetRef ref,
     required MealState mealState,
     required MealNotifier notifier,
     FoodItem? existingItem,
@@ -919,6 +926,17 @@ class MealScreen extends ConsumerWidget {
       fatController.text = (result.fatPer100g * ratio).toStringAsFixed(1);
       carbsController.text =
           (result.carbsPer100g * ratio).toStringAsFixed(1);
+    }
+
+    void fillFromCommunity(CommunityFoodEntry entry) {
+      nameController.text = entry.name;
+      calorieController.text = entry.calories.toString();
+      proteinController.text = entry.protein.toStringAsFixed(1);
+      fatController.text = entry.fat.toStringAsFixed(1);
+      carbsController.text = entry.carbs.toStringAsFixed(1);
+      if (entry.sugar > 0) sugarController.text = entry.sugar.toStringAsFixed(1);
+      if (entry.fiber > 0) fiberController.text = entry.fiber.toStringAsFixed(1);
+      if (entry.sodium > 0) sodiumController.text = entry.sodium.toStringAsFixed(0);
     }
 
     showDialog(
@@ -996,6 +1014,17 @@ class MealScreen extends ConsumerWidget {
                         context,
                         (result, grams) {
                           setDialogState(() => fillFromSearch(result, grams));
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    OutlinedButton.icon(
+                      icon: const Icon(Icons.people_outline, size: 16),
+                      label: const Text('コミュニティ食品から検索'),
+                      onPressed: () => _showCommunitySearchDialog(
+                        context,
+                        (entry) {
+                          setDialogState(() => fillFromCommunity(entry));
                         },
                       ),
                     ),
@@ -1103,6 +1132,28 @@ class MealScreen extends ConsumerWidget {
                       sodium: sodium,
                       mealType: selectedMealType,
                     );
+
+                    // コミュニティDBへの貢献（fire-and-forget）
+                    final userId = AuthService().userId;
+                    final contributeEnabled = ref
+                        .read(settingsProvider)
+                        .communityFoodContributeEnabled;
+                    if (userId != null && contributeEnabled && calories > 0) {
+                      CommunityFoodService().contribute(CommunityFoodEntry(
+                        id: const Uuid().v4(),
+                        name: nameController.text.trim(),
+                        nameSearch: nameController.text.trim().toLowerCase(),
+                        calories: calories,
+                        protein: protein,
+                        fat: fat,
+                        carbs: carbs,
+                        sugar: sugar,
+                        fiber: fiber,
+                        sodium: sodium,
+                        contributedBy: userId,
+                        createdAt: DateTime.now(),
+                      ));
+                    }
                   }
                   Navigator.pop(context);
                 },
@@ -1264,6 +1315,114 @@ class MealScreen extends ConsumerWidget {
     );
   }
 
+  // ── Community food search ──────────────────────────────────────────────────
+
+  void _showCommunitySearchDialog(
+    BuildContext context,
+    void Function(CommunityFoodEntry entry) onSelect,
+  ) {
+    final searchController = TextEditingController();
+    final service = CommunityFoodService();
+    List<CommunityFoodEntry> results = [];
+    bool isSearching = false;
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          Future<void> doSearch() async {
+            setDialogState(() => isSearching = true);
+            final r = await service.search(searchController.text);
+            setDialogState(() {
+              results = r;
+              isSearching = false;
+            });
+          }
+
+          return AlertDialog(
+            title: const Text('コミュニティ食品を検索'),
+            content: SizedBox(
+              width: double.maxFinite,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: searchController,
+                          decoration: const InputDecoration(labelText: '食品名'),
+                          onSubmitted: (_) => doSearch(),
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.search),
+                        onPressed: doSearch,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  if (isSearching)
+                    const Padding(
+                      padding: EdgeInsets.all(16),
+                      child: CircularProgressIndicator(),
+                    )
+                  else if (results.isNotEmpty)
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxHeight: 250),
+                      child: ListView.builder(
+                        shrinkWrap: true,
+                        itemCount: results.length,
+                        itemBuilder: (context, i) {
+                          final r = results[i];
+                          return ListTile(
+                            dense: true,
+                            title: Text(
+                              r.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            subtitle: Text(
+                              '${r.calories}kcal  P:${r.protein.toStringAsFixed(1)}g  '
+                              'F:${r.fat.toStringAsFixed(1)}g  C:${r.carbs.toStringAsFixed(1)}g'
+                              '${r.useCount > 0 ? '  （${r.useCount}回使用）' : ''}',
+                              style: const TextStyle(fontSize: 10),
+                            ),
+                            onTap: () {
+                              service.incrementUseCount(r.id);
+                              onSelect(r);
+                              Navigator.pop(context);
+                            },
+                          );
+                        },
+                      ),
+                    )
+                  else if (searchController.text.isNotEmpty)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 8),
+                      child: Text('該当する食品が見つかりませんでした',
+                          style: TextStyle(color: Colors.grey, fontSize: 13)),
+                    ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'コミュニティに投稿された食品データです。数値の正確性は保証されません。',
+                    style: TextStyle(fontSize: 10, color: Colors.grey),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('閉じる'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
   // ── Add method selection ───────────────────────────────────────────────────
 
   void _showAddMethodSheet(
@@ -1285,7 +1444,7 @@ class MealScreen extends ConsumerWidget {
                 title: const Text('手動で入力'),
                 onTap: () {
                   Navigator.pop(ctx);
-                  _showFoodDialog(context: context, mealState: mealState, notifier: notifier);
+                  _showFoodDialog(context: context, ref: ref, mealState: mealState, notifier: notifier);
                 },
               ),
               ListTile(

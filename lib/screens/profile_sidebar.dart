@@ -559,6 +559,38 @@ class ProfileSidebar extends ConsumerWidget {
                       ),
                     ],
                   ),
+                  const SizedBox(height: 8),
+                  const Divider(),
+                  const SizedBox(height: 8),
+                  const Text('コミュニティ食品DB',
+                      style: TextStyle(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Switch(
+                        value: ref
+                            .read(settingsProvider)
+                            .communityFoodContributeEnabled,
+                        onChanged: (v) {
+                          ref
+                              .read(settingsProvider.notifier)
+                              .updateCommunityFoodContributeEnabled(v);
+                          setDialogState(() {});
+                        },
+                      ),
+                      const Expanded(
+                        child: Text(
+                          '手動入力した食品をコミュニティに共有する',
+                          style: TextStyle(fontSize: 13),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    '食品名・栄養素のみ共有されます（個人情報は含まれません）',
+                    style: TextStyle(fontSize: 11, color: Colors.grey),
+                  ),
                 ],
               ),
             ),
