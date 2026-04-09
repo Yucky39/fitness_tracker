@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
 
 import '../models/training_log.dart';
 import '../providers/energy_profile_provider.dart';
@@ -51,41 +50,32 @@ class _TrainingScreenState extends ConsumerState<TrainingScreen> {
   }
 
   Future<void> _autoImportFromHealth() async {
-    final granted = await HealthService.requestPermissions();
-    if (!granted || !mounted) return;
-
-    final workouts = await HealthService.fetchRecentWorkouts(days: 30);
-    if (workouts.isEmpty || !mounted) return;
-
-    final notifier = ref.read(trainingProvider.notifier);
-
-    final existingDates = ref
-        .read(trainingProvider)
-        .logs
-        .where((l) => l.note == 'ヘルスケアから取得')
-        .map((l) =>
-            '${l.exerciseName}_${DateFormat('yyyyMMddHHmm').format(l.date)}')
-        .toSet();
-
-    final newWorkouts = workouts.where((w) {
-      final key =
-          '${w.exerciseName}_${DateFormat('yyyyMMddHHmm').format(w.date)}';
-      return !existingDates.contains(key);
-    }).toList();
-
-    if (newWorkouts.isEmpty) return;
-
-    for (final w in newWorkouts) {
-      await notifier.addLogFromHealth(w);
-    }
-
-    if (mounted) {
+    if (!HealthService.isSupported || !mounted) return;
+    final n =
+        await ref.read(trainingProvider.notifier).syncWorkoutsFromHealth();
+    if (n > 0 && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('ヘルスケアから ${newWorkouts.length} 件のワークアウトを取り込みました'),
+          content: Text('ヘルスケアから $n 件のワークアウトを取り込みました'),
         ),
       );
     }
+  }
+
+  Future<void> _manualImportFromHealth() async {
+    if (!HealthService.isSupported) return;
+    final n =
+        await ref.read(trainingProvider.notifier).syncWorkoutsFromHealth();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          n > 0
+              ? 'ヘルスケアから $n 件のワークアウトを取り込みました'
+              : '新しいワークアウトはありませんでした（または権限・データを確認してください）',
+        ),
+      ),
+    );
   }
 
   void _startIntervalTimer(int seconds) {
@@ -143,11 +133,16 @@ class _TrainingScreenState extends ConsumerState<TrainingScreen> {
     if (trainingState.isLoading) {
       bodyChild = const Center(child: CircularProgressIndicator());
     } else if (trainingState.logs.isEmpty) {
-      bodyChild = const Center(
-        child: Text(
-          'まだ記録がありません\n右下の + ボタンで追加できます',
-          textAlign: TextAlign.center,
-          style: TextStyle(color: Colors.grey),
+      bodyChild = Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Text(
+            HealthService.isSupported
+                ? 'まだ記録がありません\n右下の + ボタンで追加できます\n\nAppleヘルスやHealth Connectにワークアウトがある場合は、右上の同期ボタンから取り込めます'
+                : 'まだ記録がありません\n右下の + ボタンで追加できます',
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: Colors.grey),
+          ),
         ),
       );
     } else {
@@ -166,6 +161,12 @@ class _TrainingScreenState extends ConsumerState<TrainingScreen> {
       appBar: AppBar(
         title: const Text('トレーニング記録'),
         actions: [
+          if (HealthService.isSupported)
+            IconButton(
+              icon: const Icon(Icons.sync),
+              tooltip: 'ヘルスケアからワークアウトを取り込む',
+              onPressed: _manualImportFromHealth,
+            ),
           IconButton(
             icon: const Icon(Icons.auto_awesome),
             tooltip: 'AIプラン作成',

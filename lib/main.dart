@@ -32,14 +32,37 @@ class _BootstrapApp extends StatefulWidget {
 
 class _BootstrapAppState extends State<_BootstrapApp> {
   var _ready = false;
+  late final DateTime _splashStartedAt;
 
   @override
   void initState() {
     super.initState();
+    _splashStartedAt = DateTime.now();
     WidgetsBinding.instance.addPostFrameCallback((_) => _bootstrap());
   }
 
+  /// GIF のデコードと本体初期化を並行し、スプラッシュ開始から最低 [_minSplashDuration] は表示する。
   Future<void> _bootstrap() async {
+    const minSplash = Duration(milliseconds: 2400);
+
+    await Future.wait([
+      splashGifPrecacheCompleter.future.timeout(
+        const Duration(seconds: 6),
+        onTimeout: () {},
+      ),
+      _runCoreInit(),
+    ]);
+
+    final elapsed = DateTime.now().difference(_splashStartedAt);
+    if (elapsed < minSplash) {
+      await Future.delayed(minSplash - elapsed);
+    }
+
+    if (!mounted) return;
+    setState(() => _ready = true);
+  }
+
+  Future<void> _runCoreInit() async {
     await initializeDateFormatting('ja');
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
@@ -54,9 +77,6 @@ class _BootstrapAppState extends State<_BootstrapApp> {
     }
 
     await NotificationService().initialize();
-
-    if (!mounted) return;
-    setState(() => _ready = true);
   }
 
   @override

@@ -220,14 +220,14 @@ class _TrainingLogCardState extends State<TrainingLogCard> {
                       ],
                     ],
                   ),
-                  if (log.note.isNotEmpty) ...[
+                  if (log.noteForDisplay.isNotEmpty) ...[
                     const SizedBox(height: 6),
                     Row(
                       children: [
                         const Icon(Icons.notes, size: 13, color: Colors.grey),
                         const SizedBox(width: 4),
                         Expanded(
-                          child: Text(log.note,
+                          child: Text(log.noteForDisplay,
                               style: const TextStyle(
                                   fontSize: 12, color: Colors.grey)),
                         ),

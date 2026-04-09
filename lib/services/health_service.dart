@@ -23,16 +23,13 @@ class HealthService {
 
   /// ワークアウト・睡眠・歩数の読み取り権限を一括リクエストする。
   /// iOS HealthKit はここで宣言した型だけが設定画面に表示される。
+  /// [permissions] の要素数は [types] と一致させる必要があるため、
+  /// 省略時はプラグイン側で各型とも READ が付与される。
   static Future<bool> requestPermissions() async {
     if (!isSupported) return false;
     try {
       return await _health.requestAuthorization(
         [..._workoutTypes, ..._sleepTypes, ..._stepTypes],
-        permissions: [
-          ..._readOnly,
-          ..._readOnly,
-          ..._readOnly,
-        ],
       );
     } catch (_) {
       return false;
@@ -160,7 +157,7 @@ class HealthService {
 
   /// 直近 [days] 日間のワークアウトを取得して TrainingLog リストに変換する。
   /// 権限がない場合や取得失敗時は空リストを返す。
-  static Future<List<TrainingLog>> fetchRecentWorkouts({int days = 30}) async {
+  static Future<List<TrainingLog>> fetchRecentWorkouts({int days = 90}) async {
     if (!isSupported) return [];
     try {
       final end = DateTime.now();
@@ -190,6 +187,10 @@ class HealthService {
             ? workout.totalDistance! / 1000.0
             : 0.0;
 
+    final note = point.uuid.isNotEmpty
+        ? '${TrainingLog.healthImportNotePrefix}|${point.uuid}'
+        : TrainingLog.healthImportNotePrefix;
+
     return TrainingLog(
       id: const Uuid().v4(),
       exerciseName: _activityName(workout.workoutActivityType),
@@ -201,20 +202,28 @@ class HealthService {
       distanceKm: distanceKm,
       durationMinutes: durationMin,
       rpe: null,
-      note: 'ヘルスケアから取得',
+      note: note,
       date: point.dateFrom,
     );
   }
 
-  /// HealthWorkoutActivityType を日本語の種目名にマッピング
+  /// HealthWorkoutActivityType を日本語の種目名にマッピング（ウェアラブル・ヘルスアプリの種類を広くカバー）
   static String _activityName(HealthWorkoutActivityType? type) {
     switch (type) {
       case HealthWorkoutActivityType.RUNNING:
+      case HealthWorkoutActivityType.RUNNING_TREADMILL:
         return 'ランニング';
       case HealthWorkoutActivityType.WALKING:
+      case HealthWorkoutActivityType.WALKING_TREADMILL:
+      case HealthWorkoutActivityType.WHEELCHAIR_WALK_PACE:
         return 'ウォーキング';
+      case HealthWorkoutActivityType.WHEELCHAIR_RUN_PACE:
+        return '車いすランニング';
       case HealthWorkoutActivityType.BIKING:
+      case HealthWorkoutActivityType.BIKING_STATIONARY:
+      case HealthWorkoutActivityType.HAND_CYCLING:
         return 'サイクリング';
+      case HealthWorkoutActivityType.SWIMMING:
       case HealthWorkoutActivityType.SWIMMING_OPEN_WATER:
       case HealthWorkoutActivityType.SWIMMING_POOL:
         return '水泳';
@@ -225,10 +234,68 @@ class HealthService {
       case HealthWorkoutActivityType.ELLIPTICAL:
         return 'エリプティカル';
       case HealthWorkoutActivityType.ROWING:
+      case HealthWorkoutActivityType.ROWING_MACHINE:
         return 'ローイングマシン';
       case HealthWorkoutActivityType.CARDIO_DANCE:
       case HealthWorkoutActivityType.STEP_TRAINING:
+      case HealthWorkoutActivityType.DANCING:
+      case HealthWorkoutActivityType.SOCIAL_DANCE:
         return 'エアロビクス';
+      case HealthWorkoutActivityType.STAIR_CLIMBING:
+      case HealthWorkoutActivityType.STAIR_CLIMBING_MACHINE:
+      case HealthWorkoutActivityType.STAIRS:
+        return '階段・ステッパー';
+      case HealthWorkoutActivityType.HIKING:
+        return 'ハイキング';
+      case HealthWorkoutActivityType.CROSS_COUNTRY_SKIING:
+      case HealthWorkoutActivityType.DOWNHILL_SKIING:
+      case HealthWorkoutActivityType.SKIING:
+      case HealthWorkoutActivityType.SNOWBOARDING:
+      case HealthWorkoutActivityType.SNOWSHOEING:
+        return 'スキー・スノーボード';
+      case HealthWorkoutActivityType.YOGA:
+      case HealthWorkoutActivityType.PILATES:
+      case HealthWorkoutActivityType.TAI_CHI:
+      case HealthWorkoutActivityType.MIND_AND_BODY:
+        return 'ヨガ・ピラティス';
+      case HealthWorkoutActivityType.TRADITIONAL_STRENGTH_TRAINING:
+      case HealthWorkoutActivityType.FUNCTIONAL_STRENGTH_TRAINING:
+      case HealthWorkoutActivityType.STRENGTH_TRAINING:
+      case HealthWorkoutActivityType.WEIGHTLIFTING:
+      case HealthWorkoutActivityType.CALISTHENICS:
+        return '筋力トレーニング';
+      case HealthWorkoutActivityType.CLIMBING:
+      case HealthWorkoutActivityType.ROCK_CLIMBING:
+        return 'クライミング';
+      case HealthWorkoutActivityType.BOXING:
+      case HealthWorkoutActivityType.KICKBOXING:
+      case HealthWorkoutActivityType.MARTIAL_ARTS:
+        return '格闘・武道';
+      case HealthWorkoutActivityType.CROSS_TRAINING:
+      case HealthWorkoutActivityType.MIXED_CARDIO:
+        return 'クロストレーニング';
+      case HealthWorkoutActivityType.CORE_TRAINING:
+        return 'コアトレーニング';
+      case HealthWorkoutActivityType.FLEXIBILITY:
+        return 'ストレッチ';
+      case HealthWorkoutActivityType.BARRE:
+        return 'バレエフィットネス';
+      case HealthWorkoutActivityType.TENNIS:
+      case HealthWorkoutActivityType.BADMINTON:
+      case HealthWorkoutActivityType.SQUASH:
+      case HealthWorkoutActivityType.RACQUETBALL:
+      case HealthWorkoutActivityType.TABLE_TENNIS:
+      case HealthWorkoutActivityType.PICKLEBALL:
+        return 'ラケットスポーツ';
+      case HealthWorkoutActivityType.SOCCER:
+      case HealthWorkoutActivityType.BASKETBALL:
+      case HealthWorkoutActivityType.VOLLEYBALL:
+      case HealthWorkoutActivityType.BASEBALL:
+      case HealthWorkoutActivityType.AMERICAN_FOOTBALL:
+        return 'ボールスポーツ';
+      case HealthWorkoutActivityType.OTHER:
+      case null:
+        return '有酸素運動';
       default:
         return '有酸素運動';
     }

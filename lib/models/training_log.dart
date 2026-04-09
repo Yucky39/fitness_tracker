@@ -16,6 +16,10 @@ enum ExerciseType {
 }
 
 class TrainingLog {
+  /// ヘルスケア（HealthKit / Health Connect）経由で取り込んだ記録のメモ接頭辞。
+  /// 重複排除用に `|ソースUUID` を付与する場合がある。
+  static const String healthImportNotePrefix = 'ヘルスケアから取得';
+
   final String id;
   final String exerciseName;
   final ExerciseType exerciseType;
@@ -81,6 +85,20 @@ class TrainingLog {
         date: date ?? this.date,
         aiAdvice: aiAdvice ?? this.aiAdvice,
       );
+
+  /// [note] からヘルス取込の一意ID（あれば）を返す。
+  static String? healthImportUuidFromNote(String note) {
+    final p = '$healthImportNotePrefix|';
+    if (!note.startsWith(p)) return null;
+    final rest = note.substring(p.length);
+    return rest.isEmpty ? null : rest;
+  }
+
+  /// メモ欄表示用（ヘルス取込の内部UUIDは隠す）
+  String get noteForDisplay {
+    if (healthImportUuidFromNote(note) != null) return healthImportNotePrefix;
+    return note;
+  }
 
   /// 総ボリューム (kg)  例: 100kg × 10rep × 3set = 3000kg（筋トレのみ）
   double get totalVolume => weight * reps * sets;

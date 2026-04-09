@@ -1,17 +1,47 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+
+/// スプラッシュ用 GIF のデコード完了を通知する（コールドスタートの `_bootstrap` が待機する）。
+final Completer<void> splashGifPrecacheCompleter = Completer<void>();
 
 /// コールドスタートおよび認証待ちなど、初期化中に表示する画面。
 ///
 /// `assets/splash/loading.gif` は GIF アニメーション（[Image.asset] が再生）。
 /// 見た目を変える場合は同パスにファイルを置き換えてください。
 /// サンプル GIF を第三者配布物に使う場合は、各ライセンス（表示義務など）に従ってください。
-class SplashScreen extends StatelessWidget {
+class SplashScreen extends StatefulWidget {
   const SplashScreen({
     super.key,
     this.message = '初期化しています…',
   });
 
   final String message;
+
+  @override
+  State<SplashScreen> createState() => _SplashScreenState();
+}
+
+class _SplashScreenState extends State<SplashScreen> {
+  var _precacheRequested = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_precacheRequested) return;
+    _precacheRequested = true;
+
+    final asset = const AssetImage('assets/splash/loading.gif');
+    precacheImage(asset, context).then((_) {
+      if (!splashGifPrecacheCompleter.isCompleted) {
+        splashGifPrecacheCompleter.complete();
+      }
+    }).catchError((Object _) {
+      if (!splashGifPrecacheCompleter.isCompleted) {
+        splashGifPrecacheCompleter.complete();
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -53,6 +83,9 @@ class SplashScreen extends StatelessWidget {
                 gaplessPlayback: true,
                 fit: BoxFit.contain,
                 errorBuilder: (context, error, stackTrace) {
+                  if (!splashGifPrecacheCompleter.isCompleted) {
+                    splashGifPrecacheCompleter.complete();
+                  }
                   return SizedBox(
                     width: 64,
                     height: 64,
@@ -74,7 +107,7 @@ class SplashScreen extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               Text(
-                message,
+                widget.message,
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       color: scheme.onSurface.withValues(alpha: 0.75),

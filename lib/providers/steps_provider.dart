@@ -50,7 +50,7 @@ class StepsNotifier extends StateNotifier<StepsState> {
   /// 起動時・ダッシュボード表示時：権限を自動リクエストしてデータ取得。
   /// iOS では既に決定済みの場合ダイアログは表示されない。
   Future<void> _autoFetch() async {
-    await HealthService.requestStepPermission(); // 権限なければリクエスト、済みならスキップ
+    await HealthService.requestPermissions(); // 歩数・睡眠・ワークアウトをまとめてリクエスト
     await _fetchSteps(granted: true);
   }
 
@@ -64,7 +64,7 @@ class StepsNotifier extends StateNotifier<StepsState> {
   /// ユーザーが「歩数を連携」ボタンをタップしたときに呼ぶ
   Future<bool> requestAndFetch() async {
     state = state.copyWith(isLoading: true);
-    await HealthService.requestStepPermission();
+    await HealthService.requestPermissions();
     await _fetchSteps(granted: true);
     final hasData = state.steps > 0;
     if (!hasData) return false;

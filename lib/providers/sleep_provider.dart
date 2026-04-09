@@ -97,7 +97,7 @@ class SleepNotifier extends StateNotifier<SleepState> {
   /// 起動時・ダッシュボード表示時：権限を自動リクエストしてデータ取得。
   /// iOS では既に決定済みの場合ダイアログは表示されない。
   Future<void> _autoFetch() async {
-    await HealthService.requestSleepPermission(); // 権限なければリクエスト、済みならスキップ
+    await HealthService.requestPermissions(); // 歩数・睡眠・ワークアウトをまとめてリクエスト
     await _fetchSleep(granted: true);
   }
 
@@ -115,7 +115,7 @@ class SleepNotifier extends StateNotifier<SleepState> {
   /// データが取得できれば true、できなければ false を返す。
   Future<bool> requestAndFetch() async {
     state = state.copyWith(isLoading: true);
-    final authRequested = await HealthService.requestSleepPermission();
+    final authRequested = await HealthService.requestPermissions();
     await _fetchSleep(granted: true);
     // iOS HealthKit は権限拒否でも authRequested が true を返すことがある。
     // データ取得を試みた結果で判定する:

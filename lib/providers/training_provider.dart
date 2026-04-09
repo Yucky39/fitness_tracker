@@ -1,7 +1,9 @@
+import 'package:intl/intl.dart';
 import 'package:riverpod/legacy.dart';
 import 'package:uuid/uuid.dart';
 import '../models/training_log.dart';
 import '../services/database_service.dart';
+import '../services/health_service.dart';
 import '../services/sync_service.dart';
 import '../services/training_calorie_calculator.dart';
 
@@ -90,6 +92,48 @@ class TrainingNotifier extends StateNotifier<TrainingState> {
     await adapter.insert('training_logs', log.toMap());
     SyncService().syncRecord('training_logs', log.toMap());
     await _loadLogs();
+  }
+
+  /// ヘルスケアに同期されたワークアウト（ウェアラブル等）を取り込み、DB にレコードとして保存する。
+  /// 既に同じソースUUIDまたは同一時刻の旧形式レコードがある場合はスキップする。
+  /// 取り込んだ件数を返す。
+  Future<int> syncWorkoutsFromHealth({int days = 90}) async {
+    if (!HealthService.isSupported) return 0;
+    await HealthService.requestPermissions();
+    final workouts = await HealthService.fetchRecentWorkouts(days: days);
+    if (workouts.isEmpty) return 0;
+
+    final existingUuids = <String>{};
+    final legacyKeys = <String>{};
+    for (final l in state.logs) {
+      final u = TrainingLog.healthImportUuidFromNote(l.note);
+      if (u != null && u.isNotEmpty) {
+        existingUuids.add(u);
+      } else if (l.note == TrainingLog.healthImportNotePrefix) {
+        legacyKeys.add(_healthWorkoutLegacyKey(l));
+      }
+    }
+
+    var added = 0;
+    for (final w in workouts) {
+      final u = TrainingLog.healthImportUuidFromNote(w.note);
+      if (u != null && u.isNotEmpty && existingUuids.contains(u)) continue;
+
+      final key = _healthWorkoutLegacyKey(w);
+      if (legacyKeys.contains(key)) continue;
+
+      if (u != null && u.isNotEmpty) existingUuids.add(u);
+      legacyKeys.add(key);
+
+      await addLogFromHealth(w);
+      added++;
+    }
+    return added;
+  }
+
+  String _healthWorkoutLegacyKey(TrainingLog l) {
+    final d = l.date.toLocal();
+    return '${l.exerciseName}_${DateFormat('yyyyMMddHHmm').format(d)}';
   }
 
   Future<void> updateLog(TrainingLog updated) async {

@@ -26,6 +26,111 @@ import '../widgets/nutrient_bar.dart';
 import '../widgets/recipe_preset_editor_sheet.dart';
 import '../widgets/supplement_entry_dialog.dart';
 
+/// 検索結果1行。行全体の水平ドラッグで食品名を横スクロールする。
+class _FoodSearchResultTile extends StatefulWidget {
+  const _FoodSearchResultTile({
+    required this.name,
+    required this.subtitle,
+    required this.onTap,
+    this.leading,
+  });
+
+  final String name;
+  final Widget subtitle;
+  final VoidCallback onTap;
+  final Widget? leading;
+
+  @override
+  State<_FoodSearchResultTile> createState() => _FoodSearchResultTileState();
+}
+
+class _FoodSearchResultTileState extends State<_FoodSearchResultTile> {
+  final ScrollController _nameHScroll = ScrollController();
+
+  @override
+  void dispose() {
+    _nameHScroll.dispose();
+    super.dispose();
+  }
+
+  void _onHorizontalDrag(DragUpdateDetails details) {
+    if (!_nameHScroll.hasClients) return;
+    final p = _nameHScroll.position;
+    final next = (p.pixels - details.delta.dx).clamp(0.0, p.maxScrollExtent);
+    _nameHScroll.jumpTo(next);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final titleStyle =
+        theme.listTileTheme.titleTextStyle ?? theme.textTheme.bodyLarge;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: widget.onTap,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onHorizontalDragUpdate: _onHorizontalDrag,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (widget.leading != null) ...[
+                  SizedBox(
+                    width: 40,
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: widget.leading,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                ],
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Builder(
+                        builder: (context) {
+                          final h = (24 * MediaQuery.textScalerOf(context).scale(1))
+                              .clamp(22.0, 56.0)
+                              .toDouble();
+                          return SizedBox(
+                            height: h,
+                            child: Align(
+                              alignment: Alignment.centerLeft,
+                              child: SingleChildScrollView(
+                                controller: _nameHScroll,
+                                scrollDirection: Axis.horizontal,
+                                physics: const NeverScrollableScrollPhysics(),
+                                child: Text(
+                                  widget.name,
+                                  maxLines: 1,
+                                  softWrap: false,
+                                  style: titleStyle,
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 2),
+                      widget.subtitle,
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 // View-mode toggle: false = grouped list, true = timeline
 final _timelineViewProvider = StateProvider<bool>((ref) => false);
 
@@ -1009,21 +1114,13 @@ class MealScreen extends ConsumerWidget {
                   if (!isEdit) ...[
                     OutlinedButton.icon(
                       icon: const Icon(Icons.search, size: 16),
-                      label: const Text('食品データベースから検索'),
-                      onPressed: () => _showFoodSearchDialog(
+                      label: const Text('食品を検索'),
+                      onPressed: () => _showUnifiedFoodSearchDialog(
                         context,
-                        (result, grams) {
+                        onSelectStandard: (result, grams) {
                           setDialogState(() => fillFromSearch(result, grams));
                         },
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    OutlinedButton.icon(
-                      icon: const Icon(Icons.people_outline, size: 16),
-                      label: const Text('コミュニティ食品から検索'),
-                      onPressed: () => _showCommunitySearchDialog(
-                        context,
-                        (entry) {
+                        onSelectCommunity: (entry) {
                           setDialogState(() => fillFromCommunity(entry));
                         },
                       ),
@@ -1166,250 +1263,209 @@ class MealScreen extends ConsumerWidget {
     );
   }
 
-  void _showFoodSearchDialog(
-    BuildContext context,
-    void Function(FoodSearchResult result, int grams) onSelect,
-  ) {
+  /// 標準成分DBとコミュニティ食品をまとめて検索する。
+  void _showUnifiedFoodSearchDialog(
+    BuildContext context, {
+    required void Function(FoodSearchResult result, int grams) onSelectStandard,
+    required void Function(CommunityFoodEntry entry) onSelectCommunity,
+  }) {
     final searchController = TextEditingController();
     final gramsController = TextEditingController(text: '100');
-    final service = FoodSearchService();
-    List<FoodSearchResult> results = [];
+    final foodSearchService = FoodSearchService();
+    final communityService = CommunityFoodService();
+    List<FoodSearchResult> standardResults = [];
+    List<CommunityFoodEntry> communityResults = [];
     bool isSearching = false;
     String? error;
-
-    showDialog(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) {
-          return AlertDialog(
-            title: const Text('食品データベース検索'),
-            content: SizedBox(
-              width: double.maxFinite,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: searchController,
-                          decoration: const InputDecoration(
-                            labelText: '食品名',
-                            hintText: '日本語可（文科省成分DBを優先）',
-                          ),
-                          onSubmitted: (_) async {
-                            setDialogState(() {
-                              isSearching = true;
-                              error = null;
-                            });
-                            try {
-                              final r =
-                                  await service.search(searchController.text);
-                              setDialogState(() {
-                                results = r;
-                                isSearching = false;
-                              });
-                            } catch (_) {
-                              setDialogState(() {
-                                error = '検索に失敗しました';
-                                isSearching = false;
-                              });
-                            }
-                          },
-                        ),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.search),
-                        onPressed: () async {
-                          setDialogState(() {
-                            isSearching = true;
-                            error = null;
-                          });
-                          try {
-                            final r =
-                                await service.search(searchController.text);
-                            setDialogState(() {
-                              results = r;
-                              isSearching = false;
-                            });
-                          } catch (_) {
-                            setDialogState(() {
-                              error = '検索に失敗しました';
-                              isSearching = false;
-                            });
-                          }
-                        },
-                      ),
-                    ],
-                  ),
-                  Row(
-                    children: [
-                      const Text('摂取量: ', style: TextStyle(fontSize: 13)),
-                      SizedBox(
-                        width: 70,
-                        child: TextField(
-                          controller: gramsController,
-                          keyboardType: TextInputType.number,
-                          decoration: const InputDecoration(
-                            suffix: Text('g'),
-                            isDense: true,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  if (isSearching)
-                    const Padding(
-                      padding: EdgeInsets.all(16),
-                      child: CircularProgressIndicator(),
-                    )
-                  else if (error != null)
-                    Text(error!, style: const TextStyle(color: Colors.red))
-                  else if (results.isNotEmpty)
-                    ConstrainedBox(
-                      constraints: const BoxConstraints(maxHeight: 250),
-                      child: ListView.builder(
-                        shrinkWrap: true,
-                        itemCount: results.length,
-                        itemBuilder: (context, i) {
-                          final r = results[i];
-                          return ListTile(
-                            dense: true,
-                            title: Text(
-                              r.name,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            subtitle: Text(
-                              [
-                                '${r.caloriesPer100g}kcal/100g  '
-                                    'P:${r.proteinPer100g.toStringAsFixed(1)}g',
-                                if (r.dataSourceLabel != null) r.dataSourceLabel!,
-                              ].join('\n'),
-                              style: const TextStyle(fontSize: 10),
-                              maxLines: 4,
-                            ),
-                            onTap: () {
-                              final grams =
-                                  int.tryParse(gramsController.text) ?? 100;
-                              onSelect(r, grams);
-                              Navigator.pop(context);
-                            },
-                          );
-                        },
-                      ),
-                    ),
-                ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('閉じる'),
-              ),
-            ],
-          );
-        },
-      ),
-    );
-  }
-
-  // ── Community food search ──────────────────────────────────────────────────
-
-  void _showCommunitySearchDialog(
-    BuildContext context,
-    void Function(CommunityFoodEntry entry) onSelect,
-  ) {
-    final searchController = TextEditingController();
-    final service = CommunityFoodService();
-    List<CommunityFoodEntry> results = [];
-    bool isSearching = false;
+    bool hasSearched = false;
 
     showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) {
           Future<void> doSearch() async {
-            setDialogState(() => isSearching = true);
-            final r = await service.search(searchController.text);
             setDialogState(() {
-              results = r;
+              isSearching = true;
+              error = null;
+              hasSearched = true;
+            });
+            final q = searchController.text;
+            List<FoodSearchResult> std = [];
+            String? err;
+            try {
+              std = await foodSearchService.search(q);
+            } catch (_) {
+              err = '食品データベースの検索に失敗しました';
+            }
+            final community = await communityService.search(q);
+            setDialogState(() {
+              standardResults = std;
+              communityResults = community;
+              error = err;
               isSearching = false;
             });
           }
 
+          final showEmpty = hasSearched &&
+              !isSearching &&
+              error == null &&
+              standardResults.isEmpty &&
+              communityResults.isEmpty &&
+              searchController.text.trim().isNotEmpty;
+
+          final media = MediaQuery.sizeOf(context);
           return AlertDialog(
-            title: const Text('コミュニティ食品を検索'),
-            content: SizedBox(
-              width: double.maxFinite,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: searchController,
-                          decoration: const InputDecoration(labelText: '食品名'),
-                          onSubmitted: (_) => doSearch(),
+            scrollable: true,
+            constraints: BoxConstraints(
+              maxWidth: 560,
+              maxHeight: media.height * 0.88,
+            ),
+            title: const Text('食品検索'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: searchController,
+                        decoration: const InputDecoration(
+                          labelText: '食品名',
+                          hintText: '標準成分表・コミュニティの両方を検索',
+                        ),
+                        onSubmitted: (_) => doSearch(),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.search),
+                      onPressed: doSearch,
+                    ),
+                  ],
+                ),
+                Row(
+                  children: [
+                    const Text('摂取量（データベース用）: ',
+                        style: TextStyle(fontSize: 13)),
+                    SizedBox(
+                      width: 70,
+                      child: TextField(
+                        controller: gramsController,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(
+                          suffix: Text('g'),
+                          isDense: true,
                         ),
                       ),
-                      IconButton(
-                        icon: const Icon(Icons.search),
-                        onPressed: doSearch,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  if (isSearching)
-                    const Padding(
-                      padding: EdgeInsets.all(16),
-                      child: CircularProgressIndicator(),
-                    )
-                  else if (results.isNotEmpty)
-                    ConstrainedBox(
-                      constraints: const BoxConstraints(maxHeight: 250),
-                      child: ListView.builder(
-                        shrinkWrap: true,
-                        itemCount: results.length,
-                        itemBuilder: (context, i) {
-                          final r = results[i];
-                          return ListTile(
-                            dense: true,
-                            title: Text(
-                              r.name,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            subtitle: Text(
-                              '${r.calories}kcal  P:${r.protein.toStringAsFixed(1)}g  '
-                              'F:${r.fat.toStringAsFixed(1)}g  C:${r.carbs.toStringAsFixed(1)}g'
-                              '${r.useCount > 0 ? '  （${r.useCount}回使用）' : ''}',
-                              style: const TextStyle(fontSize: 10),
-                            ),
-                            onTap: () {
-                              service.incrementUseCount(r.id);
-                              onSelect(r);
-                              Navigator.pop(context);
-                            },
-                          );
-                        },
-                      ),
-                    )
-                  else if (searchController.text.isNotEmpty)
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  'コミュニティの項目は登録された分量の数値がそのまま反映されます。',
+                  style: TextStyle(fontSize: 10, color: Colors.grey),
+                ),
+                const SizedBox(height: 8),
+                if (isSearching)
+                  const Padding(
+                    padding: EdgeInsets.all(16),
+                    child: Center(child: CircularProgressIndicator()),
+                  )
+                else ...[
+                  if (error != null)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Text(error!,
+                          style: const TextStyle(color: Colors.red)),
+                    ),
+                  if (showEmpty)
                     const Padding(
                       padding: EdgeInsets.symmetric(vertical: 8),
-                      child: Text('該当する食品が見つかりませんでした',
-                          style: TextStyle(color: Colors.grey, fontSize: 13)),
+                      child: Text(
+                        '該当する食品が見つかりませんでした',
+                        style: TextStyle(color: Colors.grey, fontSize: 13),
+                      ),
                     ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'コミュニティに投稿された食品データです。数値の正確性は保証されません。',
-                    style: TextStyle(fontSize: 10, color: Colors.grey),
-                  ),
+                  if (!isSearching &&
+                      (standardResults.isNotEmpty ||
+                          communityResults.isNotEmpty)) ...[
+                    if (standardResults.isNotEmpty) ...[
+                      const Padding(
+                        padding: EdgeInsets.only(bottom: 4),
+                        child: Text(
+                          '食品データベース',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.grey,
+                          ),
+                        ),
+                      ),
+                      ...standardResults.map(
+                        (r) => _FoodSearchResultTile(
+                          name: r.name,
+                          subtitle: Text(
+                            [
+                              '${r.caloriesPer100g}kcal/100g  '
+                                  'P:${r.proteinPer100g.toStringAsFixed(1)}g',
+                              if (r.dataSourceLabel != null) r.dataSourceLabel!,
+                            ].join('\n'),
+                            style: const TextStyle(fontSize: 10),
+                            maxLines: 4,
+                          ),
+                          onTap: () {
+                            final grams =
+                                int.tryParse(gramsController.text) ?? 100;
+                            onSelectStandard(r, grams);
+                            Navigator.pop(context);
+                          },
+                        ),
+                      ),
+                    ],
+                    if (standardResults.isNotEmpty &&
+                        communityResults.isNotEmpty)
+                      const Divider(height: 16),
+                    if (communityResults.isNotEmpty) ...[
+                      const Padding(
+                        padding: EdgeInsets.only(bottom: 4, top: 4),
+                        child: Text(
+                          'コミュニティ食品',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.grey,
+                          ),
+                        ),
+                      ),
+                      ...communityResults.map(
+                        (r) => _FoodSearchResultTile(
+                          name: r.name,
+                          leading: const Icon(Icons.people_outline,
+                              size: 18, color: Colors.grey),
+                          subtitle: Text(
+                            '${r.calories}kcal  P:${r.protein.toStringAsFixed(1)}g  '
+                            'F:${r.fat.toStringAsFixed(1)}g  C:${r.carbs.toStringAsFixed(1)}g'
+                            '${r.useCount > 0 ? '  （${r.useCount}回使用）' : ''}',
+                            style: const TextStyle(fontSize: 10),
+                          ),
+                          onTap: () {
+                            communityService.incrementUseCount(r.id);
+                            onSelectCommunity(r);
+                            Navigator.pop(context);
+                          },
+                        ),
+                      ),
+                      const Padding(
+                        padding: EdgeInsets.only(top: 8),
+                        child: Text(
+                          'コミュニティの数値は保証されません。',
+                          style: TextStyle(fontSize: 10, color: Colors.grey),
+                        ),
+                      ),
+                    ],
+                  ],
                 ],
-              ),
+              ],
             ),
             actions: [
               TextButton(
