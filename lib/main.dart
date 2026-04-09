@@ -19,10 +19,6 @@ void main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
-
   tz.initializeTimeZones();
   try {
     final tzInfo = await FlutterTimezone.getLocalTimezone();

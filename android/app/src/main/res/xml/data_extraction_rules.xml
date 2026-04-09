@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    flutter_secure_storage が保存する機密データをクラウドバックアップから除外する。
+    バックアップに含めると、別のデバイスに復元した際にキーストアと不整合が生じる。
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="sharedpref" path="FlutterSecureStorage"/>
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="sharedpref" path="FlutterSecureStorage"/>
+    </device-transfer>
+</data-extraction-rules>

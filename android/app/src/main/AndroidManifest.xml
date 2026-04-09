@@ -3,7 +3,13 @@
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <uses-permission android:name="android.permission.USE_EXACT_ALARM"/>
-    <!-- Health Connect (Android 14+) -->
+    <!-- カメラ（image_picker / mobile_scanner） -->
+    <uses-permission android:name="android.permission.CAMERA"/>
+    <!-- フォトライブラリ: Android 13+ は READ_MEDIA_IMAGES、それ以前は READ_EXTERNAL_STORAGE -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES"/>
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32"/>
+    <!-- Health Connect (Android 9+) -->
     <uses-permission android:name="android.permission.health.READ_EXERCISE"/>
     <uses-permission android:name="android.permission.health.READ_DISTANCE"/>
     <uses-permission android:name="android.permission.health.READ_TOTAL_CALORIES_BURNED"/>
@@ -11,10 +17,14 @@
     <uses-permission android:name="android.permission.health.READ_STEPS"/>
     <!-- 歩数センサーアクセス（Android 10 以降） -->
     <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION"/>
+    <!-- カメラハードウェアは必須ではない（カメラなし端末でも動作可） -->
+    <uses-feature android:name="android.hardware.camera" android:required="false"/>
     <application
         android:label="fitness_tracker"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:fullBackupContent="false"
+        android:dataExtractionRules="@xml/data_extraction_rules">
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -35,6 +45,10 @@
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+            <!-- Health Connect: パーミッション説明画面を表示するために必要 -->
+            <intent-filter>
+                <action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE"/>
             </intent-filter>
         </activity>
         <!-- Don't delete the meta-data below.

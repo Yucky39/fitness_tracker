@@ -27,7 +27,8 @@ android {
         applicationId = "com.example.fitness_tracker"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = flutter.minSdkVersion
+        // Health Connect は API 26 (Android 8.0) 以上が必要なため明示指定
+        minSdk = 26
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
