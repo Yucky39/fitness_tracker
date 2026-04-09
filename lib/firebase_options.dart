@@ -24,18 +24,6 @@ class DefaultFirebaseOptions {
         return android;
       case TargetPlatform.iOS:
         return ios;
-      case TargetPlatform.macOS:
-        return macos;
-      case TargetPlatform.windows:
-        throw UnsupportedError(
-          'DefaultFirebaseOptions have not been configured for windows - '
-          'you can reconfigure this by running the FlutterFire CLI again.',
-        );
-      case TargetPlatform.linux:
-        throw UnsupportedError(
-          'DefaultFirebaseOptions have not been configured for linux - '
-          'you can reconfigure this by running the FlutterFire CLI again.',
-        );
       default:
         throw UnsupportedError(
           'DefaultFirebaseOptions are not supported for this platform.',
@@ -70,14 +58,4 @@ class DefaultFirebaseOptions {
     iosBundleId: 'com.takayukimasaki.fitnessTracker',
   );
 
-  static const FirebaseOptions macos = FirebaseOptions(
-    apiKey: 'AIzaSyD_g54xQLocP_tWo0Nl5Nl6nDw1bOrEY2U',
-    appId: '1:1041203655666:ios:84e5c91a60f5ca76bdf16b',
-    messagingSenderId: '1041203655666',
-    projectId: 'fitness-tracker-828df',
-    storageBucket: 'fitness-tracker-828df.firebasestorage.app',
-    iosBundleId: 'com.takayukimasaki.fitnessTracker',
-  );
-
-  /// Same Firebase Apple app as [ios] (`Runner/GoogleService-Info.plist` on macOS).
 }
