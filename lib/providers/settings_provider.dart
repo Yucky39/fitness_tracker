@@ -175,6 +175,25 @@ class SettingsState {
     }
   }
 
+  /// [selectedProvider] の更新が非同期で遅れる場合でも、UIで正しいモデルIDを参照するために使う。
+  String modelForProvider(AiProviderType p) {
+    switch (p) {
+      case AiProviderType.anthropic:
+        return selectedAnthropicModel;
+      case AiProviderType.openai:
+        return selectedOpenAiModel;
+      case AiProviderType.gemini:
+        return selectedGeminiModel;
+    }
+  }
+
+  /// 保存済みIDが [p.availableModels] に無い場合はデフォルトにフォールバック（ドロップダウンと整合させる）。
+  String resolvedModelForProvider(AiProviderType p) {
+    final id = modelForProvider(p);
+    final ids = p.availableModels.map((m) => m.id).toSet();
+    return ids.contains(id) ? id : p.defaultModel;
+  }
+
   String get currentModelLabel {
     final models = selectedProvider.availableModels;
     return models.firstWhere(
@@ -233,6 +252,9 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
   SettingsNotifier() : super(const SettingsState()) {
     _load();
   }
+
+  /// `ref` が使えないコールバック（例: Dropdown の非同期 onChanged）から現在状態を読む用。
+  SettingsState get currentSettings => state;
 
   static const _secureStorage = FlutterSecureStorage(
     aOptions: AndroidOptions(encryptedSharedPreferences: true),
@@ -296,34 +318,29 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
   }
 
   Future<void> updateSelectedProvider(AiProviderType provider) async {
+    state = state.copyWith(selectedProvider: provider);
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('selectedAiProvider', provider.name);
-    state = state.copyWith(selectedProvider: provider);
   }
 
   Future<void> updateModel(AiProviderType provider, String modelId) async {
+    state = switch (provider) {
+      AiProviderType.anthropic =>
+        state.copyWith(selectedAnthropicModel: modelId),
+      AiProviderType.openai => state.copyWith(selectedOpenAiModel: modelId),
+      AiProviderType.gemini => state.copyWith(selectedGeminiModel: modelId),
+    };
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(provider.modelStorageKey, modelId);
-    switch (provider) {
-      case AiProviderType.anthropic:
-        state = state.copyWith(selectedAnthropicModel: modelId);
-      case AiProviderType.openai:
-        state = state.copyWith(selectedOpenAiModel: modelId);
-      case AiProviderType.gemini:
-        state = state.copyWith(selectedGeminiModel: modelId);
-    }
   }
 
   Future<void> updateApiKey(AiProviderType provider, String key) async {
     await _secureStorage.write(key: provider.storageKey, value: key);
-    switch (provider) {
-      case AiProviderType.anthropic:
-        state = state.copyWith(anthropicApiKey: key);
-      case AiProviderType.openai:
-        state = state.copyWith(openAiApiKey: key);
-      case AiProviderType.gemini:
-        state = state.copyWith(geminiApiKey: key);
-    }
+    state = switch (provider) {
+      AiProviderType.anthropic => state.copyWith(anthropicApiKey: key),
+      AiProviderType.openai => state.copyWith(openAiApiKey: key),
+      AiProviderType.gemini => state.copyWith(geminiApiKey: key),
+    };
   }
 
   Future<void> updateTrainingAdviceEnabled(bool enabled) async {

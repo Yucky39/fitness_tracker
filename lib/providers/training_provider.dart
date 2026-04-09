@@ -1,3 +1,4 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:riverpod/legacy.dart';
 import 'package:uuid/uuid.dart';
@@ -6,6 +7,7 @@ import '../services/database_service.dart';
 import '../services/health_service.dart';
 import '../services/sync_service.dart';
 import '../services/training_calorie_calculator.dart';
+import 'achievement_provider.dart';
 
 class TrainingState {
   final List<TrainingLog> logs;
@@ -37,9 +39,11 @@ class TrainingState {
 }
 
 class TrainingNotifier extends StateNotifier<TrainingState> {
-  TrainingNotifier() : super(TrainingState()) {
+  TrainingNotifier(this._ref) : super(TrainingState()) {
     _loadLogs();
   }
+
+  final Ref _ref;
 
   Future<void> _loadLogs() async {
     state = state.copyWith(isLoading: true);
@@ -84,6 +88,19 @@ class TrainingNotifier extends StateNotifier<TrainingState> {
     await adapter.insert('training_logs', newLog.toMap());
     SyncService().syncRecord('training_logs', newLog.toMap());
     await _loadLogs();
+    _ref.read(achievementProvider.notifier).onTrainingLogged(state.logs.length);
+  }
+
+  /// ワークアウトセッションで記録した複数のログをまとめて保存
+  Future<void> bulkAddLogs(List<TrainingLog> logs) async {
+    if (logs.isEmpty) return;
+    final adapter = await DatabaseService().database;
+    for (final log in logs) {
+      await adapter.insert('training_logs', log.toMap());
+      SyncService().syncRecord('training_logs', log.toMap());
+    }
+    await _loadLogs();
+    _ref.read(achievementProvider.notifier).onTrainingLogged(state.logs.length);
   }
 
   /// HealthKit / Health Connect から取得済みの TrainingLog をそのまま保存
@@ -238,5 +255,5 @@ class TrainingNotifier extends StateNotifier<TrainingState> {
 
 final trainingProvider =
     StateNotifierProvider<TrainingNotifier, TrainingState>((ref) {
-  return TrainingNotifier();
+  return TrainingNotifier(ref);
 });

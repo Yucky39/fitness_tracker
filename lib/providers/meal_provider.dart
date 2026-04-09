@@ -7,6 +7,7 @@ import '../models/food_item.dart';
 import '../models/micronutrients.dart';
 import '../services/database_service.dart';
 import '../services/sync_service.dart';
+import 'achievement_provider.dart';
 import 'dashboard_provider.dart';
 
 class MealState {
@@ -17,6 +18,8 @@ class MealState {
   final double proteinGoal;
   final double fatGoal;
   final double carbsGoal;
+  final double fiberGoal;
+  final double sodiumGoal;
   final bool isLoading;
 
   /// 食事の追加・更新・削除のたびに増やす。日付変更だけでは増やさない（サマリ再計算のトリガー用）。
@@ -30,6 +33,8 @@ class MealState {
     this.proteinGoal = 150,
     this.fatGoal = 60,
     this.carbsGoal = 200,
+    this.fiberGoal = 25,
+    this.sodiumGoal = 2300,
     this.isLoading = true,
     this.mealDataEpoch = 0,
   }) : selectedDate = selectedDate ?? DateTime.now();
@@ -42,6 +47,8 @@ class MealState {
     double? proteinGoal,
     double? fatGoal,
     double? carbsGoal,
+    double? fiberGoal,
+    double? sodiumGoal,
     bool? isLoading,
     int? mealDataEpoch,
   }) {
@@ -53,6 +60,8 @@ class MealState {
       proteinGoal: proteinGoal ?? this.proteinGoal,
       fatGoal: fatGoal ?? this.fatGoal,
       carbsGoal: carbsGoal ?? this.carbsGoal,
+      fiberGoal: fiberGoal ?? this.fiberGoal,
+      sodiumGoal: sodiumGoal ?? this.sodiumGoal,
       isLoading: isLoading ?? this.isLoading,
       mealDataEpoch: mealDataEpoch ?? this.mealDataEpoch,
     );
@@ -119,6 +128,8 @@ class MealNotifier extends StateNotifier<MealState> {
       proteinGoal: prefs.getDouble('proteinGoal') ?? 150,
       fatGoal: prefs.getDouble('fatGoal') ?? 60,
       carbsGoal: prefs.getDouble('carbsGoal') ?? 200,
+      fiberGoal: prefs.getDouble('fiberGoal') ?? 25,
+      sodiumGoal: prefs.getDouble('sodiumGoal') ?? 2300,
     );
   }
 
@@ -171,18 +182,24 @@ class MealNotifier extends StateNotifier<MealState> {
     required double protein,
     required double fat,
     required double carbs,
+    double? fiber,
+    double? sodium,
   }) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt('calorieGoal', calories);
     await prefs.setDouble('proteinGoal', protein);
     await prefs.setDouble('fatGoal', fat);
     await prefs.setDouble('carbsGoal', carbs);
+    if (fiber != null) await prefs.setDouble('fiberGoal', fiber);
+    if (sodium != null) await prefs.setDouble('sodiumGoal', sodium);
 
     state = state.copyWith(
       calorieGoal: calories,
       proteinGoal: protein,
       fatGoal: fat,
       carbsGoal: carbs,
+      fiberGoal: fiber ?? state.fiberGoal,
+      sodiumGoal: sodium ?? state.sodiumGoal,
     );
     _bumpMealDataEpoch();
   }
@@ -232,6 +249,8 @@ class MealNotifier extends StateNotifier<MealState> {
     await _loadRecentFoods();
     _bumpMealDataEpoch();
     _invalidateDashboard();
+    // バッジ評価
+    _ref.read(achievementProvider.notifier).onNutritionLogged(state.todayItems.length);
   }
 
   Future<void> updateFoodItem(FoodItem updated) async {

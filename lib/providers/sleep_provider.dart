@@ -1,4 +1,8 @@
 import 'package:riverpod/legacy.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:uuid/uuid.dart';
+import '../models/sleep_log.dart';
+import '../services/database_service.dart';
 import '../services/health_service.dart';
 
 /// 昨夜の睡眠データと睡眠評価を保持する状態
@@ -8,12 +12,18 @@ class SleepState {
   final bool isLoading;
   final bool isSupported;
   final bool permissionGranted;
+  /// 過去14日間の睡眠履歴
+  final List<SleepLog> recentLogs;
+  /// 睡眠目標（分）
+  final int goalMinutes;
 
   const SleepState({
     this.sleepMinutes,
     this.isLoading = false,
     this.isSupported = true,
     this.permissionGranted = false,
+    this.recentLogs = const [],
+    this.goalMinutes = 420,
   });
 
   /// 睡眠時間（時間部分）
@@ -43,12 +53,16 @@ class SleepState {
     bool? isLoading,
     bool? isSupported,
     bool? permissionGranted,
+    List<SleepLog>? recentLogs,
+    int? goalMinutes,
   }) =>
       SleepState(
         sleepMinutes: clearSleep ? null : (sleepMinutes ?? this.sleepMinutes),
         isLoading: isLoading ?? this.isLoading,
         isSupported: isSupported ?? this.isSupported,
         permissionGranted: permissionGranted ?? this.permissionGranted,
+        recentLogs: recentLogs ?? this.recentLogs,
+        goalMinutes: goalMinutes ?? this.goalMinutes,
       );
 }
 
@@ -87,12 +101,15 @@ enum SleepQuality {
 
 class SleepNotifier extends StateNotifier<SleepState> {
   SleepNotifier() : super(const SleepState()) {
+    _loadGoal();
     if (!HealthService.isSupported) {
       state = const SleepState(isSupported: false);
     } else {
       _autoFetch();
     }
   }
+
+  static const _uuid = Uuid();
 
   /// 起動時・ダッシュボード表示時：権限を自動リクエストしてデータ取得。
   /// iOS では既に決定済みの場合ダイアログは表示されない。
@@ -134,15 +151,96 @@ class SleepNotifier extends StateNotifier<SleepState> {
     await _fetchSleep(granted: true);
   }
 
+  Future<void> _loadGoal() async {
+    final prefs = await SharedPreferences.getInstance();
+    final goal = prefs.getInt('sleepGoalMinutes') ?? 420;
+    state = state.copyWith(goalMinutes: goal);
+  }
+
+  Future<void> setGoal(int minutes) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('sleepGoalMinutes', minutes);
+    state = state.copyWith(goalMinutes: minutes);
+  }
+
   Future<void> _fetchSleep({required bool granted}) async {
     state = state.copyWith(isLoading: true, permissionGranted: granted);
     final minutes = await HealthService.fetchLastNightSleepMinutes();
+
+    // 取得できた場合は sleep_logs に upsert（日付ベース）
+    if (minutes != null && minutes > 0) {
+      await _persistSleepLog(minutes);
+    }
+
+    // 14日間履歴をロード
+    final recentLogs = await _load14DayLogs();
+
     state = SleepState(
       sleepMinutes: minutes,
       isLoading: false,
       isSupported: state.isSupported,
       permissionGranted: granted,
+      recentLogs: recentLogs,
+      goalMinutes: state.goalMinutes,
     );
+  }
+
+  Future<void> _persistSleepLog(int minutes) async {
+    try {
+      final adapter = await DatabaseService().database;
+      final today = DateTime.now();
+      final dateKey = DateTime(today.year, today.month, today.day)
+          .toIso8601String();
+
+      // 既存レコードを確認（upsert）
+      final existing = await adapter.query(
+        'sleep_logs',
+        where: 'date = ?',
+        whereArgs: [dateKey],
+        limit: 1,
+      );
+
+      if (existing.isEmpty) {
+        await adapter.insert('sleep_logs', {
+          'id': _uuid.v4(),
+          'date': dateKey,
+          'duration_m': minutes,
+          'source': 'health',
+        });
+      } else {
+        await adapter.update(
+          'sleep_logs',
+          {'duration_m': minutes},
+          where: 'date = ?',
+          whereArgs: [dateKey],
+        );
+      }
+    } catch (_) {
+      // 永続化失敗はサイレントに無視
+    }
+  }
+
+  Future<List<SleepLog>> _load14DayLogs() async {
+    try {
+      final adapter = await DatabaseService().database;
+      final since = DateTime.now()
+          .subtract(const Duration(days: 14))
+          .toIso8601String();
+      final maps = await adapter.query(
+        'sleep_logs',
+        where: 'date >= ?',
+        whereArgs: [since],
+        orderBy: 'date ASC',
+      );
+      return maps.map(SleepLog.fromMap).toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  Future<void> load14DayTrend() async {
+    final logs = await _load14DayLogs();
+    state = state.copyWith(recentLogs: logs);
   }
 }
 

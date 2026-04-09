@@ -12,8 +12,11 @@ import '../providers/period_summary_provider.dart';
 import '../providers/progress_provider.dart';
 import '../providers/routine_provider.dart';
 import '../providers/settings_provider.dart';
+import '../providers/achievement_provider.dart';
 import '../providers/sleep_provider.dart';
 import '../providers/steps_provider.dart';
+import '../providers/water_provider.dart';
+import 'sleep_detail_screen.dart';
 import '../models/training_routine.dart';
 import '../providers/training_provider.dart';
 import '../services/health_service.dart';
@@ -38,8 +41,9 @@ class DashboardScreen extends ConsumerWidget {
     final energy = ref.watch(energyProfileProvider);
     final settings = ref.watch(settingsProvider);
     final sleepState = ref.watch(sleepProvider);
-
     final stepsState = ref.watch(stepsProvider);
+    final waterState = ref.watch(waterProvider);
+    final achievementState = ref.watch(achievementProvider);
 
     final intake = dashboardState.todayCalories;
     final goal = mealState.calorieGoal;
@@ -95,10 +99,14 @@ class DashboardScreen extends ConsumerWidget {
                     fatGoal: mealState.fatGoal,
                     carbsGoal: mealState.carbsGoal,
                   ),
+                  if (!achievementState.isLoading)
+                    _buildStreakRow(context, scheme, achievementState),
                   const SizedBox(height: 12),
                   _buildSleepCard(context, scheme, ref, sleepState),
                   const SizedBox(height: 12),
                   _buildStepsCard(context, scheme, ref, stepsState),
+                  const SizedBox(height: 12),
+                  _buildWaterCard(context, scheme, ref, waterState),
                   const SizedBox(height: 12),
                   _buildPeriodSummarySection(context, scheme, ref),
                   const SizedBox(height: 20),
@@ -162,6 +170,82 @@ class DashboardScreen extends ConsumerWidget {
       sum += TrainingNotifier.estimateCalories(log, bodyWeightKg: w);
     }
     return sum;
+  }
+
+  Widget _buildStreakRow(
+    BuildContext context,
+    ColorScheme scheme,
+    AchievementState achievementState,
+  ) {
+    final streaks = achievementState.streaks;
+    if (streaks.nutritionStreak == 0 &&
+        streaks.trainingStreak == 0 &&
+        streaks.overallStreak == 0) {
+      return const SizedBox.shrink();
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 10),
+      child: Row(
+        children: [
+          if (streaks.nutritionStreak > 0)
+            _streakChip(
+              context,
+              scheme,
+              '🍽',
+              streaks.nutritionStreak,
+              '食事',
+            ),
+          if (streaks.trainingStreak > 0)
+            _streakChip(
+              context,
+              scheme,
+              '💪',
+              streaks.trainingStreak,
+              'トレ',
+            ),
+          if (streaks.overallStreak > 0)
+            _streakChip(
+              context,
+              scheme,
+              '🚶',
+              streaks.overallStreak,
+              '歩数',
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _streakChip(BuildContext context, ColorScheme scheme, String emoji,
+      int streak, String label) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+          color: Colors.deepOrange.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+              color: Colors.deepOrange.withValues(alpha: 0.3)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('$emoji 🔥', style: const TextStyle(fontSize: 13)),
+            const SizedBox(width: 4),
+            Text(
+              '$streak日 $label',
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: Colors.deepOrange,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _buildSleepCard(
@@ -292,10 +376,25 @@ class DashboardScreen extends ConsumerWidget {
                 child: const Text('連携'),
               )
             else
-              IconButton(
-                icon: const Icon(Icons.refresh_rounded),
-                tooltip: '睡眠データを更新',
-                onPressed: () => ref.read(sleepProvider.notifier).refresh(),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.refresh_rounded),
+                    tooltip: '睡眠データを更新',
+                    onPressed: () =>
+                        ref.read(sleepProvider.notifier).refresh(),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.chevron_right_rounded),
+                    tooltip: '睡眠の詳細',
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const _SleepDetailWrapper(),
+                      ),
+                    ),
+                  ),
+                ],
               ),
           ],
         ),
@@ -401,6 +500,126 @@ class DashboardScreen extends ConsumerWidget {
       return '${(steps / 1000).toStringAsFixed(1)}k';
     }
     return steps.toString();
+  }
+
+  Widget _buildWaterCard(
+    BuildContext context,
+    ColorScheme scheme,
+    WidgetRef ref,
+    WaterState waterState,
+  ) {
+    final theme = Theme.of(context);
+    final totalMl = waterState.totalMl;
+    final goalMl = waterState.dailyGoalMl;
+    final progress = waterState.progressFraction;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: scheme.tertiaryContainer,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(Icons.water_drop_rounded,
+                      color: scheme.onTertiaryContainer),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('今日の水分',
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          )),
+                      const SizedBox(height: 2),
+                      Text(
+                        '${totalMl}ml ／ ${goalMl}ml',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: progress >= 1.0
+                              ? Colors.green
+                              : theme.colorScheme.onSurface,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (progress >= 1.0)
+                  const Icon(Icons.check_circle_rounded,
+                      color: Colors.green, size: 24),
+              ],
+            ),
+            const SizedBox(height: 10),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: LinearProgressIndicator(
+                value: progress,
+                minHeight: 8,
+                backgroundColor: Colors.blue.withValues(alpha: 0.15),
+                color: Colors.blue,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                for (final ml in [150, 200, 250, 500])
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 2),
+                      child: FilledButton.tonal(
+                        style: FilledButton.styleFrom(
+                          padding: EdgeInsets.zero,
+                          minimumSize: const Size(0, 34),
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        onPressed: () =>
+                            ref.read(waterProvider.notifier).addLog(ml),
+                        child: Text('+${ml}ml',
+                            style: const TextStyle(fontSize: 12)),
+                      ),
+                    ),
+                  ),
+                const SizedBox(width: 4),
+                _WaterCustomInput(onAdd: (ml) =>
+                    ref.read(waterProvider.notifier).addLog(ml)),
+              ],
+            ),
+            if (waterState.todayLogs.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 4,
+                runSpacing: 4,
+                children: waterState.todayLogs.map((log) {
+                  return GestureDetector(
+                    onLongPress: () =>
+                        ref.read(waterProvider.notifier).removeLog(log.id),
+                    child: Chip(
+                      visualDensity: VisualDensity.compact,
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      label: Text('${log.amountMl}ml',
+                          style: const TextStyle(fontSize: 11)),
+                      deleteIcon:
+                          const Icon(Icons.close_rounded, size: 14),
+                      onDeleted: () =>
+                          ref.read(waterProvider.notifier).removeLog(log.id),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _buildHeroHeader(
@@ -1391,6 +1610,71 @@ class DashboardScreen extends ConsumerWidget {
                   ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// SleepDetailScreen への遷移ラッパー（ProviderScope の外でも動作するよう ConsumerWidget を使用）
+class _SleepDetailWrapper extends ConsumerWidget {
+  const _SleepDetailWrapper();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return const SleepDetailScreen();
+  }
+}
+
+class _WaterCustomInput extends StatefulWidget {
+  const _WaterCustomInput({required this.onAdd});
+  final void Function(int ml) onAdd;
+
+  @override
+  State<_WaterCustomInput> createState() => _WaterCustomInputState();
+}
+
+class _WaterCustomInputState extends State<_WaterCustomInput> {
+  final _controller = TextEditingController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final ml = int.tryParse(_controller.text.trim());
+    if (ml != null && ml > 0) {
+      widget.onAdd(ml);
+      _controller.clear();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 72,
+      height: 34,
+      child: TextField(
+        controller: _controller,
+        keyboardType: TextInputType.number,
+        textAlign: TextAlign.center,
+        style: const TextStyle(fontSize: 12),
+        decoration: InputDecoration(
+          hintText: 'ml',
+          hintStyle: const TextStyle(fontSize: 12),
+          contentPadding: EdgeInsets.zero,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+          ),
+          isDense: true,
+          suffixIcon: IconButton(
+            icon: const Icon(Icons.add_rounded, size: 16),
+            padding: EdgeInsets.zero,
+            onPressed: _submit,
+          ),
+        ),
+        onSubmitted: (_) => _submit(),
       ),
     );
   }

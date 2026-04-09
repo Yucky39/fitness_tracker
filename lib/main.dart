@@ -6,10 +6,13 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 
+import 'package:shared_preferences/shared_preferences.dart';
+
 import 'firebase_options.dart';
 import 'providers/auth_provider.dart';
 import 'screens/auth_screen.dart';
 import 'screens/home_screen.dart';
+import 'screens/onboarding_screen.dart';
 import 'screens/splash_screen.dart';
 import 'services/notification_service.dart';
 
@@ -150,13 +153,26 @@ class AuthGate extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final authState = ref.watch(authStateProvider);
+    final onboardingDone = ref.watch(_onboardingProvider);
 
     return authState.when(
       loading: () => const SplashScreen(
         message: 'ログイン状態を確認しています…',
       ),
       error: (_, __) => const AuthScreen(),
-      data: (user) => user != null ? const HomeScreen() : const AuthScreen(),
+      data: (user) {
+        if (user == null) return const AuthScreen();
+        return onboardingDone.when(
+          loading: () => const SplashScreen(),
+          error: (_, __) => const HomeScreen(),
+          data: (done) => done ? const HomeScreen() : const OnboardingScreen(),
+        );
+      },
     );
   }
 }
+
+final _onboardingProvider = FutureProvider<bool>((ref) async {
+  final prefs = await SharedPreferences.getInstance();
+  return prefs.getBool('onboardingComplete') ?? false;
+});

@@ -14,7 +14,7 @@ class SqfliteDatabaseAdapter implements DatabaseAdapter {
 
     _database = await openDatabase(
       path,
-      version: 14,
+      version: 17,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -102,6 +102,35 @@ class SqfliteDatabaseAdapter implements DatabaseAdapter {
       await db.execute(
           "ALTER TABLE training_plans ADD COLUMN equipment TEXT DEFAULT 'fullGym'");
     }
+    if (oldVersion < 15) {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS water_logs(
+          id TEXT PRIMARY KEY,
+          amount_ml INTEGER NOT NULL,
+          date TEXT NOT NULL
+        )
+      ''');
+    }
+    if (oldVersion < 16) {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS sleep_logs(
+          id TEXT PRIMARY KEY,
+          date TEXT NOT NULL,
+          duration_m INTEGER NOT NULL,
+          source TEXT DEFAULT 'health'
+        )
+      ''');
+    }
+    if (oldVersion < 17) {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS achievements(
+          id TEXT PRIMARY KEY,
+          badge_key TEXT NOT NULL UNIQUE,
+          unlocked_at TEXT,
+          progress INTEGER DEFAULT 0
+        )
+      ''');
+    }
   }
 
   Future<void> _onCreate(Database db, int version) async {
@@ -185,6 +214,32 @@ class SqfliteDatabaseAdapter implements DatabaseAdapter {
         plan_days TEXT,
         overview TEXT,
         created_at TEXT
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE water_logs(
+        id TEXT PRIMARY KEY,
+        amount_ml INTEGER NOT NULL,
+        date TEXT NOT NULL
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE sleep_logs(
+        id TEXT PRIMARY KEY,
+        date TEXT NOT NULL,
+        duration_m INTEGER NOT NULL,
+        source TEXT DEFAULT 'health'
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE achievements(
+        id TEXT PRIMARY KEY,
+        badge_key TEXT NOT NULL UNIQUE,
+        unlocked_at TEXT,
+        progress INTEGER DEFAULT 0
       )
     ''');
   }

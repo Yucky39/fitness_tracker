@@ -3,20 +3,26 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../data/exercise_muscle_map.dart';
 import '../models/training_log.dart';
+import '../providers/active_workout_provider.dart';
 import '../providers/energy_profile_provider.dart';
+import '../providers/muscle_heatmap_provider.dart';
+import '../providers/routine_provider.dart';
 import '../providers/settings_provider.dart';
 import '../providers/sleep_provider.dart';
 import '../providers/training_advice_provider.dart';
 import '../providers/training_provider.dart';
 import '../services/health_service.dart';
 import '../services/training_calorie_calculator.dart';
+import '../widgets/muscle_heatmap_painter.dart';
 import '../widgets/training/exercise_weight_chart_sheet.dart';
 import '../widgets/training/training_log_card.dart';
 import '../widgets/training/training_log_dialog.dart';
 import '../widgets/training/training_one_rm_card.dart';
 import '../widgets/training/training_today_summary.dart';
 import '../widgets/training/training_timer_overlay.dart';
+import 'active_workout_screen.dart';
 import 'routine_screen.dart';
 import 'training_plan_screen.dart';
 
@@ -103,6 +109,16 @@ class _TrainingScreenState extends ConsumerState<TrainingScreen> {
     });
   }
 
+  void _startSession(dynamic routine, List<TrainingLog> allLogs) {
+    ref.read(activeWorkoutProvider.notifier).startSession(
+          routine: routine,
+          allLogs: allLogs,
+        );
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const ActiveWorkoutScreen()),
+    );
+  }
+
   void _openTrainingDialog({
     required TrainingNotifier notifier,
     required double bodyWeightKg,
@@ -125,9 +141,16 @@ class _TrainingScreenState extends ConsumerState<TrainingScreen> {
     final bodyWeightKg = ref.watch(energyProfileProvider).weightKg;
     final settings = ref.watch(settingsProvider);
     final sleepState = ref.watch(sleepProvider);
+    final routineState = ref.watch(routineProvider);
     final effectiveBw = bodyWeightKg > 0
         ? bodyWeightKg
         : TrainingCalorieCalculator.defaultBodyWeightKg;
+
+    // 今日のルーティンでメモに種目が書かれているものを探す
+    final todaysRoutines = routineState.routines
+        .where((r) => r.weekdays.contains(DateTime.now().weekday))
+        .where((r) => r.note.trim().isNotEmpty)
+        .toList();
 
     Widget bodyChild;
     if (trainingState.isLoading) {
@@ -161,6 +184,11 @@ class _TrainingScreenState extends ConsumerState<TrainingScreen> {
       appBar: AppBar(
         title: const Text('トレーニング記録'),
         actions: [
+          if (todaysRoutines.isNotEmpty)
+            FilledButton.tonal(
+              onPressed: () => _startSession(todaysRoutines.first, trainingState.logs),
+              child: const Text('セッション開始'),
+            ),
           if (HealthService.isSupported)
             IconButton(
               icon: const Icon(Icons.sync),
@@ -221,6 +249,7 @@ class _TrainingScreenState extends ConsumerState<TrainingScreen> {
   ) {
     final todayLogs = state.todayLogs;
     final adviceState = ref.watch(trainingAdviceProvider);
+    final heatmap = ref.watch(muscleHeatmapProvider);
 
     return CustomScrollView(
       slivers: [
@@ -231,6 +260,9 @@ class _TrainingScreenState extends ConsumerState<TrainingScreen> {
               bodyWeightKg: bodyWeightKg,
             ),
           ),
+        SliverToBoxAdapter(
+          child: _MuscleHeatmapCard(heatmap: heatmap),
+        ),
         SliverToBoxAdapter(
           child: TrainingOneRmCard(
             logs: state.logs,
@@ -306,6 +338,55 @@ class _TrainingScreenState extends ConsumerState<TrainingScreen> {
         ),
         const SliverToBoxAdapter(child: SizedBox(height: 80)),
       ],
+    );
+  }
+}
+
+/// 折りたたみ可能な筋肉部位ヒートマップカード
+class _MuscleHeatmapCard extends StatefulWidget {
+  const _MuscleHeatmapCard({required this.heatmap});
+  final Map<MuscleGroup, double> heatmap;
+
+  @override
+  State<_MuscleHeatmapCard> createState() => _MuscleHeatmapCardState();
+}
+
+class _MuscleHeatmapCardState extends State<_MuscleHeatmapCard> {
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      child: Column(
+        children: [
+          InkWell(
+            onTap: () => setState(() => _expanded = !_expanded),
+            borderRadius: BorderRadius.circular(12),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: Row(
+                children: [
+                  const Icon(Icons.accessibility_new, size: 20),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: Text(
+                      '筋肉部位ヒートマップ（過去7日間）',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  Icon(_expanded ? Icons.expand_less : Icons.expand_more),
+                ],
+              ),
+            ),
+          ),
+          if (_expanded)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              child: MuscleHeatmapWidget(heatmap: widget.heatmap),
+            ),
+        ],
+      ),
     );
   }
 }

@@ -5,6 +5,8 @@ import '../models/energy_profile.dart';
 import '../providers/energy_profile_provider.dart';
 import '../providers/meal_provider.dart';
 import '../providers/settings_provider.dart';
+import '../providers/water_provider.dart';
+import 'achievements_screen.dart';
 import '../services/auth_service.dart';
 import '../services/energy_goal_calculator.dart';
 import '../services/export_service.dart';
@@ -43,6 +45,7 @@ class ProfileSidebar extends ConsumerWidget {
   void _showCalorieGoalDialog(BuildContext context, WidgetRef ref) {
     final ep = ref.read(energyProfileProvider);
     final mealState = ref.read(mealProvider);
+    final waterState = ref.read(waterProvider);
     var dialogSex = ep.sex;
     var dialogActivity = ep.activityLevel;
     ComputedNutritionGoals? lastComputed;
@@ -55,6 +58,8 @@ class ProfileSidebar extends ConsumerWidget {
         TextEditingController(text: mealState.fatGoal.toString());
     final carbsController =
         TextEditingController(text: mealState.carbsGoal.toString());
+    final waterGoalController =
+        TextEditingController(text: waterState.dailyGoalMl.toString());
     final ageController =
         TextEditingController(text: ep.age > 0 ? ep.age.toString() : '');
     final heightController = TextEditingController(
@@ -332,6 +337,15 @@ class ProfileSidebar extends ConsumerWidget {
                         labelText: '目標炭水化物 (g)'),
                     keyboardType: TextInputType.number,
                   ),
+                  const SizedBox(height: 8),
+                  const Divider(),
+                  TextField(
+                    controller: waterGoalController,
+                    decoration: const InputDecoration(
+                        labelText: '目標水分摂取量 (ml)',
+                        hintText: '例: 2000'),
+                    keyboardType: TextInputType.number,
+                  ),
                 ],
               ),
             ),
@@ -370,6 +384,9 @@ class ProfileSidebar extends ConsumerWidget {
                         carbs:
                             double.tryParse(carbsController.text) ?? 200,
                       );
+                  final waterGoal =
+                      int.tryParse(waterGoalController.text) ?? 2000;
+                  ref.read(waterProvider.notifier).setGoal(waterGoal);
                   Navigator.pop(context);
                 },
                 child: const Text('保存'),
@@ -385,6 +402,7 @@ class ProfileSidebar extends ConsumerWidget {
 
   void _showAISettingsDialog(BuildContext context, WidgetRef ref) {
     final initialSettings = ref.read(settingsProvider);
+    final settingsNotifier = ref.read(settingsProvider.notifier);
     final anthropicKeyCtrl =
         TextEditingController(text: initialSettings.anthropicApiKey);
     final openAiKeyCtrl =
@@ -396,10 +414,12 @@ class ProfileSidebar extends ConsumerWidget {
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) {
-          String currentLevel = ref.read(settingsProvider).adviceLevel;
+          String currentLevel = settingsNotifier.currentSettings.adviceLevel;
           AiProviderType currentProvider =
-              ref.read(settingsProvider).selectedProvider;
-          String currentModel = ref.read(settingsProvider).currentModel;
+              settingsNotifier.currentSettings.selectedProvider;
+          String currentModel = settingsNotifier.currentSettings
+              .resolvedModelForProvider(
+                  settingsNotifier.currentSettings.selectedProvider);
 
           Widget apiKeyField(
               AiProviderType provider, TextEditingController ctrl) {
@@ -419,9 +439,8 @@ class ProfileSidebar extends ConsumerWidget {
                         setFieldState(() => obscure = !obscure),
                   ),
                 ),
-                onChanged: (v) => ref
-                    .read(settingsProvider.notifier)
-                    .updateApiKey(provider, v),
+                onChanged: (v) =>
+                    settingsNotifier.updateApiKey(provider, v),
               ),
             );
           }
@@ -440,7 +459,7 @@ class ProfileSidebar extends ConsumerWidget {
                       style: TextStyle(fontSize: 13)),
                   const SizedBox(height: 8),
                   DropdownButtonFormField<AiProviderType>(
-                    value: currentProvider,
+                    initialValue: currentProvider,
                     decoration: const InputDecoration(
                       border: OutlineInputBorder(),
                       contentPadding: EdgeInsets.symmetric(
@@ -454,13 +473,11 @@ class ProfileSidebar extends ConsumerWidget {
                     }).toList(),
                     onChanged: (p) {
                       if (p == null) return;
-                      ref
-                          .read(settingsProvider.notifier)
-                          .updateSelectedProvider(p);
+                      settingsNotifier.updateSelectedProvider(p);
                       setDialogState(() {
                         currentProvider = p;
-                        currentModel =
-                            ref.read(settingsProvider).currentModel;
+                        currentModel = settingsNotifier.currentSettings
+                            .resolvedModelForProvider(p);
                       });
                     },
                   ),
@@ -469,7 +486,9 @@ class ProfileSidebar extends ConsumerWidget {
                       style: TextStyle(fontSize: 13)),
                   const SizedBox(height: 8),
                   DropdownButtonFormField<String>(
-                    value: currentModel,
+                    key: ValueKey<String>(
+                        'ai_model_${currentProvider.name}'),
+                    initialValue: currentModel,
                     decoration: const InputDecoration(
                       border: OutlineInputBorder(),
                       contentPadding: EdgeInsets.symmetric(
@@ -484,9 +503,7 @@ class ProfileSidebar extends ConsumerWidget {
                     }).toList(),
                     onChanged: (m) {
                       if (m == null) return;
-                      ref
-                          .read(settingsProvider.notifier)
-                          .updateModel(currentProvider, m);
+                      settingsNotifier.updateModel(currentProvider, m);
                       setDialogState(() => currentModel = m);
                     },
                   ),
@@ -505,9 +522,7 @@ class ProfileSidebar extends ConsumerWidget {
                     ],
                     selected: {currentLevel},
                     onSelectionChanged: (selection) {
-                      ref
-                          .read(settingsProvider.notifier)
-                          .updateAdviceLevel(selection.first);
+                      settingsNotifier.updateAdviceLevel(selection.first);
                       setDialogState(
                           () => currentLevel = selection.first);
                     },
@@ -541,13 +556,10 @@ class ProfileSidebar extends ConsumerWidget {
                   Row(
                     children: [
                       Switch(
-                        value: ref
-                            .read(settingsProvider)
-                            .trainingAdviceEnabled,
+                        value: settingsNotifier
+                            .currentSettings.trainingAdviceEnabled,
                         onChanged: (v) {
-                          ref
-                              .read(settingsProvider.notifier)
-                              .updateTrainingAdviceEnabled(v);
+                          settingsNotifier.updateTrainingAdviceEnabled(v);
                           setDialogState(() {});
                         },
                       ),
@@ -568,12 +580,10 @@ class ProfileSidebar extends ConsumerWidget {
                   Row(
                     children: [
                       Switch(
-                        value: ref
-                            .read(settingsProvider)
-                            .communityFoodContributeEnabled,
+                        value: settingsNotifier
+                            .currentSettings.communityFoodContributeEnabled,
                         onChanged: (v) {
-                          ref
-                              .read(settingsProvider.notifier)
+                          settingsNotifier
                               .updateCommunityFoodContributeEnabled(v);
                           setDialogState(() {});
                         },
@@ -878,6 +888,21 @@ class ProfileSidebar extends ConsumerWidget {
             const Spacer(),
             const Divider(height: 1),
 
+            // ── バッジ・実績 ──
+            ListTile(
+              leading: const Icon(Icons.emoji_events_rounded),
+              title: const Text('バッジ・実績'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const _AchievementsWrapper(),
+                  ),
+                );
+              },
+            ),
+            const Divider(height: 1),
+
             // ── ログアウト ──
             ListTile(
               leading: const Icon(Icons.logout),
@@ -892,5 +917,14 @@ class ProfileSidebar extends ConsumerWidget {
         ),
       ),
     );
+  }
+}
+
+class _AchievementsWrapper extends ConsumerWidget {
+  const _AchievementsWrapper();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return const AchievementsScreen();
   }
 }

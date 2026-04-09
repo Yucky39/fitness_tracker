@@ -29,11 +29,15 @@ class NutritionAdviceService {
     required double proteinGoal,
     required double fatGoal,
     required double carbsGoal,
+    double fiberGoal = 25,
+    double sodiumGoal = 2300,
   }) {
     final totalCal = items.fold(0, (s, i) => s + i.calories);
     final totalP = items.fold(0.0, (s, i) => s + i.protein);
     final totalF = items.fold(0.0, (s, i) => s + i.fat);
     final totalC = items.fold(0.0, (s, i) => s + i.carbs);
+    final totalFiber = items.fold(0.0, (s, i) => s + i.fiber);
+    final totalSodium = items.fold(0.0, (s, i) => s + i.sodium);
     final calDiff = totalCal - calorieGoal;
     final calStatus = calDiff >= 0 ? '+$calDiff kcal オーバー' : '${calDiff.abs()} kcal 不足';
 
@@ -42,6 +46,13 @@ class NutritionAdviceService {
         : items
             .map((i) => '・${i.name}: ${i.calories}kcal (P:${i.protein}g, F:${i.fat}g, C:${i.carbs}g)')
             .join('\n');
+
+    final fiberLine = totalFiber > 0
+        ? '- 食物繊維: ${totalFiber.toStringAsFixed(1)}g ／ 目標 ${fiberGoal.toStringAsFixed(0)}g\n'
+        : '';
+    final sodiumLine = totalSodium > 0
+        ? '- ナトリウム: ${totalSodium.toInt()}mg ／ 目標 ${sodiumGoal.toInt()}mg以下\n'
+        : '';
 
     return '''
 【${date.year}/${date.month}/${date.day} の食事記録】
@@ -54,7 +65,7 @@ $foodLines
 - タンパク質: ${totalP.toStringAsFixed(1)}g ／ 目標 ${proteinGoal}g
 - 脂質: ${totalF.toStringAsFixed(1)}g ／ 目標 ${fatGoal}g
 - 炭水化物: ${totalC.toStringAsFixed(1)}g ／ 目標 ${carbsGoal}g
-
+$fiberLine$sodiumLine
 上記の食事内容を分析し、栄養バランスのアドバイスをお願いします。
 残りの食事で補うべき栄養素についても教えてください。
 3〜5点の箇条書きでまとめてください。
@@ -70,6 +81,8 @@ $foodLines
     required double proteinGoal,
     required double fatGoal,
     required double carbsGoal,
+    double fiberGoal = 25,
+    double sodiumGoal = 2300,
     required String adviceLevel,
     required String apiKey,
     required AiProviderType provider,
@@ -83,6 +96,8 @@ $foodLines
       proteinGoal: proteinGoal,
       fatGoal: fatGoal,
       carbsGoal: carbsGoal,
+      fiberGoal: fiberGoal,
+      sodiumGoal: sodiumGoal,
     );
     final resolvedModel = model ?? provider.defaultModel;
     switch (provider) {

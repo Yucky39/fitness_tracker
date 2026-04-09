@@ -303,21 +303,31 @@ class MealScreen extends ConsumerWidget {
               goal: state.carbsGoal,
               color: Colors.purple,
             ),
-            // Micronutrient summary (shown only when data exists)
-            if (state.totalSugar > 0 || state.totalFiber > 0 || state.totalSodium > 0) ...[
+            // 食物繊維・ナトリウム（目標付きバー表示）
+            const SizedBox(height: 8),
+            NutrientBar(
+              label: '食物繊維',
+              current: state.totalFiber,
+              goal: state.fiberGoal,
+              color: Colors.green,
+            ),
+            const SizedBox(height: 8),
+            NutrientBar(
+              label: 'ナトリウム (Na)',
+              current: state.totalSodium,
+              goal: state.sodiumGoal,
+              color: Colors.blueGrey,
+              unit: 'mg',
+            ),
+            // Micronutrient summary (shown only when sugar data exists)
+            if (state.totalSugar > 0) ...[
               const SizedBox(height: 12),
               const Divider(height: 1),
               const SizedBox(height: 8),
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                mainAxisAlignment: MainAxisAlignment.start,
                 children: [
-                  if (state.totalSugar > 0)
-                    _microNutrientChip('糖質', '${state.totalSugar.toStringAsFixed(1)}g', Colors.amber),
-                  if (state.totalFiber > 0)
-                    _microNutrientChip('食物繊維', '${state.totalFiber.toStringAsFixed(1)}g', Colors.green),
-                  if (state.totalSodium > 0)
-                    _microNutrientChip(
-                        'Na', '${state.totalSodium.toInt()}mg', Colors.blueGrey),
+                  _microNutrientChip('糖質', '${state.totalSugar.toStringAsFixed(1)}g', Colors.amber),
                 ],
               ),
             ],
@@ -572,6 +582,8 @@ class MealScreen extends ConsumerWidget {
                           proteinGoal: mealState.proteinGoal,
                           fatGoal: mealState.fatGoal,
                           carbsGoal: mealState.carbsGoal,
+                          fiberGoal: mealState.fiberGoal,
+                          sodiumGoal: mealState.sodiumGoal,
                           adviceLevel: settings.adviceLevel,
                           apiKey: settings.currentApiKey,
                           provider: settings.selectedProvider,

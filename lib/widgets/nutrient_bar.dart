@@ -5,6 +5,7 @@ class NutrientBar extends StatelessWidget {
   final double current;
   final double goal;
   final Color color;
+  final String unit;
 
   const NutrientBar({
     super.key,
@@ -12,6 +13,7 @@ class NutrientBar extends StatelessWidget {
     required this.current,
     required this.goal,
     required this.color,
+    this.unit = 'g',
   });
 
   @override
@@ -20,8 +22,8 @@ class NutrientBar extends StatelessWidget {
     final double progress = goal > 0 ? (current / goal).clamp(0.0, 1.0) : 0.0;
     final Color displayColor = isOver ? Colors.red : color;
     final String valueText = isOver
-        ? '${current.toStringAsFixed(1)} / ${goal.toStringAsFixed(1)} g  (+${(current - goal).toStringAsFixed(1)}超)'
-        : '${current.toStringAsFixed(1)} / ${goal.toStringAsFixed(1)} g';
+        ? '${current.toStringAsFixed(1)} / ${goal.toStringAsFixed(1)} $unit  (+${(current - goal).toStringAsFixed(1)}超)'
+        : '${current.toStringAsFixed(1)} / ${goal.toStringAsFixed(1)} $unit';
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
