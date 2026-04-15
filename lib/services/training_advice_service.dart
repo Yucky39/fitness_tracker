@@ -177,6 +177,139 @@ class TrainingAdviceService {
     return buffer.toString();
   }
 
+  // ── Daily advice ───────────────────────────────────────────────────────────
+
+  static String _dailySystemPrompt(String level) {
+    const base = 'あなたは経験豊富なパーソナルトレーナーです。'
+        '提示された1日のトレーニングセッション全体を総合的に評価し、日本語で具体的なアドバイスを提供してください。'
+        '種目の組み合わせ・順序・ボリューム・強度バランス（有酸素と筋トレの配分）・総消費カロリーに触れてください。'
+        '直近の週間負荷と照らして過負荷・回復不足・オーバートレーニングの兆候があれば指摘し、次のセッションへの具体的な提案を示してください。'
+        '睡眠・栄養・水分補給の一般的な留意点も簡潔に含めてください。'
+        '回答は箇条書き中心で、3〜6点にまとめてください。';
+    final modifiers = {
+      'strict': '弱点や非効率な点を遠慮なく指摘し、改善のための具体的な数値目標を提示してください。',
+      'normal': '良い点と改善点をバランスよく取り上げ、実践しやすい次のステップを提案してください。',
+      'gentle': 'ポジティブに励ましつつ、改善点は短く優しく伝えてください。',
+    };
+    return '$base${modifiers[level] ?? modifiers['normal']!}';
+  }
+
+  static String _buildDailyUserMessage({
+    required List<TrainingLog> dayLogs,
+    required DateTime date,
+    required double bodyWeightKg,
+    String? sleepContext,
+    String? weeklyLoadContext,
+  }) {
+    final buffer = StringBuffer();
+    final dateLabel = DateFormat('yyyy/M/d').format(date.toLocal());
+    buffer.writeln('【$dateLabel のトレーニングセッション全体】');
+    buffer.writeln();
+
+    if (dayLogs.isEmpty) {
+      buffer.writeln('この日のトレーニング記録はありません。');
+    } else {
+      final strengthLogs = dayLogs.where((l) => l.exerciseType != ExerciseType.cardio).toList();
+      final cardioLogs = dayLogs.where((l) => l.exerciseType == ExerciseType.cardio).toList();
+      final exerciseNames = dayLogs.map((l) => l.exerciseName).toSet();
+
+      buffer.writeln('■ 実施種目一覧:');
+      for (final log in dayLogs) {
+        if (log.exerciseType == ExerciseType.cardio) {
+          final pace = log.paceMinPerKm;
+          final paceStr = pace != null
+              ? '  ペース: ${pace.floor()}:${((pace - pace.floor()) * 60).round().toString().padLeft(2, '0')}/km'
+              : '';
+          buffer.writeln(
+            '・${log.exerciseName}（有酸素）: ${log.distanceKm.toStringAsFixed(2)} km / ${log.durationMinutes} 分$paceStr'
+            '${log.rpe != null ? " RPE${log.rpe}" : ""}',
+          );
+        } else {
+          final oneRm = log.reps > 0 ? log.weight * (1 + log.reps / 30) : log.weight;
+          buffer.writeln(
+            '・${log.exerciseName}（${log.exerciseType.label}）: '
+            '${log.weight} kg × ${log.reps} 回 × ${log.sets} セット'
+            '（推定1RM: ${oneRm.toStringAsFixed(1)} kg）'
+            '${log.rpe != null ? " RPE${log.rpe}" : ""}',
+          );
+        }
+      }
+
+      buffer.writeln();
+      buffer.writeln('■ セッションサマリー:');
+      buffer.writeln('  種目数: ${exerciseNames.length} 種目');
+
+      if (strengthLogs.isNotEmpty) {
+        final totalSets = strengthLogs.fold(0, (s, l) => s + l.sets);
+        final totalVolume = strengthLogs.fold(0.0, (s, l) => s + l.totalVolume);
+        buffer.writeln('  筋トレ: $totalSets セット合計 / 総ボリューム ${totalVolume.round()} kg');
+      }
+      if (cardioLogs.isNotEmpty) {
+        final totalDist = cardioLogs.fold(0.0, (s, l) => s + l.distanceKm);
+        final totalMin = cardioLogs.fold(0, (s, l) => s + l.durationMinutes);
+        buffer.writeln('  有酸素: ${totalDist.toStringAsFixed(1)} km / ${totalMin} 分');
+      }
+
+      final rpes = dayLogs.where((l) => l.rpe != null).map((l) => l.rpe!).toList();
+      if (rpes.isNotEmpty) {
+        final avgRpe = rpes.fold(0, (s, v) => s + v) / rpes.length;
+        buffer.writeln('  平均RPE: ${avgRpe.toStringAsFixed(1)}（記録あり ${rpes.length}/${dayLogs.length} 件）');
+      }
+    }
+
+    buffer.writeln();
+
+    if (weeklyLoadContext != null && weeklyLoadContext.isNotEmpty) {
+      buffer.writeln(weeklyLoadContext);
+      buffer.writeln();
+    }
+
+    if (sleepContext != null) {
+      buffer.writeln('【コンディション情報】');
+      buffer.writeln(sleepContext);
+      buffer.writeln();
+    }
+
+    buffer.writeln('このセッション全体を総合評価し、改善点と次回セッションへのアドバイスを箇条書きで提供してください。');
+    return buffer.toString();
+  }
+
+  Future<String> getDailyAdvice({
+    required List<TrainingLog> dayLogs,
+    required List<TrainingLog> allLogs,
+    required DateTime date,
+    required double bodyWeightKg,
+    required String adviceLevel,
+    required String apiKey,
+    required AiProviderType provider,
+    String? model,
+    String? sleepContext,
+  }) {
+    if (dayLogs.isEmpty) {
+      throw Exception('この日のトレーニング記録がありません。');
+    }
+    final systemPrompt = _dailySystemPrompt(adviceLevel);
+    final weeklyContext = buildWeeklyLoadContext(allLogs, date);
+    final userMessage = _buildDailyUserMessage(
+      dayLogs: dayLogs,
+      date: date,
+      bodyWeightKg: bodyWeightKg,
+      sleepContext: sleepContext,
+      weeklyLoadContext: weeklyContext,
+    );
+    final resolvedModel = model ?? provider.defaultModel;
+    switch (provider) {
+      case AiProviderType.anthropic:
+        return _callAnthropic(systemPrompt, userMessage, apiKey, resolvedModel);
+      case AiProviderType.openai:
+        return _callOpenAi(systemPrompt, userMessage, apiKey, resolvedModel);
+      case AiProviderType.gemini:
+        return _callGemini(systemPrompt, userMessage, apiKey, resolvedModel);
+    }
+  }
+
+  // ── Per-log advice ──────────────────────────────────────────────────────────
+
   Future<String> getAdvice({
     required List<TrainingLog> focusLogs,
     required Map<String, List<TrainingLog>> historyByExercise,
