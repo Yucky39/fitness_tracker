@@ -3,16 +3,32 @@ import 'package:flutter/material.dart';
 import '../../models/training_log.dart';
 import '../../services/training_calorie_calculator.dart';
 
-/// 「今日のセッション」サマリーカード
+/// 選択日のトレーニングセッションサマリーカード
 class TrainingTodaySummary extends StatelessWidget {
   final List<TrainingLog> todayLogs;
   final double bodyWeightKg;
+  /// 表示中の日付（null の場合は今日として扱う）
+  final DateTime? date;
 
   const TrainingTodaySummary({
     super.key,
     required this.todayLogs,
     required this.bodyWeightKg,
+    this.date,
   });
+
+  String _sessionLabel() {
+    final d = date ?? DateTime.now();
+    final now = DateTime.now();
+    if (d.year == now.year && d.month == now.month && d.day == now.day) {
+      return '今日のセッション';
+    }
+    final yesterday = DateTime(now.year, now.month, now.day - 1);
+    if (d.year == yesterday.year && d.month == yesterday.month && d.day == yesterday.day) {
+      return '昨日のセッション';
+    }
+    return '${d.month}/${d.day} のセッション';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -44,9 +60,9 @@ class TrainingTodaySummary extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            '今日のセッション',
-            style: TextStyle(
+          Text(
+            _sessionLabel(),
+            style: const TextStyle(
                 color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
           ),
           const SizedBox(height: 10),

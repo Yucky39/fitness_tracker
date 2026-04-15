@@ -12,20 +12,33 @@ import 'achievement_provider.dart';
 class TrainingState {
   final List<TrainingLog> logs;
   final bool isLoading;
+  final DateTime selectedDate;
 
   TrainingState({
     this.logs = const [],
     this.isLoading = true,
-  });
+    DateTime? selectedDate,
+  }) : selectedDate = selectedDate ?? DateTime.now();
 
   TrainingState copyWith({
     List<TrainingLog>? logs,
     bool? isLoading,
+    DateTime? selectedDate,
   }) {
     return TrainingState(
       logs: logs ?? this.logs,
       isLoading: isLoading ?? this.isLoading,
+      selectedDate: selectedDate ?? this.selectedDate,
     );
+  }
+
+  /// 選択中の日付のログ
+  List<TrainingLog> get selectedDateLogs {
+    final d = selectedDate;
+    return logs.where((l) {
+      final ld = l.date.toLocal();
+      return ld.year == d.year && ld.month == d.month && ld.day == d.day;
+    }).toList();
   }
 
   /// 今日のログ（端末ローカルの暦日。UTC のまま保存された記録も toLocal() で揃える）
@@ -58,6 +71,11 @@ class TrainingNotifier extends StateNotifier<TrainingState> {
     );
   }
 
+  /// 表示する日付を変更する
+  void changeDate(DateTime date) {
+    state = state.copyWith(selectedDate: date);
+  }
+
   Future<void> addLog({
     required String exerciseName,
     required ExerciseType exerciseType,
@@ -71,6 +89,8 @@ class TrainingNotifier extends StateNotifier<TrainingState> {
     required String note,
   }) async {
     final adapter = await DatabaseService().database;
+    final now = DateTime.now();
+    final selectedDate = state.selectedDate;
     final newLog = TrainingLog(
       id: const Uuid().v4(),
       exerciseName: exerciseName,
@@ -83,7 +103,14 @@ class TrainingNotifier extends StateNotifier<TrainingState> {
       durationMinutes: durationMinutes,
       rpe: rpe,
       note: note,
-      date: DateTime.now(),
+      date: DateTime(
+        selectedDate.year,
+        selectedDate.month,
+        selectedDate.day,
+        now.hour,
+        now.minute,
+        now.second,
+      ),
     );
     await adapter.insert('training_logs', newLog.toMap());
     SyncService().syncRecord('training_logs', newLog.toMap());
