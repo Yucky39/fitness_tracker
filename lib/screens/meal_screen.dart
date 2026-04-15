@@ -14,9 +14,11 @@ import '../models/food_item.dart';
 import '../models/meal_preset.dart';
 import '../providers/advice_provider.dart';
 import '../providers/meal_provider.dart';
+import '../providers/meal_suggestion_provider.dart';
 import '../providers/nutrition_trend_provider.dart';
 import '../providers/preset_provider.dart';
 import '../providers/settings_provider.dart';
+import 'meal_suggestion_screen.dart';
 import '../services/auth_service.dart';
 import '../services/barcode_lookup_service.dart';
 import '../services/community_food_service.dart';
@@ -160,6 +162,8 @@ class MealScreen extends ConsumerWidget {
                   _buildTrendCard(context, ref, mealState),
                   const SizedBox(height: 8),
                   _buildAdviceCard(context, ref, mealState),
+                  const SizedBox(height: 8),
+                  _buildMealSuggestionCard(context, ref),
                   const SizedBox(height: 8),
                   _buildFoodList(context, ref, mealState, mealNotifier),
                   const SizedBox(height: 80),
@@ -534,6 +538,73 @@ class MealScreen extends ConsumerWidget {
         const SizedBox(height: 2),
         Text(value, style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: color)),
       ],
+    );
+  }
+
+  // ── Meal Suggestion card ──────────────────────────────────────────────────
+
+  Widget _buildMealSuggestionCard(BuildContext context, WidgetRef ref) {
+    final settings = ref.watch(settingsProvider);
+    if (!settings.mealSuggestionEnabled) return const SizedBox.shrink();
+
+    final suggestionState = ref.watch(mealSuggestionProvider);
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const MealSuggestionScreen()),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: cs.primaryContainer,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  Icons.restaurant_menu,
+                  color: cs.onPrimaryContainer,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '今日の食事メニュー提案',
+                      style: theme.textTheme.titleSmall
+                          ?.copyWith(fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      suggestionState.suggestion != null
+                          ? 'PFC目標に合わせたメニューを提案中 →'
+                          : 'カロリー・PFC目標に合ったメニューをAIが提案',
+                      style: theme.textTheme.bodySmall
+                          ?.copyWith(color: cs.onSurfaceVariant),
+                    ),
+                    if (suggestionState.isLoading) ...[
+                      const SizedBox(height: 6),
+                      const LinearProgressIndicator(),
+                    ],
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_right, color: cs.onSurfaceVariant),
+            ],
+          ),
+        ),
+      ),
     );
   }
 

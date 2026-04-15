@@ -133,6 +133,7 @@ class SettingsState {
   final int workoutReminderMinute;
   final bool trainingAdviceEnabled;
   final bool communityFoodContributeEnabled;
+  final bool mealSuggestionEnabled;
 
   const SettingsState({
     this.adviceLevel = 'normal',
@@ -151,6 +152,7 @@ class SettingsState {
     this.workoutReminderMinute = 0,
     this.trainingAdviceEnabled = true,
     this.communityFoodContributeEnabled = true,
+    this.mealSuggestionEnabled = false,
   });
 
   String get currentApiKey {
@@ -222,6 +224,7 @@ class SettingsState {
     int? workoutReminderMinute,
     bool? trainingAdviceEnabled,
     bool? communityFoodContributeEnabled,
+    bool? mealSuggestionEnabled,
   }) =>
       SettingsState(
         adviceLevel: adviceLevel ?? this.adviceLevel,
@@ -245,6 +248,8 @@ class SettingsState {
             trainingAdviceEnabled ?? this.trainingAdviceEnabled,
         communityFoodContributeEnabled:
             communityFoodContributeEnabled ?? this.communityFoodContributeEnabled,
+        mealSuggestionEnabled:
+            mealSuggestionEnabled ?? this.mealSuggestionEnabled,
       );
 }
 
@@ -308,6 +313,8 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
       trainingAdviceEnabled: prefs.getBool('trainingAdviceEnabled') ?? true,
       communityFoodContributeEnabled:
           prefs.getBool('communityFoodContributeEnabled') ?? true,
+      mealSuggestionEnabled:
+          prefs.getBool('mealSuggestionEnabled') ?? false,
     );
   }
 
@@ -353,6 +360,12 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('communityFoodContributeEnabled', enabled);
     state = state.copyWith(communityFoodContributeEnabled: enabled);
+  }
+
+  Future<void> updateMealSuggestionEnabled(bool enabled) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('mealSuggestionEnabled', enabled);
+    state = state.copyWith(mealSuggestionEnabled: enabled);
   }
 
   Future<void> updateNotificationSettings({

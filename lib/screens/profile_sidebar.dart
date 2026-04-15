@@ -574,6 +574,36 @@ class ProfileSidebar extends ConsumerWidget {
                   const SizedBox(height: 8),
                   const Divider(),
                   const SizedBox(height: 8),
+                  const Text('食事メニュー提案',
+                      style: TextStyle(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Switch(
+                        value: settingsNotifier
+                            .currentSettings.mealSuggestionEnabled,
+                        onChanged: (v) {
+                          settingsNotifier.updateMealSuggestionEnabled(v);
+                          setDialogState(() {});
+                        },
+                      ),
+                      const Expanded(
+                        child: Text(
+                          'カロリー・PFC目標に合った食事メニューを提案する',
+                          style: TextStyle(fontSize: 13),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'オンにすると食事管理画面に「今日の食事メニュー提案」カードが表示されます。'
+                    'サプリ・プロテインの記録も考慮して献立を提案します。',
+                    style: TextStyle(fontSize: 11, color: Colors.grey),
+                  ),
+                  const SizedBox(height: 8),
+                  const Divider(),
+                  const SizedBox(height: 8),
                   const Text('コミュニティ食品DB',
                       style: TextStyle(fontWeight: FontWeight.bold)),
                   const SizedBox(height: 4),
