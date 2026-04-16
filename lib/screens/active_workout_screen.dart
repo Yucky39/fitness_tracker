@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../providers/active_workout_provider.dart';
 import '../providers/training_provider.dart';
+import '../widgets/training/exercise_motion_demo_sheet.dart';
 
 class ActiveWorkoutScreen extends ConsumerStatefulWidget {
   const ActiveWorkoutScreen({super.key});
@@ -223,12 +224,31 @@ class _ActiveWorkoutScreenState extends ConsumerState<ActiveWorkoutScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // エクササイズ名
-                    Text(
-                      exercise.name,
-                      style:
-                          Theme.of(context).textTheme.headlineMedium?.copyWith(
-                                fontWeight: FontWeight.bold,
-                              ),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            exercise.name,
+                            style: Theme.of(context)
+                                .textTheme
+                                .headlineMedium
+                                ?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                          ),
+                        ),
+                        IconButton(
+                          icon:
+                              const Icon(Icons.play_circle_outline_rounded),
+                          tooltip: '動きを見る',
+                          onPressed: () => showExerciseMotionDemoSheet(
+                            context,
+                            exerciseName: exercise.name,
+                            exerciseType: exercise.exerciseType,
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 4),
                     Text(

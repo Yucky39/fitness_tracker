@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/training_plan.dart';
 import '../providers/training_plan_provider.dart';
+import '../widgets/training/exercise_motion_demo_sheet.dart';
 
 class TrainingPlanScreen extends ConsumerStatefulWidget {
   const TrainingPlanScreen({super.key});
@@ -1179,6 +1180,15 @@ class _ExerciseRow extends ConsumerWidget {
                       ),
                       child: Text(exercise.type.label,
                           style: const TextStyle(fontSize: 11)),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.play_circle_outline_rounded),
+                      tooltip: '動きを見る',
+                      onPressed: () => showExerciseMotionDemoSheet(
+                        context,
+                        exerciseName: exercise.name,
+                        exerciseType: exercise.type,
+                      ),
                     ),
                   ],
                 ),

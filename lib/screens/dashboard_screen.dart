@@ -1,5 +1,6 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
@@ -21,6 +22,7 @@ import '../models/training_routine.dart';
 import '../providers/training_provider.dart';
 import '../services/health_service.dart';
 import '../services/training_calorie_calculator.dart';
+import '../widgets/micro_tap.dart';
 import 'routine_screen.dart';
 
 class DashboardScreen extends ConsumerWidget {
@@ -575,16 +577,12 @@ class DashboardScreen extends ConsumerWidget {
                   Expanded(
                     child: Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 2),
-                      child: FilledButton.tonal(
-                        style: FilledButton.styleFrom(
-                          padding: EdgeInsets.zero,
-                          minimumSize: const Size(0, 34),
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        ),
-                        onPressed: () =>
-                            ref.read(waterProvider.notifier).addLog(ml),
-                        child: Text('+${ml}ml',
-                            style: const TextStyle(fontSize: 12)),
+                      child: _WaterAddButton(
+                        ml: ml,
+                        onPressed: () {
+                          HapticFeedback.lightImpact();
+                          ref.read(waterProvider.notifier).addLog(ml);
+                        },
                       ),
                     ),
                   ),
@@ -1041,21 +1039,24 @@ class DashboardScreen extends ConsumerWidget {
         ),
       ),
       clipBehavior: Clip.antiAlias,
-      child: InkWell(
+      child: MicroTap(
         onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: accent.withValues(alpha: 0.18),
-                  borderRadius: BorderRadius.circular(14),
+        scale: 0.97,
+        child: InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: accent.withValues(alpha: 0.18),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Icon(icon, color: accent, size: 22),
                 ),
-                child: Icon(icon, color: accent, size: 22),
-              ),
               const SizedBox(width: 14),
               Expanded(
                 child: Column(
@@ -1100,6 +1101,7 @@ class DashboardScreen extends ConsumerWidget {
           ),
         ),
       ),
+    ),
     );
   }
 
@@ -1625,6 +1627,70 @@ class _SleepDetailWrapper extends ConsumerWidget {
   }
 }
 
+/// タップ時にスケールバウンスを伴う水分追加ボタン（48dp タッチターゲット）。
+class _WaterAddButton extends StatefulWidget {
+  const _WaterAddButton({required this.ml, required this.onPressed});
+  final int ml;
+  final VoidCallback onPressed;
+
+  @override
+  State<_WaterAddButton> createState() => _WaterAddButtonState();
+}
+
+class _WaterAddButtonState extends State<_WaterAddButton>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+  late final Animation<double> _scale;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 80),
+      reverseDuration: const Duration(milliseconds: 200),
+    );
+    _scale = Tween<double>(begin: 1.0, end: 0.92).animate(
+      CurvedAnimation(
+        parent: _ctrl,
+        curve: Curves.easeIn,
+        reverseCurve: Curves.elasticOut,
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTapDown: (_) => _ctrl.forward(),
+      onTapUp: (_) {
+        _ctrl.reverse();
+        widget.onPressed();
+      },
+      onTapCancel: () => _ctrl.reverse(),
+      child: ScaleTransition(
+        scale: _scale,
+        child: FilledButton.tonal(
+          style: FilledButton.styleFrom(
+            padding: EdgeInsets.zero,
+            minimumSize: const Size(0, 48),
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          ),
+          onPressed: widget.onPressed,
+          child: Text('+${widget.ml}ml',
+              style: const TextStyle(fontSize: 12)),
+        ),
+      ),
+    );
+  }
+}
+
 class _WaterCustomInput extends StatefulWidget {
   const _WaterCustomInput({required this.onAdd});
   final void Function(int ml) onAdd;
@@ -1654,7 +1720,7 @@ class _WaterCustomInputState extends State<_WaterCustomInput> {
   Widget build(BuildContext context) {
     return SizedBox(
       width: 72,
-      height: 34,
+      height: 48,
       child: TextField(
         controller: _controller,
         keyboardType: TextInputType.number,

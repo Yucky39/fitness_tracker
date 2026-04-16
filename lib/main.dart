@@ -110,6 +110,18 @@ ThemeData _appLightTheme() {
         borderRadius: BorderRadius.circular(20),
       ),
     ),
+    // サムフレンドリー: FilledButton の最小タッチターゲットを 48dp に統一
+    filledButtonTheme: FilledButtonThemeData(
+      style: FilledButton.styleFrom(
+        minimumSize: const Size(48, 48),
+      ),
+    ),
+    // IconButton は Material3 デフォルト 48dp だが明示的に設定
+    iconButtonTheme: IconButtonThemeData(
+      style: IconButton.styleFrom(
+        minimumSize: const Size(48, 48),
+      ),
+    ),
   );
 }
 
@@ -126,6 +138,16 @@ ThemeData _appDarkTheme() {
       clipBehavior: Clip.antiAlias,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(20),
+      ),
+    ),
+    filledButtonTheme: FilledButtonThemeData(
+      style: FilledButton.styleFrom(
+        minimumSize: const Size(48, 48),
+      ),
+    ),
+    iconButtonTheme: IconButtonThemeData(
+      style: IconButton.styleFrom(
+        minimumSize: const Size(48, 48),
       ),
     ),
   );

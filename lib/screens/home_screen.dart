@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../providers/home_tab_provider.dart';
@@ -52,14 +53,40 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           IconButton(
             icon: const Icon(Icons.account_circle_outlined),
             tooltip: 'プロフィール設定',
-            onPressed: () => _scaffoldKey.currentState?.openEndDrawer(),
+            onPressed: () {
+              HapticFeedback.lightImpact();
+              _scaffoldKey.currentState?.openEndDrawer();
+            },
           ),
         ],
       ),
       endDrawer: ProfileSidebar(scaffoldKey: _scaffoldKey),
-      body: _screens[selectedIndex],
+      body: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 220),
+        switchInCurve: Curves.easeOutCubic,
+        switchOutCurve: Curves.easeIn,
+        transitionBuilder: (child, animation) {
+          final slideAnim = Tween<Offset>(
+            begin: const Offset(0.04, 0),
+            end: Offset.zero,
+          ).animate(CurvedAnimation(
+            parent: animation,
+            curve: Curves.easeOutCubic,
+          ));
+          return FadeTransition(
+            opacity: animation,
+            child: SlideTransition(position: slideAnim, child: child),
+          );
+        },
+        child: KeyedSubtree(
+          key: ValueKey<int>(selectedIndex),
+          child: _screens[selectedIndex],
+        ),
+      ),
       bottomNavigationBar: NavigationBar(
         onDestinationSelected: (index) {
+          if (index == selectedIndex) return;
+          HapticFeedback.selectionClick();
           ref.read(homeTabIndexProvider.notifier).state = index;
           if (index == 0) {
             unawaited(ref.read(sleepProvider.notifier).syncOnDashboardVisible());

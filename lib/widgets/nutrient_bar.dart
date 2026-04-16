@@ -43,12 +43,19 @@ class NutrientBar extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 4),
-        LinearProgressIndicator(
-          value: progress,
-          backgroundColor: displayColor.withValues(alpha: 0.2),
-          color: displayColor,
-          minHeight: 8,
-          borderRadius: BorderRadius.circular(4),
+        TweenAnimationBuilder<double>(
+          tween: Tween<double>(begin: 0, end: progress),
+          duration: const Duration(milliseconds: 900),
+          curve: Curves.easeOutCubic,
+          builder: (context, value, _) {
+            return LinearProgressIndicator(
+              value: value,
+              backgroundColor: displayColor.withValues(alpha: 0.2),
+              color: displayColor,
+              minHeight: 8,
+              borderRadius: BorderRadius.circular(4),
+            );
+          },
         ),
       ],
     );
