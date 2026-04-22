@@ -14,6 +14,7 @@ class WebDatabaseAdapter implements DatabaseAdapter {
     _tables['training_logs'] = [];
     _tables['body_metrics'] = [];
     _tables['meal_presets'] = [];
+    _tables['exercise_animations'] = [];
     _loadFromStorage();
   }
 

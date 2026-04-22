@@ -20,7 +20,8 @@
       "Bash(flutter analyze:*)",
       "Bash(pod install:*)",
       "Bash(grep -r \"HealthKit\\\\|health_kit\\\\|Apple.*health\\\\|HealthStore\" /Users/yucky/Desktop/fitness_tracker/ios --include=*.swift --include=*.plist)",
-      "Bash(grep -r \"CYCLING\\\\|BIKE\\\\|cycling\\\\|bike\" ~/.pub-cache/hosted/pub.dev/health-*/lib/)"
+      "Bash(grep -r \"CYCLING\\\\|BIKE\\\\|cycling\\\\|bike\" ~/.pub-cache/hosted/pub.dev/health-*/lib/)",
+      "Bash(ls -la /Users/yucky/Desktop/fitness_tracker/lib/services/database_factory*)"
     ],
     "additionalDirectories": [
       "/Users/yucky"
