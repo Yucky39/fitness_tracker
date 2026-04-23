@@ -24,7 +24,7 @@ enum AiProviderType {
         return [
           (id: 'claude-haiku-4-5-20251001', label: 'Haiku 4.5（高速・低コスト）'),
           (id: 'claude-sonnet-4-6', label: 'Sonnet 4.6（バランス）'),
-          (id: 'claude-opus-4-6', label: 'Opus 4.6（最高性能）'),
+          (id: 'claude-opus-4-7', label: 'Opus 4.7（最高性能）'),
         ];
       case AiProviderType.openai:
         return [
@@ -34,9 +34,6 @@ enum AiProviderType {
           (id: 'gpt-4.1', label: 'GPT-4.1（高性能）'),
           (id: 'o4-mini', label: 'o4 mini（推論・高速）'),
           (id: 'o3', label: 'o3（推論・最高性能）'),
-          (id: 'gpt-5.4-nano', label: 'GPT-5.4 nano（最新・高速・低コスト）'),
-          (id: 'gpt-5.4-mini', label: 'GPT-5.4 mini（最新・高速）'),
-          (id: 'gpt-5.4', label: 'GPT-5.4（最新・最高性能）'),
         ];
       case AiProviderType.gemini:
         return [
@@ -54,7 +51,7 @@ enum AiProviderType {
       case AiProviderType.anthropic:
         return 'claude-haiku-4-5-20251001';
       case AiProviderType.openai:
-        return 'gpt-5.4-mini';
+        return 'gpt-4o-mini';
       case AiProviderType.gemini:
         return 'gemini-3-flash-preview';
     }
@@ -142,7 +139,7 @@ class SettingsState {
     this.openAiApiKey = '',
     this.geminiApiKey = '',
     this.selectedAnthropicModel = 'claude-haiku-4-5-20251001',
-    this.selectedOpenAiModel = 'gpt-5.4-mini',
+    this.selectedOpenAiModel = 'gpt-4o-mini',
     this.selectedGeminiModel = 'gemini-3-flash-preview',
     this.mealReminderEnabled = false,
     this.mealReminderHour = 12,

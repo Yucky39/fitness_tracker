@@ -59,7 +59,7 @@ class MealSuggestionNotifier extends StateNotifier<MealSuggestionState> {
         todayItems: mealState.todayItems,
         apiKey: settings.currentApiKey,
         provider: settings.selectedProvider,
-        model: settings.currentModel,
+        model: settings.resolvedModelForProvider(settings.selectedProvider),
       );
       state = MealSuggestionState(suggestion: suggestion);
     } catch (e) {
