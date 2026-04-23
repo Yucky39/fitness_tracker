@@ -202,6 +202,7 @@ class MealNotifier extends StateNotifier<MealState> {
       sodiumGoal: sodium ?? state.sodiumGoal,
     );
     _bumpMealDataEpoch();
+    _invalidateDashboard();
   }
 
   Future<void> addFoodItem({
