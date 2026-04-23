@@ -46,6 +46,11 @@ class ProfileSidebar extends ConsumerWidget {
     final ep = ref.read(energyProfileProvider);
     final mealState = ref.read(mealProvider);
     final waterState = ref.read(waterProvider);
+    // ドロワーが閉じると ProfileSidebar がアンマウントされ ref が無効になるため、
+    // Notifier への参照をダイアログ表示前に取得しておく。
+    final energyNotifier = ref.read(energyProfileProvider.notifier);
+    final mealNotifier = ref.read(mealProvider.notifier);
+    final waterNotifier = ref.read(waterProvider.notifier);
     var dialogSex = ep.sex;
     var dialogActivity = ep.activityLevel;
     ComputedNutritionGoals? lastComputed;
@@ -356,37 +361,36 @@ class ProfileSidebar extends ConsumerWidget {
               ),
               TextButton(
                 onPressed: () async {
-                  await ref.read(energyProfileProvider.notifier).save(
-                        EnergyProfileState(
-                          sex: dialogSex,
-                          age: int.tryParse(ageController.text) ?? 0,
-                          heightCm:
-                              double.tryParse(heightController.text) ??
-                                  0,
-                          weightKg:
-                              double.tryParse(weightController.text) ??
-                                  0,
-                          targetWeightKg: double.tryParse(
-                                  targetWeightController.text) ??
+                  await energyNotifier.save(
+                    EnergyProfileState(
+                      sex: dialogSex,
+                      age: int.tryParse(ageController.text) ?? 0,
+                      heightCm:
+                          double.tryParse(heightController.text) ?? 0,
+                      weightKg:
+                          double.tryParse(weightController.text) ?? 0,
+                      targetWeightKg:
+                          double.tryParse(targetWeightController.text) ??
                               0,
-                          goalWeeks:
-                              int.tryParse(weeksController.text) ?? 12,
-                          activityLevel: dialogActivity,
-                        ),
-                      );
+                      goalWeeks:
+                          int.tryParse(weeksController.text) ?? 12,
+                      activityLevel: dialogActivity,
+                    ),
+                  );
                   if (!context.mounted) return;
-                  await ref.read(mealProvider.notifier).updateGoals(
-                        calories:
-                            int.tryParse(calorieController.text) ?? 2000,
-                        protein: double.tryParse(proteinController.text) ??
-                            150,
-                        fat: double.tryParse(fatController.text) ?? 60,
-                        carbs:
-                            double.tryParse(carbsController.text) ?? 200,
-                      );
+                  await mealNotifier.updateGoals(
+                    calories:
+                        int.tryParse(calorieController.text) ?? 2000,
+                    protein:
+                        double.tryParse(proteinController.text) ?? 150,
+                    fat: double.tryParse(fatController.text) ?? 60,
+                    carbs:
+                        double.tryParse(carbsController.text) ?? 200,
+                  );
                   final waterGoal =
                       int.tryParse(waterGoalController.text) ?? 2000;
-                  ref.read(waterProvider.notifier).setGoal(waterGoal);
+                  waterNotifier.setGoal(waterGoal);
+                  if (!context.mounted) return;
                   Navigator.pop(context);
                 },
                 child: const Text('保存'),
