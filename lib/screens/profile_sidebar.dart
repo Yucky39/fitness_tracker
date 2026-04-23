@@ -375,7 +375,7 @@ class ProfileSidebar extends ConsumerWidget {
                         ),
                       );
                   if (!context.mounted) return;
-                  ref.read(mealProvider.notifier).updateGoals(
+                  await ref.read(mealProvider.notifier).updateGoals(
                         calories:
                             int.tryParse(calorieController.text) ?? 2000,
                         protein: double.tryParse(proteinController.text) ??
