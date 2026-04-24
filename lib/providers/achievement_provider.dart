@@ -11,52 +11,64 @@ import '../services/database_service.dart';
 class StreakData {
   final int nutritionStreak;
   final int trainingStreak;
-  final int overallStreak;
+  final int stepsStreak; // 1日5000歩以上の連続日数（バッジ steps_7day_streak 用）
+  final int overallStreak; // なんらかの活動をした連続日数（streak_*_overall 用）
   final String nutritionLastDate;
   final String trainingLastDate;
+  final String stepsLastDate;
   final String overallLastDate;
 
   const StreakData({
     this.nutritionStreak = 0,
     this.trainingStreak = 0,
+    this.stepsStreak = 0,
     this.overallStreak = 0,
     this.nutritionLastDate = '',
     this.trainingLastDate = '',
+    this.stepsLastDate = '',
     this.overallLastDate = '',
   });
 
   StreakData copyWith({
     int? nutritionStreak,
     int? trainingStreak,
+    int? stepsStreak,
     int? overallStreak,
     String? nutritionLastDate,
     String? trainingLastDate,
+    String? stepsLastDate,
     String? overallLastDate,
   }) =>
       StreakData(
         nutritionStreak: nutritionStreak ?? this.nutritionStreak,
         trainingStreak: trainingStreak ?? this.trainingStreak,
+        stepsStreak: stepsStreak ?? this.stepsStreak,
         overallStreak: overallStreak ?? this.overallStreak,
         nutritionLastDate: nutritionLastDate ?? this.nutritionLastDate,
         trainingLastDate: trainingLastDate ?? this.trainingLastDate,
+        stepsLastDate: stepsLastDate ?? this.stepsLastDate,
         overallLastDate: overallLastDate ?? this.overallLastDate,
       );
 
   Map<String, dynamic> toJson() => {
         'nutritionStreak': nutritionStreak,
         'trainingStreak': trainingStreak,
+        'stepsStreak': stepsStreak,
         'overallStreak': overallStreak,
         'nutritionLastDate': nutritionLastDate,
         'trainingLastDate': trainingLastDate,
+        'stepsLastDate': stepsLastDate,
         'overallLastDate': overallLastDate,
       };
 
   factory StreakData.fromJson(Map<String, dynamic> j) => StreakData(
         nutritionStreak: j['nutritionStreak'] as int? ?? 0,
         trainingStreak: j['trainingStreak'] as int? ?? 0,
+        stepsStreak: j['stepsStreak'] as int? ?? 0,
         overallStreak: j['overallStreak'] as int? ?? 0,
         nutritionLastDate: j['nutritionLastDate'] as String? ?? '',
         trainingLastDate: j['trainingLastDate'] as String? ?? '',
+        stepsLastDate: j['stepsLastDate'] as String? ?? '',
         overallLastDate: j['overallLastDate'] as String? ?? '',
       );
 }
@@ -144,18 +156,25 @@ class AchievementNotifier extends StateNotifier<AchievementState> {
         nutritionStreak: streak,
         nutritionLastDate: today,
       );
-      await _saveStreaks(streaks);
     }
+    streaks = _tickOverall(streaks, today);
+    await _saveStreaks(streaks);
 
     await _evaluateAndUnlock({
       'nutrition_first_log': totalFoodItems >= 1 ? 1 : 0,
       'nutrition_7day_streak': streaks.nutritionStreak,
       'nutrition_30day_streak': streaks.nutritionStreak,
+      'streak_7day_overall': streaks.overallStreak,
+      'streak_30day_overall': streaks.overallStreak,
     }, streaks);
   }
 
-  /// トレーニング記録時に呼ぶ
-  Future<void> onTrainingLogged(int totalTrainingLogs) async {
+  /// トレーニング記録時に呼ぶ。
+  /// [trainingDaysThisWeek] は今週（月曜始まり）にトレーニングした固有日数。
+  Future<void> onTrainingLogged(
+    int totalTrainingLogs, {
+    int trainingDaysThisWeek = 0,
+  }) async {
     final today = _todayKey();
     var streaks = state.streaks;
 
@@ -167,27 +186,32 @@ class AchievementNotifier extends StateNotifier<AchievementState> {
         trainingStreak: streak,
         trainingLastDate: today,
       );
-      await _saveStreaks(streaks);
     }
-
-    // 今週のトレーニング日数
-    final weekStart =
-        DateTime.now().subtract(Duration(days: DateTime.now().weekday - 1));
+    streaks = _tickOverall(streaks, today);
+    await _saveStreaks(streaks);
 
     await _evaluateAndUnlock({
       'training_first_log': totalTrainingLogs >= 1 ? 1 : 0,
       'training_10_sessions': totalTrainingLogs,
       'training_50_sessions': totalTrainingLogs,
-      'training_3days_week': streaks.trainingStreak, // 簡略化
-    }, streaks, weekStart: weekStart);
+      'training_3days_week': trainingDaysThisWeek,
+      'streak_7day_overall': streaks.overallStreak,
+      'streak_30day_overall': streaks.overallStreak,
+    }, streaks);
   }
 
   /// 体重記録時に呼ぶ
   Future<void> onBodyMetricsLogged(int totalMetrics) async {
+    final today = _todayKey();
+    final streaks = _tickOverall(state.streaks, today);
+    await _saveStreaks(streaks);
+
     await _evaluateAndUnlock({
       'body_first_metrics': totalMetrics >= 1 ? 1 : 0,
       'body_10_metrics': totalMetrics,
-    }, state.streaks);
+      'streak_7day_overall': streaks.overallStreak,
+      'streak_30day_overall': streaks.overallStreak,
+    }, streaks);
   }
 
   /// 歩数更新時に呼ぶ
@@ -195,30 +219,46 @@ class AchievementNotifier extends StateNotifier<AchievementState> {
     final today = _todayKey();
     var streaks = state.streaks;
 
-    if (steps >= 5000 && streaks.overallLastDate != today) {
-      final streak = _isConsecutive(streaks.overallLastDate, today)
-          ? streaks.overallStreak + 1
+    // 歩数ストリーク（5000歩以上の連続日数）
+    if (steps >= 5000 && streaks.stepsLastDate != today) {
+      final streak = _isConsecutive(streaks.stepsLastDate, today)
+          ? streaks.stepsStreak + 1
           : 1;
       streaks = streaks.copyWith(
-        overallStreak: streak,
-        overallLastDate: today,
+        stepsStreak: streak,
+        stepsLastDate: today,
       );
-      await _saveStreaks(streaks);
     }
+    // 歩いた実績があれば全体継続日数も進める
+    if (steps > 0) {
+      streaks = _tickOverall(streaks, today);
+    }
+    await _saveStreaks(streaks);
 
     await _evaluateAndUnlock({
       'steps_10k_day': steps >= 10000 ? 1 : 0,
-      'steps_7day_streak': streaks.overallStreak,
+      'steps_7day_streak': streaks.stepsStreak,
       'streak_7day_overall': streaks.overallStreak,
       'streak_30day_overall': streaks.overallStreak,
     }, streaks);
   }
 
+  /// 当日分の全体継続日数をまだ進めていなければ進める。
+  StreakData _tickOverall(StreakData streaks, String today) {
+    if (streaks.overallLastDate == today) return streaks;
+    final streak = _isConsecutive(streaks.overallLastDate, today)
+        ? streaks.overallStreak + 1
+        : 1;
+    return streaks.copyWith(
+      overallStreak: streak,
+      overallLastDate: today,
+    );
+  }
+
   Future<void> _evaluateAndUnlock(
     Map<String, int> progressValues,
-    StreakData streaks, {
-    DateTime? weekStart,
-  }) async {
+    StreakData streaks,
+  ) async {
     final adapter = await DatabaseService().database;
     final newlyUnlocked = <String>[];
 

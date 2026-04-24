@@ -115,7 +115,7 @@ class TrainingNotifier extends StateNotifier<TrainingState> {
     await adapter.insert('training_logs', newLog.toMap());
     SyncService().syncRecord('training_logs', newLog.toMap());
     await _loadLogs();
-    _ref.read(achievementProvider.notifier).onTrainingLogged(state.logs.length);
+    _notifyAchievements();
   }
 
   /// ワークアウトセッションで記録した複数のログをまとめて保存
@@ -127,7 +127,27 @@ class TrainingNotifier extends StateNotifier<TrainingState> {
       SyncService().syncRecord('training_logs', log.toMap());
     }
     await _loadLogs();
-    _ref.read(achievementProvider.notifier).onTrainingLogged(state.logs.length);
+    _notifyAchievements();
+  }
+
+  /// バッジ評価へ現在のトレーニング統計を渡す。
+  /// 「今週のユニーク日数」= 月曜 00:00 以降に記録された日付の集合サイズ。
+  void _notifyAchievements() {
+    final now = DateTime.now();
+    final weekStart = DateTime(now.year, now.month, now.day)
+        .subtract(Duration(days: now.weekday - 1));
+    final daysThisWeek = <String>{};
+    for (final log in state.logs) {
+      final d = log.date.toLocal();
+      final day = DateTime(d.year, d.month, d.day);
+      if (!day.isBefore(weekStart)) {
+        daysThisWeek.add('${day.year}-${day.month}-${day.day}');
+      }
+    }
+    _ref.read(achievementProvider.notifier).onTrainingLogged(
+          state.logs.length,
+          trainingDaysThisWeek: daysThisWeek.length,
+        );
   }
 
   /// HealthKit / Health Connect から取得済みの TrainingLog をそのまま保存

@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod/legacy.dart';
 
 import '../providers/energy_profile_provider.dart';
 import '../services/health_service.dart';
+import 'achievement_provider.dart';
 
 /// 歩数の計測データと推定消費カロリーを保持する状態
 class StepsState {
@@ -85,6 +88,8 @@ class StepsNotifier extends StateNotifier<StepsState> {
       burnedKcal: kcal,
       isLoading: false,
     );
+    // バッジ評価（歩数系・全体継続）
+    unawaited(_ref.read(achievementProvider.notifier).onStepsUpdated(steps));
   }
 
   /// 歩数を手動リフレッシュ（権限はすでにある前提）

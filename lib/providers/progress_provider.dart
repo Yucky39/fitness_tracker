@@ -1,8 +1,10 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod/legacy.dart';
 import 'package:uuid/uuid.dart';
 import '../models/body_metrics.dart';
 import '../services/database_service.dart';
 import '../services/sync_service.dart';
+import 'achievement_provider.dart';
 
 class ProgressState {
   final List<BodyMetrics> metrics;
@@ -91,9 +93,11 @@ class ProgressState {
 }
 
 class ProgressNotifier extends StateNotifier<ProgressState> {
-  ProgressNotifier() : super(ProgressState()) {
+  ProgressNotifier(this._ref) : super(ProgressState()) {
     _loadMetrics();
   }
+
+  final Ref _ref;
 
   Future<void> _loadMetrics() async {
     state = state.copyWith(isLoading: true);
@@ -126,6 +130,10 @@ class ProgressNotifier extends StateNotifier<ProgressState> {
     await adapter.insert('body_metrics', newMetrics.toMap());
     SyncService().syncRecord('body_metrics', newMetrics.toMap());
     await _loadMetrics();
+    // バッジ評価（体重記録・全体継続）
+    _ref
+        .read(achievementProvider.notifier)
+        .onBodyMetricsLogged(state.metrics.length);
   }
 
   Future<void> updateMetrics(BodyMetrics updated) async {
@@ -150,5 +158,5 @@ class ProgressNotifier extends StateNotifier<ProgressState> {
 
 final progressProvider =
     StateNotifierProvider<ProgressNotifier, ProgressState>((ref) {
-  return ProgressNotifier();
+  return ProgressNotifier(ref);
 });
