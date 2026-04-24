@@ -23,8 +23,13 @@ class MealSuggestionScreen extends ConsumerWidget {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
-    final hasResult =
-        state.suggestion != null || state.weeklySuggestion != null;
+    final hasWeekly = state.weeklySuggestion != null;
+    final hasDaily = state.suggestion != null;
+    final hasContentForPeriod = switch (state.period) {
+      SuggestionPeriod.week => hasWeekly,
+      SuggestionPeriod.today || SuggestionPeriod.tomorrow => hasDaily,
+    };
+    final anyCached = hasWeekly || hasDaily;
 
     return Scaffold(
       appBar: AppBar(
@@ -71,7 +76,7 @@ class MealSuggestionScreen extends ConsumerWidget {
           ),
 
           // ── 生成日時バッジ ────────────────────────────────────────────────
-          if (!state.isLoading && hasResult)
+          if (!state.isLoading && hasContentForPeriod)
             SliverToBoxAdapter(
               child: _GeneratedAtBadge(
                 generatedAt: state.period == SuggestionPeriod.week
@@ -82,7 +87,7 @@ class MealSuggestionScreen extends ConsumerWidget {
             ),
 
           if (!state.isLoading &&
-              hasResult &&
+              anyCached &&
               state.error == null &&
               (state.weeklySuggestion != null || state.suggestion != null))
             SliverToBoxAdapter(
@@ -140,11 +145,12 @@ class MealSuggestionScreen extends ConsumerWidget {
                 ),
               ),
             )
-          else if (!hasResult)
+          else if (!hasContentForPeriod)
             SliverFillRemaining(
               child: _EmptyState(
                 hasApiKey: settings.currentApiKey.isNotEmpty,
                 period: state.period,
+                hasWeeklyPlanCached: hasWeekly,
                 onGenerate: () => notifier.generate(),
               ),
             )
@@ -827,9 +833,12 @@ class _EmptyState extends StatelessWidget {
     required this.hasApiKey,
     required this.period,
     required this.onGenerate,
+    this.hasWeeklyPlanCached = false,
   });
   final bool hasApiKey;
   final SuggestionPeriod period;
+  /// 今日／明日タブで日次が未生成でも、週間キャッシュがあるとき true
+  final bool hasWeeklyPlanCached;
   final VoidCallback onGenerate;
 
   @override
@@ -868,6 +877,17 @@ class _EmptyState extends StatelessWidget {
               style: theme.textTheme.bodySmall
                   ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
             ),
+            if (hasWeeklyPlanCached &&
+                (period == SuggestionPeriod.today ||
+                    period == SuggestionPeriod.tomorrow)) ...[
+              const SizedBox(height: 12),
+              Text(
+                '1週間プランのキャッシュがあります。「1週間」タブで一覧を確認できます。ここではボタンを押したときだけ、${period.label}の詳細メニューをAIが作成します。',
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodySmall
+                    ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+              ),
+            ],
             const SizedBox(height: 24),
             if (!hasApiKey) ...[
               Container(

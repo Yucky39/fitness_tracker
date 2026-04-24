@@ -54,14 +54,10 @@ class MealSuggestionNotifier extends StateNotifier<MealSuggestionState> {
     _init();
   }
 
+  /// キャッシュのみ復元。AI 呼び出しはユーザーが明示したとき（[generate]）のみ。
   Future<void> _init() async {
     await _loadCache(SuggestionPeriod.week);
     await _loadCache(SuggestionPeriod.today);
-    if (!mounted) return;
-    if (state.suggestion == null && state.weeklySuggestion != null) {
-      final weeklyDay = _findWeeklyDayForPeriod(SuggestionPeriod.today);
-      if (weeklyDay != null) await generate();
-    }
   }
 
   WeeklyDayPlan? _findWeeklyDayForPeriod(SuggestionPeriod period) {
@@ -151,18 +147,11 @@ class MealSuggestionNotifier extends StateNotifier<MealSuggestionState> {
       clearWeeklySuggestion: period == SuggestionPeriod.week,
       clearError: true,
     );
-    _loadCacheAndAutoGenerate(period);
+    _loadCacheForPeriod(period);
   }
 
-  Future<void> _loadCacheAndAutoGenerate(SuggestionPeriod period) async {
+  Future<void> _loadCacheForPeriod(SuggestionPeriod period) async {
     await _loadCache(period);
-    if (!mounted) return;
-    if (period != SuggestionPeriod.week &&
-        state.suggestion == null &&
-        state.weeklySuggestion != null) {
-      final weeklyDay = _findWeeklyDayForPeriod(period);
-      if (weeklyDay != null) await generate();
-    }
   }
 
   Future<void> generate() async {
@@ -197,7 +186,7 @@ class MealSuggestionNotifier extends StateNotifier<MealSuggestionState> {
           weeklySuggestion: suggestion,
           period: currentPeriod,
         );
-        // Invalidate daily caches so today/tomorrow auto-regenerate from new weekly
+        // 日次キャッシュは週プランと整合しないため破棄（再取得はユーザーが generate したとき）
         await _clearDailyCache();
       } else {
         final suggestion = await MealSuggestionService().suggestDaily(

@@ -22,8 +22,8 @@ enum SuggestionPeriod {
 }
 
 class MealSuggestionService {
-  /// 今日／明日の1日分提案用（出力が比較的短い）
-  static const _maxTokensDaily = 8192;
+  /// 今日／明日の1日分提案用（食材・手順付きJSONは週間並みに長くなりうる）
+  static const _maxTokensDaily = 16384;
 
   /// 週間プランの分割API（4日分／3日分）用。食材付きJSONは長くなりやすい。
   /// 日次のままだと max_tokens で出力が切れて JSON 壊れやすい。
