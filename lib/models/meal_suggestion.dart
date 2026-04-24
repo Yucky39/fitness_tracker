@@ -133,6 +133,70 @@ class SuggestedMeal {
       };
 }
 
+/// 週間プラン 1日分
+class WeeklyDayPlan {
+  final int day;
+  final String dayLabel;
+  final List<SuggestedMeal> meals;
+
+  const WeeklyDayPlan({
+    required this.day,
+    required this.dayLabel,
+    required this.meals,
+  });
+
+  int get totalCalories => meals.fold(0, (s, m) => s + m.totalCalories);
+  double get totalProtein => meals.fold(0.0, (s, m) => s + m.totalProtein);
+  double get totalFat => meals.fold(0.0, (s, m) => s + m.totalFat);
+  double get totalCarbs => meals.fold(0.0, (s, m) => s + m.totalCarbs);
+
+  factory WeeklyDayPlan.fromJson(Map<String, dynamic> j) => WeeklyDayPlan(
+        day: (j['day'] as num?)?.toInt() ?? 1,
+        dayLabel: j['day_label'] as String? ?? '',
+        meals: (j['meals'] as List<dynamic>?)
+                ?.map((e) => SuggestedMeal.fromJson(e as Map<String, dynamic>))
+                .toList() ??
+            [],
+      );
+
+  Map<String, dynamic> toJson() => {
+        'day': day,
+        'day_label': dayLabel,
+        'meals': meals.map((m) => m.toJson()).toList(),
+      };
+}
+
+/// 1週間の食事提案全体
+class WeeklyMealSuggestion {
+  final List<WeeklyDayPlan> days;
+  final String? supplementNote;
+  final DateTime generatedAt;
+
+  const WeeklyMealSuggestion({
+    required this.days,
+    this.supplementNote,
+    required this.generatedAt,
+  });
+
+  factory WeeklyMealSuggestion.fromJson(Map<String, dynamic> j) =>
+      WeeklyMealSuggestion(
+        days: (j['days'] as List<dynamic>?)
+                ?.map((e) => WeeklyDayPlan.fromJson(e as Map<String, dynamic>))
+                .toList() ??
+            [],
+        supplementNote: j['supplement_note'] as String?,
+        generatedAt:
+            DateTime.tryParse(j['generated_at'] as String? ?? '') ??
+                DateTime.now(),
+      );
+
+  Map<String, dynamic> toJson() => {
+        'days': days.map((d) => d.toJson()).toList(),
+        if (supplementNote != null) 'supplement_note': supplementNote,
+        'generated_at': generatedAt.toIso8601String(),
+      };
+}
+
 /// 1日の食事提案全体
 class DailyMealSuggestion {
   final List<SuggestedMeal> meals;

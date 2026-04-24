@@ -4,6 +4,7 @@ import '../models/meal_suggestion.dart';
 import '../providers/meal_provider.dart';
 import '../providers/meal_suggestion_provider.dart';
 import '../providers/settings_provider.dart';
+import '../services/meal_suggestion_service.dart';
 
 /// 1日の食事提案を表示する画面
 class MealSuggestionScreen extends ConsumerWidget {
@@ -18,17 +19,13 @@ class MealSuggestionScreen extends ConsumerWidget {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
+    final hasResult =
+        state.suggestion != null || state.weeklySuggestion != null;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('食事メニュー提案'),
-        actions: [
-          if (state.suggestion != null && !state.isLoading)
-            IconButton(
-              icon: const Icon(Icons.refresh),
-              tooltip: '再提案',
-              onPressed: () => notifier.generate(),
-            ),
-        ],
+        actions: const [],
       ),
       body: CustomScrollView(
         slivers: [
@@ -40,16 +37,58 @@ class MealSuggestionScreen extends ConsumerWidget {
             ),
           ),
 
+          // ── 期間セレクタ ──────────────────────────────────────────────────
+          SliverToBoxAdapter(
+            child: Padding(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              child: SegmentedButton<SuggestionPeriod>(
+                segments: const [
+                  ButtonSegment(
+                    value: SuggestionPeriod.today,
+                    label: Text('今日'),
+                    icon: Icon(Icons.today),
+                  ),
+                  ButtonSegment(
+                    value: SuggestionPeriod.tomorrow,
+                    label: Text('明日'),
+                    icon: Icon(Icons.event),
+                  ),
+                  ButtonSegment(
+                    value: SuggestionPeriod.week,
+                    label: Text('1週間'),
+                    icon: Icon(Icons.date_range),
+                  ),
+                ],
+                selected: {state.period},
+                onSelectionChanged: (s) => notifier.setPeriod(s.first),
+              ),
+            ),
+          ),
+
+          // ── 生成日時バッジ ────────────────────────────────────────────────
+          if (!state.isLoading && hasResult)
+            SliverToBoxAdapter(
+              child: _GeneratedAtBadge(
+                generatedAt: state.period == SuggestionPeriod.week
+                    ? state.weeklySuggestion?.generatedAt
+                    : state.suggestion?.generatedAt,
+                onRegenerate: () => notifier.generate(),
+              ),
+            ),
+
           // ── コンテンツ ────────────────────────────────────────────────────
           if (state.isLoading)
-            const SliverFillRemaining(
+            SliverFillRemaining(
               child: Center(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    CircularProgressIndicator(),
-                    SizedBox(height: 16),
-                    Text('AIが食事メニューを考えています...'),
+                    const CircularProgressIndicator(),
+                    const SizedBox(height: 16),
+                    Text(state.period == SuggestionPeriod.week
+                        ? 'AIが1週間の食事メニューを考えています...'
+                        : 'AIが食事メニューを考えています...'),
                   ],
                 ),
               ),
@@ -81,22 +120,32 @@ class MealSuggestionScreen extends ConsumerWidget {
                 ),
               ),
             )
-          else if (state.suggestion == null)
+          else if (!hasResult)
             SliverFillRemaining(
               child: _EmptyState(
                 hasApiKey: settings.currentApiKey.isNotEmpty,
+                period: state.period,
                 onGenerate: () => notifier.generate(),
               ),
             )
-          else ...[
-            // サプリコメント
+          // 週間プラン表示
+          else if (state.period == SuggestionPeriod.week &&
+              state.weeklySuggestion != null) ...[
+            if ((state.weeklySuggestion!.supplementNote ?? '').isNotEmpty)
+              SliverToBoxAdapter(
+                child: _SupplementNoteCard(
+                    note: state.weeklySuggestion!.supplementNote!),
+              ),
+            _WeeklyView(weekly: state.weeklySuggestion!),
+            const SliverToBoxAdapter(child: SizedBox(height: 80)),
+          ]
+          // 日次プラン表示（今日・明日）
+          else if (state.suggestion != null) ...[
             if ((state.suggestion!.supplementNote ?? '').isNotEmpty)
               SliverToBoxAdapter(
                 child: _SupplementNoteCard(
                     note: state.suggestion!.supplementNote!),
               ),
-
-            // 各食事セクション
             SliverList.separated(
               itemCount: state.suggestion!.meals.length,
               separatorBuilder: (_, __) => const SizedBox(height: 8),
@@ -105,17 +154,56 @@ class MealSuggestionScreen extends ConsumerWidget {
                 return _MealSection(meal: meal);
               },
             ),
-
-            // 下余白
             const SliverToBoxAdapter(child: SizedBox(height: 80)),
           ],
         ],
       ),
-      // 提案がない・エラーでもない場合の生成ボタン（初回）
-      floatingActionButton:
-          (state.suggestion == null && !state.isLoading && state.error == null)
-              ? null // EmptyState 内に表示
-              : null,
+    );
+  }
+}
+
+// ── 生成日時バッジ ────────────────────────────────────────────────────────────
+
+class _GeneratedAtBadge extends StatelessWidget {
+  const _GeneratedAtBadge({required this.generatedAt, required this.onRegenerate});
+  final DateTime? generatedAt;
+  final VoidCallback onRegenerate;
+
+  String _format(DateTime dt) {
+    final now = DateTime.now();
+    final isToday = dt.year == now.year && dt.month == now.month && dt.day == now.day;
+    final time = '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+    if (isToday) return '本日 $time 生成';
+    return '${dt.month}/${dt.day} $time 生成';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (generatedAt == null) return const SizedBox.shrink();
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+      child: Row(
+        children: [
+          Icon(Icons.save_outlined, size: 14, color: cs.onSurfaceVariant),
+          const SizedBox(width: 4),
+          Text(
+            _format(generatedAt!),
+            style: theme.textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant),
+          ),
+          const Spacer(),
+          TextButton.icon(
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            icon: const Icon(Icons.refresh, size: 14),
+            label: const Text('再生成', style: TextStyle(fontSize: 12)),
+            onPressed: onRegenerate,
+          ),
+        ],
+      ),
     );
   }
 }
@@ -330,7 +418,7 @@ class _MealSection extends StatelessWidget {
 
           // 料理リスト
           for (final dish in meal.dishes) ...[
-            _DishCard(dish: dish),
+            _DishCard(dish: dish, initiallyExpanded: dish.ingredients.isNotEmpty),
             const SizedBox(height: 8),
           ],
         ],
@@ -368,8 +456,9 @@ class _PfcMiniLabel extends StatelessWidget {
 // ── 料理カード ───────────────────────────────────────────────────────────────
 
 class _DishCard extends StatelessWidget {
-  const _DishCard({required this.dish});
+  const _DishCard({required this.dish, this.initiallyExpanded = false});
   final SuggestedDish dish;
+  final bool initiallyExpanded;
 
   @override
   Widget build(BuildContext context) {
@@ -382,6 +471,7 @@ class _DishCard extends StatelessWidget {
       child: Theme(
         data: theme.copyWith(dividerColor: Colors.transparent),
         child: ExpansionTile(
+          initiallyExpanded: initiallyExpanded,
           tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
           childrenPadding:
               const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -521,16 +611,219 @@ class _StepRow extends StatelessWidget {
   }
 }
 
+// ── 週間プラン表示 ────────────────────────────────────────────────────────────
+
+class _WeeklyView extends StatelessWidget {
+  const _WeeklyView({required this.weekly});
+  final WeeklyMealSuggestion weekly;
+
+  static const _mealIcons = {
+    'breakfast': Icons.wb_sunny_outlined,
+    'lunch': Icons.wb_twilight,
+    'dinner': Icons.nightlight_round,
+    'snack': Icons.cookie_outlined,
+  };
+
+  static const _mealLabels = {
+    'breakfast': '朝食',
+    'lunch': '昼食',
+    'dinner': '夕食',
+    'snack': '間食',
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    return SliverList.separated(
+      itemCount: weekly.days.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 4),
+      itemBuilder: (context, i) => _DayCard(
+        day: weekly.days[i],
+        generatedAt: weekly.generatedAt,
+        mealIcons: _mealIcons,
+        mealLabels: _mealLabels,
+      ),
+    );
+  }
+}
+
+class _DayCard extends StatelessWidget {
+  const _DayCard({
+    required this.day,
+    required this.generatedAt,
+    required this.mealIcons,
+    required this.mealLabels,
+  });
+
+  final WeeklyDayPlan day;
+  final DateTime generatedAt;
+  final Map<String, IconData> mealIcons;
+  final Map<String, String> mealLabels;
+
+  static const _weekdays = ['月', '火', '水', '木', '金', '土', '日'];
+
+  String _buildDateLabel(DateTime actualDate) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final wd = _weekdays[actualDate.weekday - 1];
+    final md = '${actualDate.month}/${actualDate.day}（$wd）';
+    if (actualDate == today) return '今日 $md';
+    if (actualDate == today.add(const Duration(days: 1))) return '明日 $md';
+    return md;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+
+    final baseDate =
+        DateTime(generatedAt.year, generatedAt.month, generatedAt.day);
+    final actualDate = baseDate.add(Duration(days: day.day - 1));
+    final now = DateTime.now();
+    final isToday =
+        actualDate == DateTime(now.year, now.month, now.day);
+    final dateLabel = _buildDateLabel(actualDate);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Card(
+        elevation: 1,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        child: Theme(
+          data: theme.copyWith(dividerColor: Colors.transparent),
+          child: ExpansionTile(
+            initiallyExpanded: isToday,
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12)),
+            collapsedShape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12)),
+            tilePadding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            title: Row(
+              children: [
+                Text(
+                  dateLabel,
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: isToday ? cs.primary : null,
+                  ),
+                ),
+                if (isToday) ...[
+                  const SizedBox(width: 6),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                    decoration: BoxDecoration(
+                      color: cs.primaryContainer,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      '今日',
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: cs.onPrimaryContainer,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+            subtitle: Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: Text(
+                '${day.totalCalories}kcal  '
+                'P${day.totalProtein.toStringAsFixed(1)}g  '
+                'F${day.totalFat.toStringAsFixed(1)}g  '
+                'C${day.totalCarbs.toStringAsFixed(1)}g',
+                style: theme.textTheme.labelSmall
+                    ?.copyWith(color: cs.onSurfaceVariant),
+              ),
+            ),
+            childrenPadding:
+                const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            children: [
+              for (final meal in day.meals) ...[
+                Row(
+                  children: [
+                    Icon(
+                      mealIcons[meal.mealType] ?? Icons.restaurant_outlined,
+                      size: 16,
+                      color: cs.primary,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      mealLabels[meal.mealType] ?? meal.mealType,
+                      style: theme.textTheme.labelMedium
+                          ?.copyWith(fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                for (final dish in meal.dishes)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 20, bottom: 4),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(dish.name,
+                                  style: theme.textTheme.bodySmall),
+                              if ((dish.note ?? '').isNotEmpty)
+                                Text(
+                                  dish.note!,
+                                  style: theme.textTheme.labelSmall?.copyWith(
+                                      color: cs.onSurfaceVariant),
+                                ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          '${dish.calories}kcal',
+                          style: theme.textTheme.labelSmall
+                              ?.copyWith(color: cs.onSurfaceVariant),
+                        ),
+                      ],
+                    ),
+                  ),
+                const SizedBox(height: 8),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 // ── 初期状態（未生成） ────────────────────────────────────────────────────────
 
 class _EmptyState extends StatelessWidget {
-  const _EmptyState({required this.hasApiKey, required this.onGenerate});
+  const _EmptyState({
+    required this.hasApiKey,
+    required this.period,
+    required this.onGenerate,
+  });
   final bool hasApiKey;
+  final SuggestionPeriod period;
   final VoidCallback onGenerate;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final description = switch (period) {
+      SuggestionPeriod.today =>
+        'カロリー目標とPFCバランスに合わせた\n今日1日分の献立・レシピをAIが提案します。\nサプリ・プロテインの記録も自動で考慮します。',
+      SuggestionPeriod.tomorrow =>
+        'カロリー目標とPFCバランスに合わせた\n明日1日分の献立・レシピをAIが提案します。',
+      SuggestionPeriod.week =>
+        'カロリー目標とPFCバランスに合わせた\n1週間分（7日分）の献立をAIが提案します。\n毎日変化のあるメニューを提案します。',
+    };
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
@@ -550,7 +843,7 @@ class _EmptyState extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              'カロリー目標とPFCバランスに合わせた\n1日分の献立・レシピをAIが提案します。\nサプリ・プロテインの記録も自動で考慮します。',
+              description,
               textAlign: TextAlign.center,
               style: theme.textTheme.bodySmall
                   ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
@@ -575,7 +868,7 @@ class _EmptyState extends StatelessWidget {
             ] else
               FilledButton.icon(
                 icon: const Icon(Icons.auto_awesome),
-                label: const Text('メニューを提案する'),
+                label: Text('${period.label}のメニューを提案する'),
                 onPressed: onGenerate,
               ),
           ],
