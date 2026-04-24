@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../data/badge_definitions.dart';
+import '../models/achievement.dart';
 import '../providers/achievement_provider.dart';
 
 class AchievementsScreen extends ConsumerWidget {
@@ -111,7 +112,7 @@ class AchievementsScreen extends ConsumerWidget {
 
 class _BadgeGrid extends StatelessWidget {
   const _BadgeGrid({required this.achievements, this.filter});
-  final List achievements;
+  final List<Achievement> achievements;
   final BadgeCategory? filter;
 
   @override
@@ -132,17 +133,18 @@ class _BadgeGrid extends StatelessWidget {
         itemCount: filteredDefs.length,
         itemBuilder: (_, i) {
           final def = filteredDefs[i];
-          final ach = achievements.firstWhere(
-            (a) => a.badgeKey == def.key,
-            orElse: () => null,
-          );
-          final isUnlocked = ach?.isUnlocked ?? false;
-          final unlockedAt = ach?.unlockedAt as DateTime?;
+          Achievement? ach;
+          for (final a in achievements) {
+            if (a.badgeKey == def.key) {
+              ach = a;
+              break;
+            }
+          }
 
           return _BadgeCard(
             def: def,
-            isUnlocked: isUnlocked,
-            unlockedAt: unlockedAt,
+            isUnlocked: ach?.isUnlocked ?? false,
+            unlockedAt: ach?.unlockedAt,
             progress: ach?.progress ?? 0,
           );
         },
@@ -179,10 +181,15 @@ class _BadgeCard extends StatelessWidget {
         : color.withValues(alpha: 0.28);
 
     return Stack(
+      // Stack の既定 StackFit.loose では Card が縮んでしまい、
+      // グリッドセルの大部分が背景色で埋まって「空の矩形」に見える。
+      // Card をセル全体に広げるため expand に切り替える。
+      fit: StackFit.expand,
       children: [
         Card(
           // surface と surfaceContainerLow の差が小さいテーマでは同化しやすい。
           // 未取得は surfaceContainerHigh、取得済みはカテゴリ色をはっきり載せる。
+          margin: EdgeInsets.zero,
           color: isUnlocked
               ? Color.alphaBlend(
                   color.withValues(alpha: 0.22),
@@ -262,15 +269,20 @@ class _BadgeCard extends StatelessWidget {
                         ),
                   ),
                   const SizedBox(height: 3),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(4),
-                    child: LinearProgressIndicator(
-                      value: def.requiredCount > 0
-                          ? (progress / def.requiredCount).clamp(0.0, 1.0)
-                          : 0,
-                      minHeight: 4,
-                      backgroundColor: scheme.surfaceContainerHighest,
-                      color: scheme.onSurfaceVariant.withValues(alpha: 0.5),
+                  // CrossAxisAlignment.center のままだと LinearProgressIndicator
+                  // が横幅を確保できずに潰れるので、明示的に幅いっぱいにする。
+                  SizedBox(
+                    width: double.infinity,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(4),
+                      child: LinearProgressIndicator(
+                        value: def.requiredCount > 0
+                            ? (progress / def.requiredCount).clamp(0.0, 1.0)
+                            : 0,
+                        minHeight: 4,
+                        backgroundColor: scheme.surfaceContainerHighest,
+                        color: scheme.onSurfaceVariant.withValues(alpha: 0.5),
+                      ),
                     ),
                   ),
                 ],
