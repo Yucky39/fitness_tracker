@@ -22,7 +22,12 @@ enum SuggestionPeriod {
 }
 
 class MealSuggestionService {
-  static const _maxTokens = 8192;
+  /// 今日／明日の1日分提案用（出力が比較的短い）
+  static const _maxTokensDaily = 8192;
+
+  /// 週間プランの分割API（4日分／3日分）用。食材付きJSONは長くなりやすい。
+  /// 日次のままだと max_tokens で出力が切れて JSON 壊れやすい。
+  static const _maxTokensWeeklyPart = 16384;
 
   // ── Prompt builders ───────────────────────────────────────────────────────
 
@@ -208,9 +213,12 @@ JSONのみを返してください。前後の説明文や```json```マークダ
 
 ## ルール
 - 各日: 朝食・昼食・夕食（間食は必要時のみ）を含める
-- 各食事のdishesは必ず1要素のみ。nameは「料理A・料理B」と「・」で結合
+- 各食事のdishesは必ず1要素のみ。nameは「料理A・料理B」と「・」で結合した献立全体の名称
 - calories/protein/fat/carbsはその食事全体の合計値（整数/小数点1位）
-- 毎日異なる献立。食材・調理手順は不要
+- 毎日異なる献立とすること
+- **各dishには、その献立（nameに含まれる全料理）を作るために必要な食材を ingredients にすべて列挙すること**（分量・各食材の栄養値は日本食品標準成分表に基づく目安でよい）
+- ingredients の各要素は name, amount, calories, protein, fat, carbs を必須とする
+- 調理手順は不要。steps は空配列 [] とする
 - $startDay 日目から$endDay 日目まで$dayCount 日分全て実際のデータを出力すること
 
 ## 返却形式（JSONのみ）
@@ -220,14 +228,14 @@ JSONのみを返してください。前後の説明文や```json```マークダ
       "day": $exampleDay,
       "day_label": "$exampleLabel",
       "meals": [
-        {"meal_type": "breakfast", "dishes": [{"name": "料理A・料理B", "calories": 500, "protein": 25.0, "fat": 12.0, "carbs": 65.0}]},
-        {"meal_type": "lunch", "dishes": [{"name": "料理C・料理D", "calories": 650, "protein": 40.0, "fat": 15.0, "carbs": 75.0}]},
-        {"meal_type": "dinner", "dishes": [{"name": "料理E・料理F", "calories": 750, "protein": 55.0, "fat": 20.0, "carbs": 85.0}]}
+        {"meal_type": "breakfast", "dishes": [{"name": "納豆・焼き鮭・ご飯・味噌汁", "calories": 500, "protein": 25.0, "fat": 12.0, "carbs": 65.0, "ingredients": [{"name": "米", "amount": "150g", "calories": 220, "protein": 3.8, "fat": 0.5, "carbs": 48.0}, {"name": "納豆", "amount": "1パック", "calories": 100, "protein": 6.8, "fat": 5.0, "carbs": 5.0}, {"name": "鮭切り身", "amount": "80g", "calories": 120, "protein": 18.0, "fat": 5.0, "carbs": 0.0}], "steps": []}]},
+        {"meal_type": "lunch", "dishes": [{"name": "鶏むね照り焼き・ひじき煮・麦ご飯", "calories": 650, "protein": 40.0, "fat": 15.0, "carbs": 75.0, "ingredients": [{"name": "鶏むね肉", "amount": "150g", "calories": 165, "protein": 31.0, "fat": 3.5, "carbs": 0.0}, {"name": "米", "amount": "130g", "calories": 190, "protein": 3.3, "fat": 0.4, "carbs": 42.0}], "steps": []}]},
+        {"meal_type": "dinner", "dishes": [{"name": "豚しゃぶサラダ・豆腐・雑穀米", "calories": 750, "protein": 55.0, "fat": 20.0, "carbs": 85.0, "ingredients": [{"name": "豚ロース薄切り", "amount": "120g", "calories": 280, "protein": 22.0, "fat": 18.0, "carbs": 0.0}, {"name": "木綿豆腐", "amount": "150g", "calories": 90, "protein": 8.0, "fat": 5.0, "carbs": 2.0}], "steps": []}]}
       ]
     }
     ${List.generate(dayCount - 1, (i) {
       final d = startDay + 1 + i;
-      return ',\n    {"day": $d, "day_label": "$d日目（${weekDays[d - 1]}）", "meals": [朝食・昼食・夕食を同じ形式で]}';
+      return ',\n    {"day": $d, "day_label": "$d日目（${weekDays[d - 1]}）", "meals": [朝食・昼食・夕食を上と同じ形式で（各dishに ingredients と steps:[] を含む）]}';
     }).join('')}
   ],
   "supplement_note": ""
@@ -314,8 +322,10 @@ JSONのみを返してください。前後の説明文や```json```マークダ
     );
 
     final results = await Future.wait([
-      _callApi(prompt1, apiKey, model, provider),
-      _callApi(prompt2, apiKey, model, provider),
+      _callApi(prompt1, apiKey, model, provider,
+          maxOutputTokens: _maxTokensWeeklyPart),
+      _callApi(prompt2, apiKey, model, provider,
+          maxOutputTokens: _maxTokensWeeklyPart),
     ]);
 
     final part1 = _parseWeeklyResponse(results[0]);
@@ -365,21 +375,31 @@ JSONのみを返してください。前後の説明文や```json```マークダ
   // ── API dispatcher ────────────────────────────────────────────────────────
 
   Future<String> _callApi(
-      String prompt, String apiKey, String model, AiProviderType provider) {
+    String prompt,
+    String apiKey,
+    String model,
+    AiProviderType provider, {
+    int? maxOutputTokens,
+  }) {
+    final max = maxOutputTokens ?? _maxTokensDaily;
     switch (provider) {
       case AiProviderType.anthropic:
-        return _callAnthropic(prompt, apiKey, model);
+        return _callAnthropic(prompt, apiKey, model, maxTokens: max);
       case AiProviderType.openai:
-        return _callOpenAi(prompt, apiKey, model);
+        return _callOpenAi(prompt, apiKey, model, maxTokens: max);
       case AiProviderType.gemini:
-        return _callGemini(prompt, apiKey, model);
+        return _callGemini(prompt, apiKey, model, maxTokens: max);
     }
   }
 
   // ── Anthropic (Claude) ────────────────────────────────────────────────────
 
   Future<String> _callAnthropic(
-      String prompt, String apiKey, String model) async {
+    String prompt,
+    String apiKey,
+    String model, {
+    required int maxTokens,
+  }) async {
     final res = await http.post(
       Uri.parse('https://api.anthropic.com/v1/messages'),
       headers: {
@@ -389,7 +409,7 @@ JSONのみを返してください。前後の説明文や```json```マークダ
       },
       body: jsonEncode({
         'model': model,
-        'max_tokens': _maxTokens,
+        'max_tokens': maxTokens,
         'messages': [
           {'role': 'user', 'content': prompt},
         ],
@@ -408,7 +428,11 @@ JSONのみを返してください。前後の説明文や```json```マークダ
   // ── OpenAI ────────────────────────────────────────────────────────────────
 
   Future<String> _callOpenAi(
-      String prompt, String apiKey, String model) async {
+    String prompt,
+    String apiKey,
+    String model, {
+    required int maxTokens,
+  }) async {
     final res = await http.post(
       Uri.parse('https://api.openai.com/v1/chat/completions'),
       headers: {
@@ -417,7 +441,7 @@ JSONのみを返してください。前後の説明文や```json```マークダ
       },
       body: jsonEncode({
         'model': model,
-        'max_tokens': _maxTokens,
+        'max_tokens': maxTokens,
         'messages': [
           {'role': 'user', 'content': prompt},
         ],
@@ -436,7 +460,11 @@ JSONのみを返してください。前後の説明文や```json```マークダ
   // ── Google Gemini ─────────────────────────────────────────────────────────
 
   Future<String> _callGemini(
-      String prompt, String apiKey, String model) async {
+    String prompt,
+    String apiKey,
+    String model, {
+    required int maxTokens,
+  }) async {
     final res = await http.post(
       Uri.parse(
         'https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=$apiKey',
@@ -450,7 +478,7 @@ JSONのみを返してください。前後の説明文や```json```マークダ
             ],
           },
         ],
-        'generationConfig': {'maxOutputTokens': _maxTokens},
+        'generationConfig': {'maxOutputTokens': maxTokens},
       }),
     );
 

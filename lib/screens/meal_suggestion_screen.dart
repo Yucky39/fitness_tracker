@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:share_plus/share_plus.dart';
 import '../models/meal_suggestion.dart';
 import '../providers/meal_provider.dart';
 import '../providers/meal_suggestion_provider.dart';
 import '../providers/settings_provider.dart';
+import '../services/ingredient_merge_service.dart';
 import '../services/meal_suggestion_service.dart';
+import '../utils/suggestion_shopping_list.dart';
 
 /// 1日の食事提案を表示する画面
 class MealSuggestionScreen extends ConsumerWidget {
@@ -74,6 +78,22 @@ class MealSuggestionScreen extends ConsumerWidget {
                     ? state.weeklySuggestion?.generatedAt
                     : state.suggestion?.generatedAt,
                 onRegenerate: () => notifier.generate(),
+              ),
+            ),
+
+          if (!state.isLoading &&
+              hasResult &&
+              state.error == null &&
+              (state.weeklySuggestion != null || state.suggestion != null))
+            SliverToBoxAdapter(
+              child: Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                child: OutlinedButton.icon(
+                  icon: const Icon(Icons.shopping_basket_outlined, size: 20),
+                  label: const Text('食材の買い物リスト（任意）'),
+                  onPressed: () => _openShoppingListBottomSheet(context, state),
+                ),
               ),
             ),
 
@@ -874,6 +894,307 @@ class _EmptyState extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+// ── 買い物リスト（任意）────────────────────────────────────────────────────────
+
+void _openShoppingListBottomSheet(
+  BuildContext context,
+  MealSuggestionState state,
+) {
+  final weekly = state.weeklySuggestion;
+  final daily = state.suggestion;
+  showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    showDragHandle: true,
+    builder: (ctx) {
+      final h = MediaQuery.sizeOf(ctx).height * 0.78;
+      return SizedBox(
+        height: h,
+        child: _ShoppingListBottomSheetBody(
+          weekly: weekly,
+          daily: daily,
+          period: state.period,
+        ),
+      );
+    },
+  );
+}
+
+enum _ShoppingScope { week, day }
+
+class _ShoppingListBottomSheetBody extends StatefulWidget {
+  const _ShoppingListBottomSheetBody({
+    required this.weekly,
+    required this.daily,
+    required this.period,
+  });
+
+  final WeeklyMealSuggestion? weekly;
+  final DailyMealSuggestion? daily;
+  final SuggestionPeriod period;
+
+  @override
+  State<_ShoppingListBottomSheetBody> createState() =>
+      _ShoppingListBottomSheetBodyState();
+}
+
+class _ShoppingListBottomSheetBodyState
+    extends State<_ShoppingListBottomSheetBody> {
+  late _ShoppingScope _scope;
+  bool _loading = true;
+  IngredientMergeContext _ctx = IngredientMergeContext.empty;
+  List<AggregatedShoppingItem> _items = const [];
+
+  bool get _hasWeek => widget.weekly != null;
+  bool get _hasDay => widget.daily != null;
+
+  @override
+  void initState() {
+    super.initState();
+    if (_hasWeek && !_hasDay) {
+      _scope = _ShoppingScope.week;
+    } else if (!_hasWeek && _hasDay) {
+      _scope = _ShoppingScope.day;
+    } else {
+      _scope = _ShoppingScope.week;
+    }
+    _loadMergeAndItems();
+  }
+
+  Future<void> _loadMergeAndItems() async {
+    setState(() => _loading = true);
+    try {
+      final userId = ingredientMergeUserKey();
+      final ctx = await IngredientMergeService.instance.loadContext(userId);
+      if (!mounted) return;
+      setState(() {
+        _ctx = ctx;
+        _items = _computeItems(ctx);
+        _loading = false;
+      });
+      await IngredientMergeService.instance
+          .recordSurfacesSeen(userId, _rawSurfacesForScope());
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _ctx = IngredientMergeContext.empty;
+        _items = _computeItems(IngredientMergeContext.empty);
+        _loading = false;
+      });
+    }
+  }
+
+  List<AggregatedShoppingItem> _computeItems(IngredientMergeContext ctx) {
+    switch (_scope) {
+      case _ShoppingScope.week:
+        return shoppingListFromWeekly(widget.weekly!, ctx);
+      case _ShoppingScope.day:
+        return shoppingListFromDaily(widget.daily!, ctx);
+    }
+  }
+
+  Iterable<String> _rawSurfacesForScope() {
+    switch (_scope) {
+      case _ShoppingScope.week:
+        return collectRawIngredientSurfaces(widget.weekly);
+      case _ShoppingScope.day:
+        return collectRawIngredientSurfacesFromDaily(widget.daily);
+    }
+  }
+
+  Future<void> _onScopeChanged(_ShoppingScope scope) async {
+    setState(() {
+      _scope = scope;
+      _items = _computeItems(_ctx);
+    });
+    try {
+      await IngredientMergeService.instance.recordSurfacesSeen(
+        ingredientMergeUserKey(),
+        _rawSurfacesForScope(),
+      );
+    } catch (_) {}
+  }
+
+  String get _heading {
+    switch (_scope) {
+      case _ShoppingScope.week:
+        return '【1週間の買い物メモ】';
+      case _ShoppingScope.day:
+        return switch (widget.period) {
+          SuggestionPeriod.today => '【今日のメニュー・買い物メモ】',
+          SuggestionPeriod.tomorrow => '【明日のメニュー・買い物メモ】',
+          SuggestionPeriod.week => '【1日分の買い物メモ】',
+        };
+    }
+  }
+
+  String get _shareText => buildPlainTextShoppingList(
+        heading: _heading,
+        items: _items,
+      );
+
+  String _daySegmentLabel() => switch (widget.period) {
+        SuggestionPeriod.today => '今日の分',
+        SuggestionPeriod.tomorrow => '明日の分',
+        SuggestionPeriod.week => '1日分',
+      };
+
+  Future<void> _copy() async {
+    await Clipboard.setData(ClipboardData(text: _shareText));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('買い物リストをコピーしました')),
+    );
+  }
+
+  Future<void> _share() async {
+    await SharePlus.instance.share(
+      ShareParams(text: _shareText, subject: '買い物リスト'),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final items = _items;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 4, 20, 4),
+          child: Text(
+            '買い物リスト',
+            style: theme.textTheme.titleLarge
+                ?.copyWith(fontWeight: FontWeight.bold),
+            textAlign: TextAlign.center,
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Text(
+            '提案メニューに出てくる食材をまとめました。同じ食材らしい表記は、この端末に保存した使用回数と別名データで1行に寄せます。',
+            style: theme.textTheme.bodySmall
+                ?.copyWith(color: cs.onSurfaceVariant),
+            textAlign: TextAlign.center,
+          ),
+        ),
+        if (_hasWeek && _hasDay) ...[
+          const SizedBox(height: 10),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: SegmentedButton<_ShoppingScope>(
+              segments: [
+                const ButtonSegment(
+                  value: _ShoppingScope.week,
+                  label: Text('1週間分'),
+                  icon: Icon(Icons.date_range, size: 18),
+                ),
+                ButtonSegment(
+                  value: _ShoppingScope.day,
+                  label: Text(_daySegmentLabel()),
+                  icon: Icon(
+                    widget.period == SuggestionPeriod.tomorrow
+                        ? Icons.event
+                        : Icons.today,
+                    size: 18,
+                  ),
+                ),
+              ],
+              selected: {_scope},
+              onSelectionChanged: (s) => _onScopeChanged(s.first),
+            ),
+          ),
+        ],
+        const SizedBox(height: 8),
+        if (_loading)
+          const Expanded(
+            child: Center(child: CircularProgressIndicator()),
+          )
+        else if (items.isEmpty)
+          Expanded(
+            child: Center(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      '食材の記載がありません',
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.bodyMedium
+                          ?.copyWith(color: cs.onSurfaceVariant),
+                    ),
+                    if (_scope == _ShoppingScope.week) ...[
+                      const SizedBox(height: 12),
+                      Text(
+                        '1週間メニューは以前の形式で保存されている可能性があります。「1週間」タブで献立を再生成すると、その週の献立に基づいた買い物リストが表示されます。',
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.bodySmall
+                            ?.copyWith(color: cs.onSurfaceVariant),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          )
+        else
+          Expanded(
+            child: ListView.builder(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              itemCount: items.length,
+              itemBuilder: (context, i) {
+                final item = items[i];
+                return Card(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: ListTile(
+                    title: Text(
+                      item.name,
+                      style: theme.textTheme.titleSmall
+                          ?.copyWith(fontWeight: FontWeight.w600),
+                    ),
+                    subtitle: Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Text(item.amountsLine),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+          child: Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: _copy,
+                  icon: const Icon(Icons.copy, size: 20),
+                  label: const Text('コピー'),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: FilledButton.icon(
+                  onPressed: _share,
+                  icon: const Icon(Icons.share, size: 20),
+                  label: const Text('共有'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

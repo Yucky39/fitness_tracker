@@ -15,6 +15,8 @@ class WebDatabaseAdapter implements DatabaseAdapter {
     _tables['body_metrics'] = [];
     _tables['meal_presets'] = [];
     _tables['exercise_animations'] = [];
+    _tables['shopping_ingredient_aliases'] = [];
+    _tables['shopping_ingredient_surface_stats'] = [];
     _loadFromStorage();
   }
 
@@ -41,6 +43,7 @@ class WebDatabaseAdapter implements DatabaseAdapter {
 
   @override
   Future<int> insert(String table, Map<String, dynamic> values) async {
+    _tables.putIfAbsent(table, () => []);
     _tables[table]!.add(Map<String, dynamic>.from(values));
     _saveToStorage();
     return 1;
@@ -53,7 +56,8 @@ class WebDatabaseAdapter implements DatabaseAdapter {
     List<dynamic>? whereArgs,
     String? orderBy,
     int? limit,
-  }) async {
+  }  ) async {
+    _tables.putIfAbsent(table, () => []);
     var results = List<Map<String, dynamic>>.from(
       _tables[table]!.map((e) => Map<String, dynamic>.from(e)),
     );
@@ -87,6 +91,26 @@ class WebDatabaseAdapter implements DatabaseAdapter {
     String where,
     List<dynamic> whereArgs,
   ) {
+    // "a = ? AND b = ?"
+    if (where.contains(' AND ')) {
+      final parts = where.split(' AND ').map((e) => e.trim()).toList();
+      if (parts.length == 2 &&
+          parts[0].contains('=') &&
+          !parts[0].contains('BETWEEN') &&
+          parts[1].contains('=') &&
+          !parts[1].contains('BETWEEN') &&
+          whereArgs.length >= 2) {
+        final f0 = parts[0].split('=').first.trim();
+        final f1 = parts[1].split('=').first.trim();
+        final v0 = whereArgs[0].toString();
+        final v1 = whereArgs[1].toString();
+        return rows
+            .where((row) =>
+                row[f0]?.toString() == v0 && row[f1]?.toString() == v1)
+            .toList();
+      }
+    }
+
     // Support "field = ?" pattern
     if (where.contains('=') && !where.contains('BETWEEN')) {
       final field = where.split('=').first.trim();
@@ -115,14 +139,13 @@ class WebDatabaseAdapter implements DatabaseAdapter {
     String? where,
     List<dynamic>? whereArgs,
   }) async {
+    _tables.putIfAbsent(table, () => []);
     final rows = _tables[table]!;
-    final targets = where != null
-        ? _applyWhere(List.from(rows), where, whereArgs ?? [])
-        : List<Map<String, dynamic>>.from(rows);
-    final targetIds = targets.map((r) => r['id']).toSet();
     int count = 0;
     for (var i = 0; i < rows.length; i++) {
-      if (targetIds.contains(rows[i]['id'])) {
+      final match = where == null ||
+          _applyWhere([rows[i]], where, whereArgs ?? []).isNotEmpty;
+      if (match) {
         rows[i] = {...rows[i], ...Map<String, dynamic>.from(values)};
         count++;
       }
@@ -133,6 +156,7 @@ class WebDatabaseAdapter implements DatabaseAdapter {
 
   @override
   Future<int> delete(String table, {String? where, List<dynamic>? whereArgs}) async {
+    _tables.putIfAbsent(table, () => []);
     if (where == null) {
       final count = _tables[table]!.length;
       _tables[table]!.clear();
@@ -141,11 +165,9 @@ class WebDatabaseAdapter implements DatabaseAdapter {
     }
 
     final before = _tables[table]!.length;
-    final keep = List<Map<String, dynamic>>.from(_tables[table]!);
-    final toRemove = _applyWhere(keep, where, whereArgs ?? []);
-    for (final item in toRemove) {
-      _tables[table]!.remove(item);
-    }
+    _tables[table]!.removeWhere(
+      (row) => _applyWhere([row], where, whereArgs ?? []).isNotEmpty,
+    );
     _saveToStorage();
     return before - _tables[table]!.length;
   }
