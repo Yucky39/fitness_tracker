@@ -190,7 +190,7 @@ class _AuthScreenState extends State<AuthScreen>
                   ),
                   const SizedBox(height: 12),
                   Text(
-                    'Fitness Tracker',
+                    'BeWell',
                     textAlign: TextAlign.center,
                     style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                           fontWeight: FontWeight.bold,

@@ -85,7 +85,7 @@ class _BootstrapAppState extends State<_BootstrapApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Fitness Tracker',
+      title: 'BeWell',
       debugShowCheckedModeBanner: false,
       theme: _appLightTheme(),
       darkTheme: _appDarkTheme(),
@@ -159,7 +159,7 @@ class FitnessTrackerApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Fitness Tracker',
+      title: 'BeWell',
       theme: _appLightTheme(),
       darkTheme: _appDarkTheme(),
       themeMode: ThemeMode.system,

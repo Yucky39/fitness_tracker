@@ -88,7 +88,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       key: _scaffoldKey,
       appBar: AppBar(
         automaticallyImplyLeading: false,
-        title: const Text('Fitness Tracker'),
+        title: const Text('BeWell'),
         actions: [
           IconButton(
             icon: const Icon(Icons.account_circle_outlined),

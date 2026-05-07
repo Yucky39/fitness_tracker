@@ -1,6 +1,6 @@
 {
-    "name": "fitness_tracker",
-    "short_name": "fitness_tracker",
+    "name": "BeWell",
+    "short_name": "BeWell",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

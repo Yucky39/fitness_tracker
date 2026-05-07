@@ -98,7 +98,7 @@ class _SplashScreenState extends State<SplashScreen> {
               ),
               const SizedBox(height: 32),
               Text(
-                'Fitness Tracker',
+                'BeWell',
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                       color: scheme.onSurface,
                       fontWeight: FontWeight.w600,

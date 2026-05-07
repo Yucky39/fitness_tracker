@@ -20,7 +20,7 @@
     <!-- カメラハードウェアは必須ではない（カメラなし端末でも動作可） -->
     <uses-feature android:name="android.hardware.camera" android:required="false"/>
     <application
-        android:label="fitness_tracker"
+        android:label="BeWell"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:fullBackupContent="false"

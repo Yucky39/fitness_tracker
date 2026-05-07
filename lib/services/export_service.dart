@@ -37,7 +37,7 @@ class ExportService {
         XFile(trainingFile.path),
         XFile(metricsFile.path),
       ],
-      subject: 'Fitness Tracker データエクスポート $now',
+      subject: 'BeWell データエクスポート $now',
     );
   }
 
