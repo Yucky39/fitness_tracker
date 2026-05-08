@@ -97,7 +97,7 @@ class MealSuggestionScreen extends ConsumerWidget {
                 child: OutlinedButton.icon(
                   icon: const Icon(Icons.shopping_basket_outlined, size: 20),
                   label: const Text('食材の買い物リスト（任意）'),
-                  onPressed: () => _openShoppingListBottomSheet(context, state),
+                  onPressed: () => _openShoppingListBottomSheet(context),
                 ),
               ),
             ),
@@ -920,12 +920,7 @@ class _EmptyState extends StatelessWidget {
 
 // ── 買い物リスト（任意）────────────────────────────────────────────────────────
 
-void _openShoppingListBottomSheet(
-  BuildContext context,
-  MealSuggestionState state,
-) {
-  final weekly = state.weeklySuggestion;
-  final daily = state.suggestion;
+void _openShoppingListBottomSheet(BuildContext context) {
   showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
@@ -935,11 +930,7 @@ void _openShoppingListBottomSheet(
       final h = MediaQuery.sizeOf(ctx).height * 0.78;
       return SizedBox(
         height: h,
-        child: _ShoppingListBottomSheetBody(
-          weekly: weekly,
-          daily: daily,
-          period: state.period,
-        ),
+        child: const _ShoppingListBottomSheetBody(),
       );
     },
   );
@@ -947,41 +938,35 @@ void _openShoppingListBottomSheet(
 
 enum _ShoppingScope { week, day }
 
-class _ShoppingListBottomSheetBody extends StatefulWidget {
-  const _ShoppingListBottomSheetBody({
-    required this.weekly,
-    required this.daily,
-    required this.period,
-  });
-
-  final WeeklyMealSuggestion? weekly;
-  final DailyMealSuggestion? daily;
-  final SuggestionPeriod period;
+class _ShoppingListBottomSheetBody extends ConsumerStatefulWidget {
+  const _ShoppingListBottomSheetBody();
 
   @override
-  State<_ShoppingListBottomSheetBody> createState() =>
+  ConsumerState<_ShoppingListBottomSheetBody> createState() =>
       _ShoppingListBottomSheetBodyState();
 }
 
 class _ShoppingListBottomSheetBodyState
-    extends State<_ShoppingListBottomSheetBody> {
+    extends ConsumerState<_ShoppingListBottomSheetBody> {
   late _ShoppingScope _scope;
   bool _loading = true;
   IngredientMergeContext _ctx = IngredientMergeContext.empty;
-  List<AggregatedShoppingItem> _items = const [];
-
-  bool get _hasWeek => widget.weekly != null;
-  bool get _hasDay => widget.daily != null;
 
   @override
   void initState() {
     super.initState();
-    if (_hasWeek && !_hasDay) {
+    final sugg = ref.read(mealSuggestionProvider);
+    final hasWeek = sugg.weeklySuggestion != null;
+    final hasDay = sugg.suggestion != null;
+    if (hasWeek && !hasDay) {
       _scope = _ShoppingScope.week;
-    } else if (!_hasWeek && _hasDay) {
+    } else if (!hasWeek && hasDay) {
       _scope = _ShoppingScope.day;
     } else {
-      _scope = _ShoppingScope.week;
+      // 両方ある場合は現在の期間タブに合わせる
+      _scope = sugg.period == SuggestionPeriod.week
+          ? _ShoppingScope.week
+          : _ShoppingScope.day;
     }
     _loadMergeAndItems();
   }
@@ -994,58 +979,58 @@ class _ShoppingListBottomSheetBodyState
       if (!mounted) return;
       setState(() {
         _ctx = ctx;
-        _items = _computeItems(ctx);
         _loading = false;
       });
+      final sugg = ref.read(mealSuggestionProvider);
       await IngredientMergeService.instance
-          .recordSurfacesSeen(userId, _rawSurfacesForScope());
+          .recordSurfacesSeen(userId, _rawSurfacesForScope(sugg));
     } catch (_) {
       if (!mounted) return;
       setState(() {
         _ctx = IngredientMergeContext.empty;
-        _items = _computeItems(IngredientMergeContext.empty);
         _loading = false;
       });
     }
   }
 
-  List<AggregatedShoppingItem> _computeItems(IngredientMergeContext ctx) {
+  List<AggregatedShoppingItem> _computeItems(
+      MealSuggestionState sugg, IngredientMergeContext ctx) {
     switch (_scope) {
       case _ShoppingScope.week:
-        return shoppingListFromWeekly(widget.weekly!, ctx);
+        if (sugg.weeklySuggestion == null) return const [];
+        return shoppingListFromWeekly(sugg.weeklySuggestion!, ctx);
       case _ShoppingScope.day:
-        return shoppingListFromDaily(widget.daily!, ctx);
+        if (sugg.suggestion == null) return const [];
+        return shoppingListFromDaily(sugg.suggestion!, ctx);
     }
   }
 
-  Iterable<String> _rawSurfacesForScope() {
+  Iterable<String> _rawSurfacesForScope(MealSuggestionState sugg) {
     switch (_scope) {
       case _ShoppingScope.week:
-        return collectRawIngredientSurfaces(widget.weekly);
+        return collectRawIngredientSurfaces(sugg.weeklySuggestion);
       case _ShoppingScope.day:
-        return collectRawIngredientSurfacesFromDaily(widget.daily);
+        return collectRawIngredientSurfacesFromDaily(sugg.suggestion);
     }
   }
 
   Future<void> _onScopeChanged(_ShoppingScope scope) async {
-    setState(() {
-      _scope = scope;
-      _items = _computeItems(_ctx);
-    });
+    setState(() => _scope = scope);
+    final sugg = ref.read(mealSuggestionProvider);
     try {
       await IngredientMergeService.instance.recordSurfacesSeen(
         ingredientMergeUserKey(),
-        _rawSurfacesForScope(),
+        _rawSurfacesForScope(sugg),
       );
     } catch (_) {}
   }
 
-  String get _heading {
+  String _heading(SuggestionPeriod period) {
     switch (_scope) {
       case _ShoppingScope.week:
         return '【1週間の買い物メモ】';
       case _ShoppingScope.day:
-        return switch (widget.period) {
+        return switch (period) {
           SuggestionPeriod.today => '【今日のメニュー・買い物メモ】',
           SuggestionPeriod.tomorrow => '【明日のメニュー・買い物メモ】',
           SuggestionPeriod.week => '【1日分の買い物メモ】',
@@ -1053,28 +1038,23 @@ class _ShoppingListBottomSheetBodyState
     }
   }
 
-  String get _shareText => buildPlainTextShoppingList(
-        heading: _heading,
-        items: _items,
-      );
-
-  String _daySegmentLabel() => switch (widget.period) {
+  String _daySegmentLabel(SuggestionPeriod period) => switch (period) {
         SuggestionPeriod.today => '今日の分',
         SuggestionPeriod.tomorrow => '明日の分',
         SuggestionPeriod.week => '1日分',
       };
 
-  Future<void> _copy() async {
-    await Clipboard.setData(ClipboardData(text: _shareText));
+  Future<void> _copy(String shareText) async {
+    await Clipboard.setData(ClipboardData(text: shareText));
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('買い物リストをコピーしました')),
     );
   }
 
-  Future<void> _share() async {
+  Future<void> _share(String shareText) async {
     await SharePlus.instance.share(
-      ShareParams(text: _shareText, subject: '買い物リスト'),
+      ShareParams(text: shareText, subject: '買い物リスト'),
     );
   }
 
@@ -1082,7 +1062,16 @@ class _ShoppingListBottomSheetBodyState
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
-    final items = _items;
+    final sugg = ref.watch(mealSuggestionProvider);
+    final hasWeek = sugg.weeklySuggestion != null;
+    final hasDay = sugg.suggestion != null;
+    final items = _loading
+        ? const <AggregatedShoppingItem>[]
+        : _computeItems(sugg, _ctx);
+    final shareText = buildPlainTextShoppingList(
+      heading: _heading(sugg.period),
+      items: items,
+    );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1105,7 +1094,7 @@ class _ShoppingListBottomSheetBodyState
             textAlign: TextAlign.center,
           ),
         ),
-        if (_hasWeek && _hasDay) ...[
+        if (hasWeek && hasDay) ...[
           const SizedBox(height: 10),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -1118,9 +1107,9 @@ class _ShoppingListBottomSheetBodyState
                 ),
                 ButtonSegment(
                   value: _ShoppingScope.day,
-                  label: Text(_daySegmentLabel()),
+                  label: Text(_daySegmentLabel(sugg.period)),
                   icon: Icon(
-                    widget.period == SuggestionPeriod.tomorrow
+                    sugg.period == SuggestionPeriod.tomorrow
                         ? Icons.event
                         : Icons.today,
                     size: 18,
@@ -1198,7 +1187,7 @@ class _ShoppingListBottomSheetBodyState
             children: [
               Expanded(
                 child: OutlinedButton.icon(
-                  onPressed: _copy,
+                  onPressed: () => _copy(shareText),
                   icon: const Icon(Icons.copy, size: 20),
                   label: const Text('コピー'),
                 ),
@@ -1206,7 +1195,7 @@ class _ShoppingListBottomSheetBodyState
               const SizedBox(width: 12),
               Expanded(
                 child: FilledButton.icon(
-                  onPressed: _share,
+                  onPressed: () => _share(shareText),
                   icon: const Icon(Icons.share, size: 20),
                   label: const Text('共有'),
                 ),
