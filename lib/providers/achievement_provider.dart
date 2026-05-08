@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../data/badge_definitions.dart';
 import '../models/achievement.dart';
 import '../services/database_service.dart';
+import '../services/sync_service.dart';
 
 class StreakData {
   final int nutritionStreak;
@@ -141,6 +142,7 @@ class AchievementNotifier extends StateNotifier<AchievementState> {
   Future<void> _saveStreaks(StreakData streaks) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_kStreaks, jsonEncode(streaks.toJson()));
+    SyncService().syncSection('streaks', streaks.toJson());
   }
 
   /// 食事記録時に呼ぶ
@@ -301,9 +303,12 @@ class AchievementNotifier extends StateNotifier<AchievementState> {
             whereArgs: [ach.badgeKey],
           );
         }
+        SyncService().syncRecord('achievements', unlocked.toMap());
       } else if (progress > ach.progress) {
         // 進捗を更新
         updatedAchievements[i] = ach.copyWith(progress: progress);
+        final progressRecord =
+            Achievement(badgeKey: ach.badgeKey, progress: progress);
         final existing = await adapter.query(
           'achievements',
           where: 'badge_key = ?',
@@ -311,10 +316,7 @@ class AchievementNotifier extends StateNotifier<AchievementState> {
           limit: 1,
         );
         if (existing.isEmpty) {
-          await adapter.insert(
-            'achievements',
-            Achievement(badgeKey: ach.badgeKey, progress: progress).toMap(),
-          );
+          await adapter.insert('achievements', progressRecord.toMap());
         } else {
           await adapter.update(
             'achievements',
@@ -323,6 +325,7 @@ class AchievementNotifier extends StateNotifier<AchievementState> {
             whereArgs: [ach.badgeKey],
           );
         }
+        SyncService().syncRecord('achievements', progressRecord.toMap());
       }
     }
 
@@ -336,6 +339,8 @@ class AchievementNotifier extends StateNotifier<AchievementState> {
   void clearNewlyUnlocked() {
     state = state.copyWith(newlyUnlocked: []);
   }
+
+  Future<void> reload() => _load();
 
   String _todayKey() {
     final now = DateTime.now();

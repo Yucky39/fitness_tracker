@@ -3,6 +3,7 @@ import 'package:riverpod/legacy.dart';
 import 'package:uuid/uuid.dart';
 import '../models/training_plan.dart';
 import '../services/database_service.dart';
+import '../services/sync_service.dart';
 import '../services/training_plan_service.dart';
 import '../providers/settings_provider.dart';
 import '../providers/training_provider.dart';
@@ -122,6 +123,7 @@ class TrainingPlanNotifier extends StateNotifier<TrainingPlanState> {
   Future<void> _savePlan(TrainingPlan plan) async {
     final adapter = await DatabaseService().database;
     await adapter.insert('training_plans', plan.toMap());
+    SyncService().syncRecord('training_plans', plan.toMap());
   }
 
   /// AIプラン内の各種目の「実施済み」チェックを更新する
@@ -148,11 +150,13 @@ class TrainingPlanNotifier extends StateNotifier<TrainingPlanState> {
     final newPlans = List<TrainingPlan>.from(state.plans);
     newPlans[idx] = updated;
     state = state.copyWith(plans: newPlans);
+    SyncService().syncRecord('training_plans', updated.toMap());
   }
 
   Future<void> deletePlan(String id) async {
     final adapter = await DatabaseService().database;
     await adapter.delete('training_plans', where: 'id = ?', whereArgs: [id]);
+    SyncService().deleteRecord('training_plans', id);
     state = state.copyWith(
       plans: state.plans.where((p) => p.id != id).toList(),
     );

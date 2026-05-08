@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 import '../models/water_log.dart';
 import '../services/database_service.dart';
+import '../services/sync_service.dart';
 
 class WaterState {
   final List<WaterLog> todayLogs;
@@ -77,12 +78,14 @@ class WaterNotifier extends StateNotifier<WaterState> {
     );
     final adapter = await DatabaseService().database;
     await adapter.insert('water_logs', log.toMap());
+    SyncService().syncRecord('water_logs', log.toMap());
     state = state.copyWith(todayLogs: [...state.todayLogs, log]);
   }
 
   Future<void> removeLog(String id) async {
     final adapter = await DatabaseService().database;
     await adapter.delete('water_logs', where: 'id = ?', whereArgs: [id]);
+    SyncService().deleteRecord('water_logs', id);
     state = state.copyWith(
       todayLogs: state.todayLogs.where((l) => l.id != id).toList(),
     );
@@ -92,7 +95,10 @@ class WaterNotifier extends StateNotifier<WaterState> {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt('waterGoalMl', goalMl);
     state = state.copyWith(dailyGoalMl: goalMl);
+    SyncService().syncFields({'goals.waterGoalMl': goalMl});
   }
+
+  Future<void> reload() => loadToday();
 }
 
 final waterProvider =

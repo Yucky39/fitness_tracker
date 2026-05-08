@@ -3,6 +3,7 @@ import '../models/food_item.dart';
 import '../models/meal_preset.dart';
 import '../models/recipe_ingredient.dart';
 import '../services/database_service.dart';
+import '../services/sync_service.dart';
 
 class PresetState {
   final List<MealPreset> presets;
@@ -27,6 +28,7 @@ class PresetNotifier extends StateNotifier<PresetState> {
     final preset = MealPreset.create(name: name, items: items);
     final adapter = await DatabaseService().database;
     await adapter.insert('meal_presets', preset.toMap());
+    SyncService().syncRecord('meal_presets', preset.toMap());
     await _load();
   }
 
@@ -42,12 +44,14 @@ class PresetNotifier extends StateNotifier<PresetState> {
     );
     final adapter = await DatabaseService().database;
     await adapter.insert('meal_presets', preset.toMap());
+    SyncService().syncRecord('meal_presets', preset.toMap());
     await _load();
   }
 
   Future<void> deletePreset(String id) async {
     final adapter = await DatabaseService().database;
     await adapter.delete('meal_presets', where: 'id = ?', whereArgs: [id]);
+    SyncService().deleteRecord('meal_presets', id);
     await _load();
   }
 }

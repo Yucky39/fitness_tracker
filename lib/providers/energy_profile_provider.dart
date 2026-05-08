@@ -2,6 +2,7 @@ import 'package:riverpod/legacy.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/energy_profile.dart';
+import '../services/sync_service.dart';
 
 class EnergyProfileState {
   /// 未設定時は null（UIでは空欄表示）
@@ -80,7 +81,19 @@ class EnergyProfileNotifier extends StateNotifier<EnergyProfileState> {
     await prefs.setInt(_kWeeks, data.goalWeeks);
     await prefs.setString(_kActivity, data.activityLevel.name);
     state = data;
+
+    SyncService().syncSection('profile', {
+      'sex': data.sex?.name,
+      'age': data.age,
+      'heightCm': data.heightCm,
+      'weightKg': data.weightKg,
+      'targetWeightKg': data.targetWeightKg,
+      'goalWeeks': data.goalWeeks,
+      'activityLevel': data.activityLevel.name,
+    });
   }
+
+  Future<void> reload() async => _load();
 }
 
 final energyProfileProvider =

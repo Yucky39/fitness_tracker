@@ -1,17 +1,25 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../providers/achievement_provider.dart';
+import '../providers/energy_profile_provider.dart';
+import '../providers/meal_provider.dart';
+import '../providers/preset_provider.dart';
+import '../providers/settings_provider.dart';
+import '../providers/training_plan_provider.dart';
+import '../providers/water_provider.dart';
 import '../services/auth_service.dart';
 import '../services/sync_service.dart';
 
-class AuthScreen extends StatefulWidget {
+class AuthScreen extends ConsumerStatefulWidget {
   const AuthScreen({super.key});
 
   @override
-  State<AuthScreen> createState() => _AuthScreenState();
+  ConsumerState<AuthScreen> createState() => _AuthScreenState();
 }
 
-class _AuthScreenState extends State<AuthScreen>
+class _AuthScreenState extends ConsumerState<AuthScreen>
     with SingleTickerProviderStateMixin {
   late final TabController _tabController;
   final _loginFormKey = GlobalKey<FormState>();
@@ -62,6 +70,16 @@ class _AuthScreenState extends State<AuthScreen>
     return null;
   }
 
+  void _reloadProviders() {
+    ref.invalidate(energyProfileProvider);
+    ref.invalidate(settingsProvider);
+    ref.invalidate(achievementProvider);
+    ref.invalidate(mealProvider);
+    ref.invalidate(waterProvider);
+    ref.invalidate(trainingPlanProvider);
+    ref.invalidate(presetProvider);
+  }
+
   Future<void> _login() async {
     if (!_loginFormKey.currentState!.validate()) return;
     setState(() {
@@ -74,8 +92,10 @@ class _AuthScreenState extends State<AuthScreen>
         email: _loginEmailController.text.trim(),
         password: _loginPasswordController.text,
       );
-      // Merge Firestore data into local DB after login
+      // Merge Firestore data (SQLite + SharedPreferences) into local storage
       await SyncService().downloadAndMergeData();
+      // Reload providers so they pick up the downloaded data
+      _reloadProviders();
     } on FirebaseAuthException catch (e) {
       setState(() => _errorMessage = _localizeAuthError(e.code));
     } catch (e) {
@@ -101,7 +121,7 @@ class _AuthScreenState extends State<AuthScreen>
         email: _registerEmailController.text.trim(),
         password: _registerPasswordController.text,
       );
-      // Upload existing local data to Firestore on registration
+      // Upload existing local data (SQLite + SharedPreferences) to Firestore
       await SyncService().uploadAllData();
     } on FirebaseAuthException catch (e) {
       setState(() => _errorMessage = _localizeAuthError(e.code));

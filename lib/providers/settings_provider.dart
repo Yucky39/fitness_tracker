@@ -1,6 +1,7 @@
 import 'package:riverpod/legacy.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../services/sync_service.dart';
 
 enum AiProviderType {
   anthropic,
@@ -319,12 +320,14 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('adviceLevel', level);
     state = state.copyWith(adviceLevel: level);
+    SyncService().syncFields({'settings.adviceLevel': level});
   }
 
   Future<void> updateSelectedProvider(AiProviderType provider) async {
     state = state.copyWith(selectedProvider: provider);
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('selectedAiProvider', provider.name);
+    SyncService().syncFields({'settings.selectedProvider': provider.name});
   }
 
   Future<void> updateModel(AiProviderType provider, String modelId) async {
@@ -336,6 +339,12 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
     };
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(provider.modelStorageKey, modelId);
+    final firestoreKey = switch (provider) {
+      AiProviderType.anthropic => 'settings.anthropicModel',
+      AiProviderType.openai => 'settings.openAiModel',
+      AiProviderType.gemini => 'settings.geminiModel',
+    };
+    SyncService().syncFields({firestoreKey: modelId});
   }
 
   Future<void> updateApiKey(AiProviderType provider, String key) async {
@@ -345,24 +354,29 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
       AiProviderType.openai => state.copyWith(openAiApiKey: key),
       AiProviderType.gemini => state.copyWith(geminiApiKey: key),
     };
+    // API keys are NOT synced to Firestore for security reasons.
   }
 
   Future<void> updateTrainingAdviceEnabled(bool enabled) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('trainingAdviceEnabled', enabled);
     state = state.copyWith(trainingAdviceEnabled: enabled);
+    SyncService().syncFields({'settings.trainingAdviceEnabled': enabled});
   }
 
   Future<void> updateCommunityFoodContributeEnabled(bool enabled) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('communityFoodContributeEnabled', enabled);
     state = state.copyWith(communityFoodContributeEnabled: enabled);
+    SyncService()
+        .syncFields({'settings.communityFoodContributeEnabled': enabled});
   }
 
   Future<void> updateMealSuggestionEnabled(bool enabled) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('mealSuggestionEnabled', enabled);
     state = state.copyWith(mealSuggestionEnabled: enabled);
+    SyncService().syncFields({'settings.mealSuggestionEnabled': enabled});
   }
 
   Future<void> updateNotificationSettings({
@@ -398,7 +412,20 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
       workoutReminderHour: workoutHour,
       workoutReminderMinute: workoutMinute,
     );
+
+    SyncService().syncFields({
+      if (mealEnabled != null) 'settings.mealReminderEnabled': mealEnabled,
+      if (mealHour != null) 'settings.mealReminderHour': mealHour,
+      if (mealMinute != null) 'settings.mealReminderMinute': mealMinute,
+      if (workoutEnabled != null)
+        'settings.workoutReminderEnabled': workoutEnabled,
+      if (workoutHour != null) 'settings.workoutReminderHour': workoutHour,
+      if (workoutMinute != null)
+        'settings.workoutReminderMinute': workoutMinute,
+    });
   }
+
+  Future<void> reload() => _load();
 }
 
 final settingsProvider = StateNotifierProvider<SettingsNotifier, SettingsState>(

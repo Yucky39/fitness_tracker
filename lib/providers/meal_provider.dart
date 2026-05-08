@@ -203,7 +203,18 @@ class MealNotifier extends StateNotifier<MealState> {
     );
     _bumpMealDataEpoch();
     _invalidateDashboard();
+
+    SyncService().syncFields({
+      'goals.calorieGoal': calories,
+      'goals.proteinGoal': protein,
+      'goals.fatGoal': fat,
+      'goals.carbsGoal': carbs,
+      'goals.fiberGoal': fiber ?? state.fiberGoal,
+      'goals.sodiumGoal': sodium ?? state.sodiumGoal,
+    });
   }
+
+  Future<void> reloadGoals() => _loadGoals();
 
   Future<void> addFoodItem({
     required String name,

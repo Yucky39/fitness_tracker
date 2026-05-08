@@ -10,7 +10,17 @@ class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  static const _tables = ['food_items', 'training_logs', 'body_metrics'];
+  static const _tables = [
+    'food_items',
+    'training_logs',
+    'body_metrics',
+    'water_logs',
+    'sleep_logs',
+    'achievements',
+    'training_plans',
+    'meal_presets',
+    'training_routines',
+  ];
 
   User? get currentUser => _auth.currentUser;
   String? get userId => _auth.currentUser?.uid;
