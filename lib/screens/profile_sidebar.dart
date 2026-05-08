@@ -7,6 +7,7 @@ import '../providers/meal_provider.dart';
 import '../providers/settings_provider.dart';
 import '../providers/water_provider.dart';
 import 'achievements_screen.dart';
+import 'faq_screen.dart';
 import '../services/auth_service.dart';
 import '../services/energy_goal_calculator.dart';
 import '../services/export_service.dart';
@@ -988,6 +989,21 @@ class ProfileSidebar extends ConsumerWidget {
             ),
 
             const Spacer(),
+            const Divider(height: 1),
+
+            // ── よくある質問 ──
+            ListTile(
+              leading: const Icon(Icons.help_outline),
+              title: const Text('よくある質問'),
+              trailing:
+                  const Icon(Icons.chevron_right, size: 20, color: Colors.grey),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const FaqScreen()),
+                );
+              },
+            ),
             const Divider(height: 1),
 
             // ── バッジ・実績 ──
