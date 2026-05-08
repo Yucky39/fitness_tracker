@@ -17,6 +17,74 @@ class ProfileSidebar extends ConsumerWidget {
 
   const ProfileSidebar({super.key, required this.scaffoldKey});
 
+  Future<void> _deleteAccount(BuildContext context) async {
+    final passwordController = TextEditingController();
+    bool obscure = true;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: const Text('アカウント削除'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'アカウントを削除すると、すべてのデータが完全に消去されます。この操作は取り消せません。',
+                style: TextStyle(fontSize: 13),
+              ),
+              const SizedBox(height: 16),
+              const Text('確認のため、パスワードを入力してください',
+                  style: TextStyle(fontSize: 13)),
+              const SizedBox(height: 8),
+              TextField(
+                controller: passwordController,
+                obscureText: obscure,
+                decoration: InputDecoration(
+                  labelText: 'パスワード',
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                        obscure ? Icons.visibility : Icons.visibility_off),
+                    onPressed: () =>
+                        setDialogState(() => obscure = !obscure),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('キャンセル'),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                  backgroundColor: Colors.red),
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('削除する'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (confirmed != true) return;
+    final password = passwordController.text;
+    if (!context.mounted) return;
+
+    try {
+      await AuthService().reauthenticate(password);
+      await AuthService().deleteAccount();
+    } on Exception catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('削除に失敗しました: $e')),
+        );
+      }
+    }
+  }
+
   Future<void> _signOut(BuildContext context) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -945,6 +1013,18 @@ class ProfileSidebar extends ConsumerWidget {
                 final ctx = scaffoldKey.currentContext!;
                 scaffoldKey.currentState?.closeEndDrawer();
                 _signOut(ctx);
+              },
+            ),
+
+            // ── アカウント削除 ──
+            ListTile(
+              leading: const Icon(Icons.delete_forever, color: Colors.red),
+              title: const Text('アカウント削除',
+                  style: TextStyle(color: Colors.red)),
+              onTap: () {
+                final ctx = scaffoldKey.currentContext!;
+                scaffoldKey.currentState?.closeEndDrawer();
+                _deleteAccount(ctx);
               },
             ),
           ],
