@@ -31,6 +31,18 @@ class _PaywallSheetState extends ConsumerState<PaywallSheet> {
   bool _purchasing = false;
   String? _error;
 
+  // プロモコード入力
+  final _promoController = TextEditingController();
+  bool _promoLoading = false;
+  String? _promoError;
+  String? _promoSuccess;
+
+  @override
+  void dispose() {
+    _promoController.dispose();
+    super.dispose();
+  }
+
   @override
   void initState() {
     super.initState();
@@ -59,6 +71,32 @@ class _PaywallSheetState extends ConsumerState<PaywallSheet> {
       if (mounted) Navigator.of(context).pop();
     } catch (e) {
       if (mounted) setState(() { _error = e.toString(); _purchasing = false; });
+    }
+  }
+
+  Future<void> _redeemPromo() async {
+    final code = _promoController.text.trim();
+    if (code.isEmpty) return;
+
+    setState(() { _promoLoading = true; _promoError = null; _promoSuccess = null; });
+    try {
+      final days = await SubscriptionService().redeemPromoCode(code);
+      if (!mounted) return;
+      setState(() {
+        _promoSuccess = 'コードが適用されました！${days}日間のプレミアムが有効になります。';
+        _promoLoading = false;
+        _promoController.clear();
+      });
+      // 少し待ってから閉じる
+      await Future.delayed(const Duration(seconds: 2));
+      if (mounted) Navigator.of(context).pop();
+    } catch (e) {
+      if (!mounted) return;
+      final msg = e.toString()
+          .replaceAll(RegExp(r'\[.*?\]'), '')
+          .replaceFirst('Exception: ', '')
+          .trim();
+      setState(() { _promoError = msg; _promoLoading = false; });
     }
   }
 
@@ -145,7 +183,70 @@ class _PaywallSheetState extends ConsumerState<PaywallSheet> {
               Text(_error!, style: TextStyle(color: cs.error, fontSize: 13),
                   textAlign: TextAlign.center),
             ],
-            const SizedBox(height: 16),
+            const SizedBox(height: 20),
+            const Divider(),
+            const SizedBox(height: 8),
+            // プロモコード入力
+            Text(
+              'プロモコードをお持ちの方',
+              style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _promoController,
+                    textCapitalization: TextCapitalization.characters,
+                    decoration: InputDecoration(
+                      hintText: 'コードを入力',
+                      isDense: true,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 10),
+                    ),
+                    onSubmitted: (_) => _redeemPromo(),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                FilledButton.tonal(
+                  onPressed: (_promoLoading || _purchasing)
+                      ? null
+                      : _redeemPromo,
+                  style: FilledButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 12),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10)),
+                  ),
+                  child: _promoLoading
+                      ? const SizedBox(width: 18, height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Text('適用'),
+                ),
+              ],
+            ),
+            if (_promoSuccess != null) ...[
+              const SizedBox(height: 8),
+              Text(_promoSuccess!,
+                  style: TextStyle(
+                      color: Colors.green.shade700,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500),
+                  textAlign: TextAlign.center),
+            ],
+            if (_promoError != null) ...[
+              const SizedBox(height: 8),
+              Text(_promoError!,
+                  style: TextStyle(color: cs.error, fontSize: 13),
+                  textAlign: TextAlign.center),
+            ],
+            const SizedBox(height: 12),
+            const Divider(),
+            const SizedBox(height: 4),
             // リストア・注意書き
             Center(
               child: TextButton(

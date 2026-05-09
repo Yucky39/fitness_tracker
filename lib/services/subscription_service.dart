@@ -75,6 +75,15 @@ class SubscriptionService {
     await _iap.restorePurchases();
   }
 
+  /// プロモコードを適用してサブスクを有効化する。
+  /// 成功時は有効日数を返す。失敗時は例外をスロー。
+  Future<int> redeemPromoCode(String code) async {
+    final callable = FirebaseFunctions.instanceFor(region: 'asia-northeast1')
+        .httpsCallable('redeemPromoCode');
+    final result = await callable.call({'code': code});
+    return (result.data['durationDays'] as num).toInt();
+  }
+
   /// Firestoreのサブスク状態を直接確認する（起動時の整合性チェック用）
   Future<bool> checkSubscriptionActive() async {
     final user = FirebaseAuth.instance.currentUser;

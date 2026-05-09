@@ -116,7 +116,87 @@ exports.activateSubscription = onCall(
   }
 );
 
-// ── checkSubscription: サブスク状態の確認 ─────────────────────────────────────
+// ── redeemPromoCode: プロモコードを適用してサブスクを有効化 ─────────────────────
+
+exports.redeemPromoCode = onCall(
+  { timeoutSeconds: 30 },
+  async (request) => {
+    if (!request.auth) throw new HttpsError('unauthenticated', 'ログインが必要です。');
+
+    const code = (request.data.code ?? '').trim().toUpperCase();
+    if (!code) throw new HttpsError('invalid-argument', 'コードを入力してください。');
+
+    const promoRef = admin.firestore().collection('promo_codes').doc(code);
+    const userSubRef = admin.firestore()
+      .collection('users').doc(request.auth.uid)
+      .collection('subscription').doc('status');
+
+    const result = await admin.firestore().runTransaction(async (tx) => {
+      const [promoSnap, userSnap] = await Promise.all([
+        tx.get(promoRef),
+        tx.get(userSubRef),
+      ]);
+
+      // コードの存在チェック
+      if (!promoSnap.exists) {
+        throw new HttpsError('not-found', '無効なコードです。もう一度確認してください。');
+      }
+
+      const promo = promoSnap.data();
+
+      // 有効フラグ
+      if (!promo.active) {
+        throw new HttpsError('failed-precondition', 'このコードは現在使用できません。');
+      }
+
+      // コード自体の有効期限
+      const promoExpiry = promo.expiresAt?.toDate?.() ?? null;
+      if (promoExpiry && promoExpiry < new Date()) {
+        throw new HttpsError('failed-precondition', 'このコードの有効期限が切れています。');
+      }
+
+      // 使用回数の上限
+      if (promo.maxUses != null && (promo.usedCount ?? 0) >= promo.maxUses) {
+        throw new HttpsError('resource-exhausted', 'このコードは使用上限に達しました。');
+      }
+
+      // ユーザーの使用済みチェック
+      const usedCodes = userSnap.exists ? (userSnap.data().usedPromoCodes ?? []) : [];
+      if (usedCodes.includes(code)) {
+        throw new HttpsError('already-exists', 'このコードは既に使用済みです。');
+      }
+
+      // 有効期限の計算（既存サブスクがあれば期間を延長）
+      const now = new Date();
+      let baseDate = now;
+      if (userSnap.exists && userSnap.data().active) {
+        const currentExpiry = userSnap.data().expiresAt?.toDate?.() ?? null;
+        if (currentExpiry && currentExpiry > now) baseDate = currentExpiry;
+      }
+      const newExpiry = new Date(baseDate);
+      newExpiry.setDate(newExpiry.getDate() + promo.durationDays);
+
+      // プロモの使用回数を更新
+      tx.update(promoRef, { usedCount: admin.firestore.FieldValue.increment(1) });
+
+      // サブスクを有効化
+      tx.set(userSubRef, {
+        active: true,
+        productId: `promo_${code}`,
+        platform: 'promo',
+        promoCode: code,
+        activatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        expiresAt: admin.firestore.Timestamp.fromDate(newExpiry),
+        usedPromoCodes: admin.firestore.FieldValue.arrayUnion(code),
+      }, { merge: true });
+
+      return { durationDays: promo.durationDays, expiresAt: newExpiry.toISOString() };
+    });
+
+    return { success: true, ...result };
+  }
+);
+
 
 exports.checkSubscription = onCall(
   { timeoutSeconds: 10 },
