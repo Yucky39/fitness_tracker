@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../providers/settings_provider.dart';
+import '../services/ai_proxy_service.dart';
 
 class AnalyzedFoodItem {
   final String name;
@@ -97,26 +98,36 @@ class MealImageAnalysisService {
   Future<List<AnalyzedFoodItem>> analyzeImage({
     required List<int> imageBytes,
     required String filePath,
+    bool useSystemAi = false,
     required String apiKey,
     required AiProviderType provider,
     String? model,
   }) async {
-    if (apiKey.isEmpty) {
-      throw Exception('APIキーが設定されていません。設定画面からAPIキーを入力してください。');
+    if (!useSystemAi && apiKey.isEmpty) {
+      throw Exception('__paywall__');
     }
 
     final base64Image = base64Encode(imageBytes);
     final mediaType = _detectMediaType(filePath);
-    final resolvedModel = model ?? provider.defaultModel;
 
     final String rawText;
-    switch (provider) {
-      case AiProviderType.anthropic:
-        rawText = await _callAnthropic(base64Image, mediaType, apiKey, resolvedModel);
-      case AiProviderType.openai:
-        rawText = await _callOpenAi(base64Image, mediaType, apiKey, resolvedModel);
-      case AiProviderType.gemini:
-        rawText = await _callGemini(base64Image, mediaType, apiKey, resolvedModel);
+    if (useSystemAi) {
+      rawText = await AiProxyService.callVision(
+        imageBytes: imageBytes,
+        mediaType: mediaType,
+        prompt: _prompt,
+        maxTokens: _maxTokens,
+      );
+    } else {
+      final resolvedModel = model ?? provider.defaultModel;
+      switch (provider) {
+        case AiProviderType.anthropic:
+          rawText = await _callAnthropic(base64Image, mediaType, apiKey, resolvedModel);
+        case AiProviderType.openai:
+          rawText = await _callOpenAi(base64Image, mediaType, apiKey, resolvedModel);
+        case AiProviderType.gemini:
+          rawText = await _callGemini(base64Image, mediaType, apiKey, resolvedModel);
+      }
     }
 
     return _parseJson(rawText);

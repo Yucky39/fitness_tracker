@@ -3,11 +3,11 @@ import 'package:riverpod/legacy.dart';
 import '../models/training_log.dart';
 import '../providers/energy_profile_provider.dart';
 import '../providers/settings_provider.dart';
+import '../providers/subscription_provider.dart';
 import '../services/training_advice_service.dart';
 import '../services/training_calorie_calculator.dart';
 
 class TrainingDailyAdviceState {
-  /// 日付文字列（yyyy-MM-dd）→ アドバイステキスト
   final Map<String, String> adviceByDate;
   final bool isLoading;
   final String? error;
@@ -32,40 +32,40 @@ class TrainingDailyAdviceState {
       adviceByDate: adviceByDate ?? this.adviceByDate,
       isLoading: isLoading ?? this.isLoading,
       error: clearError ? null : (error ?? this.error),
-      loadingDateKey: clearLoadingDate ? null : (loadingDateKey ?? this.loadingDateKey),
+      loadingDateKey:
+          clearLoadingDate ? null : (loadingDateKey ?? this.loadingDateKey),
     );
   }
 }
 
-class TrainingDailyAdviceNotifier extends StateNotifier<TrainingDailyAdviceState> {
+class TrainingDailyAdviceNotifier
+    extends StateNotifier<TrainingDailyAdviceState> {
   final Ref _ref;
 
-  TrainingDailyAdviceNotifier(this._ref) : super(const TrainingDailyAdviceState());
+  TrainingDailyAdviceNotifier(this._ref)
+      : super(const TrainingDailyAdviceState());
 
-  static String _dateKey(DateTime date) {
-    return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
-  }
+  static String _dateKey(DateTime date) =>
+      '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
 
-  /// 指定日のトレーニングセッション全体のAIアドバイスを取得する。
-  /// キャッシュがある場合は再取得をスキップ（[forceRefresh] で強制再取得可能）。
   Future<void> fetchDailyAdvice({
     required List<TrainingLog> dayLogs,
     required List<TrainingLog> allLogs,
     required DateTime date,
     required String adviceLevel,
-    required String apiKey,
-    required AiProviderType provider,
-    String? model,
     String? sleepContext,
     bool forceRefresh = false,
   }) async {
     final key = _dateKey(date);
-
     if (!forceRefresh && state.adviceByDate.containsKey(key)) return;
 
-    if (apiKey.isEmpty) {
+    final isSubscribed = _ref.read(isSubscribedProvider);
+    final settings = _ref.read(settingsProvider);
+    final apiKey = settings.currentApiKey;
+
+    if (!isSubscribed && apiKey.isEmpty) {
       state = state.copyWith(
-        error: '${provider.label} のAPIキーが設定されていません。⚙️設定から入力してください。',
+        error: '__paywall__',
         clearLoadingDate: true,
         isLoading: false,
       );
@@ -99,9 +99,10 @@ class TrainingDailyAdviceNotifier extends StateNotifier<TrainingDailyAdviceState
         date: date,
         bodyWeightKg: effectiveBw,
         adviceLevel: adviceLevel,
+        useSystemAi: isSubscribed,
         apiKey: apiKey,
-        provider: provider,
-        model: model,
+        provider: settings.selectedProvider,
+        model: settings.currentModel.isNotEmpty ? settings.currentModel : null,
         sleepContext: sleepContext,
       );
 
@@ -120,7 +121,6 @@ class TrainingDailyAdviceNotifier extends StateNotifier<TrainingDailyAdviceState
     }
   }
 
-  /// 指定日のキャッシュを削除して再取得できるようにする
   void clearAdviceForDate(DateTime date) {
     final key = _dateKey(date);
     final updated = Map<String, String>.from(state.adviceByDate)..remove(key);
@@ -129,6 +129,7 @@ class TrainingDailyAdviceNotifier extends StateNotifier<TrainingDailyAdviceState
 }
 
 final trainingDailyAdviceProvider =
-    StateNotifierProvider<TrainingDailyAdviceNotifier, TrainingDailyAdviceState>(
+    StateNotifierProvider<TrainingDailyAdviceNotifier,
+        TrainingDailyAdviceState>(
   (ref) => TrainingDailyAdviceNotifier(ref),
 );

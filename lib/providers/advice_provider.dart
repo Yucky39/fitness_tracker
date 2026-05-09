@@ -1,6 +1,7 @@
 import 'package:riverpod/legacy.dart';
 import '../models/food_item.dart';
 import '../providers/settings_provider.dart';
+import '../providers/subscription_provider.dart';
 import '../services/nutrition_advice_service.dart';
 
 class AdviceState {
@@ -10,7 +11,8 @@ class AdviceState {
 
   const AdviceState({this.adviceText, this.isLoading = false, this.error});
 
-  AdviceState copyWith({String? adviceText, bool? isLoading, String? error}) => AdviceState(
+  AdviceState copyWith({String? adviceText, bool? isLoading, String? error}) =>
+      AdviceState(
         adviceText: adviceText ?? this.adviceText,
         isLoading: isLoading ?? this.isLoading,
         error: error ?? this.error,
@@ -18,7 +20,8 @@ class AdviceState {
 }
 
 class AdviceNotifier extends StateNotifier<AdviceState> {
-  AdviceNotifier() : super(const AdviceState());
+  final Ref _ref;
+  AdviceNotifier(this._ref) : super(const AdviceState());
 
   final _service = NutritionAdviceService();
   String? _cachedKey;
@@ -26,6 +29,7 @@ class AdviceNotifier extends StateNotifier<AdviceState> {
   String _cacheKey(
     List<FoodItem> items,
     String adviceLevel,
+    bool useSystemAi,
     AiProviderType provider,
     String model,
   ) {
@@ -37,7 +41,7 @@ class AdviceNotifier extends StateNotifier<AdviceState> {
         '${totalP.toStringAsFixed(1)}_'
         '${totalF.toStringAsFixed(1)}_'
         '${totalC.toStringAsFixed(1)}_'
-        '${adviceLevel}_${provider.name}_$model';
+        '${adviceLevel}_${useSystemAi ? 'system' : '${provider.name}_$model'}';
   }
 
   Future<void> fetchAdvice({
@@ -50,22 +54,23 @@ class AdviceNotifier extends StateNotifier<AdviceState> {
     double fiberGoal = 25,
     double sodiumGoal = 2300,
     required String adviceLevel,
-    required String apiKey,
-    required AiProviderType provider,
-    String? model,
     bool forceRefresh = false,
   }) async {
-    if (apiKey.isEmpty) {
-      state = AdviceState(
-        error: '${provider.label} のAPIキーが設定されていません。⚙️設定から入力してください。',
-      );
+    final isSubscribed = _ref.read(isSubscribedProvider);
+    final settings = _ref.read(settingsProvider);
+    final apiKey = settings.currentApiKey;
+    final provider = settings.selectedProvider;
+    final model = settings.currentModel;
+
+    // サブスク未加入 かつ APIキー未設定
+    if (!isSubscribed && apiKey.isEmpty) {
+      state = const AdviceState(error: '__paywall__');
       return;
     }
 
-    final resolvedModel = model ?? provider.defaultModel;
-    final key = _cacheKey(items, adviceLevel, provider, resolvedModel);
+    final resolvedModel = model.isNotEmpty ? model : provider.defaultModel;
+    final key = _cacheKey(items, adviceLevel, isSubscribed, provider, resolvedModel);
     if (!forceRefresh && key == _cachedKey && state.adviceText != null) {
-      // キャッシュヒット — 食事内容が変わっていないため再取得をスキップ
       return;
     }
 
@@ -81,6 +86,7 @@ class AdviceNotifier extends StateNotifier<AdviceState> {
         fiberGoal: fiberGoal,
         sodiumGoal: sodiumGoal,
         adviceLevel: adviceLevel,
+        useSystemAi: isSubscribed,
         apiKey: apiKey,
         provider: provider,
         model: resolvedModel,
@@ -98,6 +104,7 @@ class AdviceNotifier extends StateNotifier<AdviceState> {
   }
 }
 
-final adviceProvider = StateNotifierProvider<AdviceNotifier, AdviceState>(
-  (_) => AdviceNotifier(),
+final adviceProvider =
+    StateNotifierProvider<AdviceNotifier, AdviceState>(
+  (ref) => AdviceNotifier(ref),
 );

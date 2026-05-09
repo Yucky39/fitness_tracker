@@ -6,6 +6,7 @@ import '../services/database_service.dart';
 import '../services/sync_service.dart';
 import '../services/training_plan_service.dart';
 import '../providers/settings_provider.dart';
+import '../providers/subscription_provider.dart';
 import '../providers/training_provider.dart';
 import '../providers/energy_profile_provider.dart';
 
@@ -67,15 +68,16 @@ class TrainingPlanNotifier extends StateNotifier<TrainingPlanState> {
     required PlanIntensity intensity,
     required EquipmentOption equipment,
   }) async {
+    final isSubscribed = _ref.read(isSubscribedProvider);
     final settings = _ref.read(settingsProvider);
     final apiKey = settings.currentApiKey;
     final provider = settings.selectedProvider;
     final model = settings.currentModel;
 
-    if (apiKey.isEmpty) {
+    if (!isSubscribed && apiKey.isEmpty) {
       state = state.copyWith(
         isGenerating: false,
-        error: 'APIキーが設定されていません。設定画面から入力してください。',
+        error: '__paywall__',
       );
       return null;
     }
@@ -86,7 +88,6 @@ class TrainingPlanNotifier extends StateNotifier<TrainingPlanState> {
       final profileState = _ref.read(energyProfileProvider);
       final allLogs = _ref.read(trainingProvider).logs;
 
-      // 直近4週間のログを絞り込む
       final cutoff = DateTime.now().subtract(const Duration(days: 28));
       final recentLogs =
           allLogs.where((l) => l.date.isAfter(cutoff)).toList();
@@ -102,6 +103,7 @@ class TrainingPlanNotifier extends StateNotifier<TrainingPlanState> {
         equipment: equipment,
         profile: profileState.toProfileIfComplete(),
         recentLogs: recentLogs,
+        useSystemAi: isSubscribed,
         apiKey: apiKey,
         provider: provider,
         model: model.isNotEmpty ? model : null,
