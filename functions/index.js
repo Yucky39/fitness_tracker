@@ -1,5 +1,6 @@
 const { onCall, HttpsError } = require('firebase-functions/v2/https');
 const { setGlobalOptions } = require('firebase-functions/v2');
+const { defineSecret } = require('firebase-functions/params');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const admin = require('firebase-admin');
 
@@ -7,6 +8,9 @@ admin.initializeApp();
 setGlobalOptions({ region: 'asia-northeast1' });
 
 const MODEL_ID = 'gemini-3-flash-preview';
+
+/** Secret Manager 上の名前と一致させる（firebase functions:secrets:set で登録） */
+const geminiApiKey = defineSecret('GEMINI_API_KEY');
 
 // ── 共通: サブスク状態の検証 ─────────────────────────────────────────────────
 
@@ -30,12 +34,16 @@ async function assertSubscribed(uid) {
 // ── geminiProxy: AI生成プロキシ ───────────────────────────────────────────────
 
 exports.geminiProxy = onCall(
-  { timeoutSeconds: 60, memory: '256MiB' },
+  {
+    secrets: [geminiApiKey],
+    timeoutSeconds: 60,
+    memory: '256MiB',
+  },
   async (request) => {
     if (!request.auth) throw new HttpsError('unauthenticated', 'ログインが必要です。');
     await assertSubscribed(request.auth.uid);
 
-    const apiKey = process.env.GEMINI_API_KEY;
+    const apiKey = geminiApiKey.value();
     if (!apiKey) throw new HttpsError('internal', 'サーバー設定エラーです。管理者にお問い合わせください。');
 
     const { type, systemPrompt, userMessage, base64Image, mediaType, prompt, maxTokens = 1024 } = request.data;
