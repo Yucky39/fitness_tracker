@@ -3,9 +3,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../../data/exercise_muscle_map.dart';
+import '../../models/community_exercise_definition.dart';
 import '../../models/training_log.dart';
+import '../../providers/community_exercise_provider.dart';
 import '../../providers/training_provider.dart';
+import '../../services/auth_service.dart';
+import '../../services/community_exercise_service.dart';
 import '../../services/training_calorie_calculator.dart';
+import '../../utils/exercise_inference.dart';
 
 /// トレーニング記録の追加・編集ダイアログを表示する。
 ///
@@ -62,489 +67,686 @@ void showTrainingLogDialog({
       .toSet()
       .toList()
     ..sort();
-  final suggestions = <String>{
-    ...recentExerciseNames,
-    ...allExerciseNames,
-  }.toList();
 
   showDialog(
     context: context,
-    builder: (context) => StatefulBuilder(
-      builder: (context, setState) {
-        TrainingLog? previousLog;
-        double previewKcal = 0;
+    builder: (dialogContext) => Consumer(
+      builder: (consumerContext, dialogRef, _) {
+        final communityAsync =
+            dialogRef.watch(communityExerciseDefinitionsProvider);
+        final communityDefs = communityAsync.maybeWhen(
+          data: (v) => v,
+          orElse: () => const <CommunityExerciseDefinition>[],
+        );
+        final muscleOverrides =
+            dialogRef.watch(communityMuscleOverridesProvider);
+        final suggestions = <String>{
+          ...recentExerciseNames,
+          ...allExerciseNames,
+          ...communityDefs.map((e) => e.displayName),
+        }.toList();
 
-        void selectExerciseFromChip(String name) {
-          exerciseName = name;
-          exerciseFieldController?.value = TextEditingValue(
-            text: name,
-            selection: TextSelection.collapsed(offset: name.length),
-          );
-          final prev = notifier.getPreviousLog(name, excludeId: existingLog?.id);
-          setState(() {
-            selectedBodyPart = null;
-            if (prev != null) {
-              previousLog = prev;
-              if (prev.exerciseType == ExerciseType.cardio) {
-                distanceController.text =
-                    prev.distanceKm > 0 ? prev.distanceKm.toString() : '';
-                durationController.text = prev.durationMinutes > 0
-                    ? prev.durationMinutes.toString()
-                    : '';
-              } else {
-                weightController.text = prev.weight.toString();
-                repsController.text = prev.reps.toString();
-                setsController.text = prev.sets.toString();
-                intervalController.text = prev.interval.toString();
-              }
-              exerciseType = prev.exerciseType;
-              if (prev.rpe != null) {
-                recordRpe = true;
-                rpeSlider = prev.rpe!.toDouble();
-              }
-            } else {
-              previousLog = null;
-              exerciseType = ExercisePresets.inferType(name);
+        return StatefulBuilder(
+          builder: (context, setState) {
+            TrainingLog? previousLog;
+            double previewKcal = 0;
+
+            void selectExerciseFromChip(String name) {
+              exerciseName = name;
+              exerciseFieldController?.value = TextEditingValue(
+                text: name,
+                selection: TextSelection.collapsed(offset: name.length),
+              );
+              final prev =
+                  notifier.getPreviousLog(name, excludeId: existingLog?.id);
+              setState(() {
+                selectedBodyPart = null;
+                if (prev != null) {
+                  previousLog = prev;
+                  if (prev.exerciseType == ExerciseType.cardio) {
+                    distanceController.text =
+                        prev.distanceKm > 0 ? prev.distanceKm.toString() : '';
+                    durationController.text = prev.durationMinutes > 0
+                        ? prev.durationMinutes.toString()
+                        : '';
+                  } else {
+                    weightController.text = prev.weight.toString();
+                    repsController.text = prev.reps.toString();
+                    setsController.text = prev.sets.toString();
+                    intervalController.text = prev.interval.toString();
+                  }
+                  exerciseType = prev.exerciseType;
+                  if (prev.rpe != null) {
+                    recordRpe = true;
+                    rpeSlider = prev.rpe!.toDouble();
+                  }
+                } else {
+                  previousLog = null;
+                  exerciseType =
+                      inferExerciseTypeWithCommunity(name, communityDefs);
+                }
+              });
             }
-          });
-        }
 
-        void updatePreview() {
-          if (exerciseType == ExerciseType.cardio) {
-            final dur = int.tryParse(durationController.text) ?? 0;
-            previewKcal = TrainingCalorieCalculator.estimate(
-              weight: 0,
-              reps: 0,
-              sets: 0,
-              intervalSec: 0,
-              exerciseType: ExerciseType.cardio,
-              bodyWeightKg: bodyWeightKg,
-              exerciseName: exerciseName,
-              durationMinutes: dur,
-            );
-          } else {
-            final w = double.tryParse(weightController.text) ?? 0;
-            final r = int.tryParse(repsController.text) ?? 0;
-            final s = int.tryParse(setsController.text) ?? 0;
-            final iv = int.tryParse(intervalController.text) ?? 0;
-            previewKcal = TrainingCalorieCalculator.estimate(
-              weight: w,
-              reps: r,
-              sets: s,
-              intervalSec: iv,
-              exerciseType: exerciseType,
-              bodyWeightKg: bodyWeightKg,
-            );
-          }
-        }
-
-        void fillFromPreviousLog(String name) {
-          final prev =
-              notifier.getPreviousLog(name, excludeId: existingLog?.id);
-          if (prev != null) {
-            setState(() {
-              previousLog = prev;
-              if (prev.exerciseType == ExerciseType.cardio) {
-                distanceController.text =
-                    prev.distanceKm > 0 ? prev.distanceKm.toString() : '';
-                durationController.text = prev.durationMinutes > 0
-                    ? prev.durationMinutes.toString()
-                    : '';
+            void updatePreview() {
+              if (exerciseType == ExerciseType.cardio) {
+                final dur = int.tryParse(durationController.text) ?? 0;
+                previewKcal = TrainingCalorieCalculator.estimate(
+                  weight: 0,
+                  reps: 0,
+                  sets: 0,
+                  intervalSec: 0,
+                  exerciseType: ExerciseType.cardio,
+                  bodyWeightKg: bodyWeightKg,
+                  exerciseName: exerciseName,
+                  durationMinutes: dur,
+                );
               } else {
-                weightController.text = prev.weight.toString();
-                repsController.text = prev.reps.toString();
-                setsController.text = prev.sets.toString();
-                intervalController.text = prev.interval.toString();
+                final w = double.tryParse(weightController.text) ?? 0;
+                final r = int.tryParse(repsController.text) ?? 0;
+                final s = int.tryParse(setsController.text) ?? 0;
+                final iv = int.tryParse(intervalController.text) ?? 0;
+                previewKcal = TrainingCalorieCalculator.estimate(
+                  weight: w,
+                  reps: r,
+                  sets: s,
+                  intervalSec: iv,
+                  exerciseType: exerciseType,
+                  bodyWeightKg: bodyWeightKg,
+                );
               }
-              exerciseType = prev.exerciseType;
-              if (prev.rpe != null) {
-                recordRpe = true;
-                rpeSlider = prev.rpe!.toDouble();
+            }
+
+            void fillFromPreviousLog(String name) {
+              final prev =
+                  notifier.getPreviousLog(name, excludeId: existingLog?.id);
+              if (prev != null) {
+                setState(() {
+                  previousLog = prev;
+                  if (prev.exerciseType == ExerciseType.cardio) {
+                    distanceController.text =
+                        prev.distanceKm > 0 ? prev.distanceKm.toString() : '';
+                    durationController.text = prev.durationMinutes > 0
+                        ? prev.durationMinutes.toString()
+                        : '';
+                  } else {
+                    weightController.text = prev.weight.toString();
+                    repsController.text = prev.reps.toString();
+                    setsController.text = prev.sets.toString();
+                    intervalController.text = prev.interval.toString();
+                  }
+                  exerciseType = prev.exerciseType;
+                  if (prev.rpe != null) {
+                    recordRpe = true;
+                    rpeSlider = prev.rpe!.toDouble();
+                  }
+                  updatePreview();
+                });
+              } else {
+                setState(() {
+                  previousLog = null;
+                  exerciseType =
+                      inferExerciseTypeWithCommunity(name, communityDefs);
+                });
               }
-              updatePreview();
-            });
-          } else {
-            setState(() {
-              previousLog = null;
-              exerciseType = ExercisePresets.inferType(name);
-            });
-          }
-        }
+            }
 
-        updatePreview();
+            updatePreview();
 
-        final isCardio = exerciseType == ExerciseType.cardio;
+            final isCardio = exerciseType == ExerciseType.cardio;
 
-        return AlertDialog(
-          title: Text(isEdit ? 'トレーニングを編集' : 'トレーニングを記録'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+            return AlertDialog(
+              title: Text(isEdit ? 'トレーニングを編集' : 'トレーニングを記録'),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Icon(Icons.event, size: 16, color: Colors.grey),
-                    const SizedBox(width: 6),
-                    Text(
-                      '記録日: ${DateFormat('yyyy/M/d').format(targetDate)}',
-                      style: const TextStyle(fontSize: 12, color: Colors.grey),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                const Text('部位で絞り込み',
-                    style: TextStyle(fontSize: 12, color: Colors.grey)),
-                const SizedBox(height: 4),
-                SizedBox(
-                  height: 36,
-                  child: ListView(
-                    scrollDirection: Axis.horizontal,
-                    children: [
-                      ChoiceChip(
-                        label: const Text('すべて'),
-                        selected: selectedBodyPart == null,
-                        onSelected: (_) =>
-                            setState(() => selectedBodyPart = null),
-                        visualDensity: VisualDensity.compact,
-                      ),
-                      const SizedBox(width: 6),
-                      ...BodyPartCategory.values.map((cat) => Padding(
-                            padding: const EdgeInsets.only(right: 6),
-                            child: ChoiceChip(
-                              label: Text(cat.label),
-                              selected: selectedBodyPart == cat,
-                              onSelected: (_) =>
-                                  setState(() => selectedBodyPart = cat),
-                              visualDensity: VisualDensity.compact,
-                            ),
-                          )),
-                    ],
-                  ),
-                ),
-                if (selectedBodyPart != null) ...[
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 6,
-                    runSpacing: 4,
-                    children: filterExercisesByBodyPart(
-                            selectedBodyPart!, suggestions)
-                        .map((name) => ActionChip(
-                              label: Text(name,
-                                  style: const TextStyle(fontSize: 12)),
-                              onPressed: () => selectExerciseFromChip(name),
-                              visualDensity: VisualDensity.compact,
-                            ))
-                        .toList(),
-                  ),
-                  const SizedBox(height: 4),
-                ],
-                const SizedBox(height: 4),
-                Autocomplete<String>(
-                  initialValue: TextEditingValue(text: exerciseName),
-                  optionsBuilder: (v) {
-                    exerciseName = v.text;
-                    final pool = selectedBodyPart != null
-                        ? filterExercisesByBodyPart(
-                            selectedBodyPart!, suggestions)
-                        : suggestions;
-                    if (v.text.isEmpty) return pool.take(20);
-                    return pool.where(
-                        (n) => n.toLowerCase().contains(v.text.toLowerCase()));
-                  },
-                  onSelected: (sel) {
-                    exerciseName = sel;
-                    fillFromPreviousLog(sel);
-                  },
-                  fieldViewBuilder:
-                      (ctx, controller, focusNode, onFieldSubmitted) {
-                    exerciseFieldController = controller;
-                    return TextField(
-                      controller: controller,
-                      focusNode: focusNode,
-                      decoration: const InputDecoration(labelText: '種目名'),
-                      onChanged: (v) {
-                        exerciseName = v;
-                        exerciseType = ExercisePresets.inferType(v);
-                        setState(updatePreview);
-                      },
-                    );
-                  },
-                ),
-                const SizedBox(height: 10),
-                const Text('器具・種別',
-                    style: TextStyle(fontSize: 12, color: Colors.grey)),
-                const SizedBox(height: 4),
-                Wrap(
-                  spacing: 8,
-                  children: ExerciseType.values.map((t) {
-                    return ChoiceChip(
-                      label: Text(t.label),
-                      selected: exerciseType == t,
-                      onSelected: (_) => setState(() {
-                        exerciseType = t;
-                        updatePreview();
-                      }),
-                    );
-                  }).toList(),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  _exerciseTypeHint(exerciseType),
-                  style: const TextStyle(fontSize: 11, color: Colors.grey),
-                ),
-                const SizedBox(height: 8),
-                if (previousLog != null)
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: Colors.blue.shade50,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Row(
+                    Row(
                       children: [
-                        const Icon(Icons.history, size: 14, color: Colors.blue),
+                        const Icon(Icons.event, size: 16, color: Colors.grey),
                         const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(
-                            previousLog!.exerciseType == ExerciseType.cardio
-                                ? '前回: ${previousLog!.durationMinutes}分'
-                                    '${previousLog!.distanceKm > 0 ? '  ${previousLog!.distanceKm.toStringAsFixed(1)}km' : ''}'
-                                    '${previousLog!.rpe != null ? '  RPE ${previousLog!.rpe}' : ''}'
-                                    '  (${DateFormat('M/d').format(previousLog!.date)})'
-                                : '前回: ${previousLog!.weight}kg × ${previousLog!.reps}回 × ${previousLog!.sets}セット'
-                                    '${previousLog!.rpe != null ? '  RPE ${previousLog!.rpe}' : ''}'
-                                    '  (${DateFormat('M/d').format(previousLog!.date)})',
-                            style: const TextStyle(
-                                fontSize: 12, color: Colors.blue),
-                          ),
+                        Text(
+                          '記録日: ${DateFormat('yyyy/M/d').format(targetDate)}',
+                          style:
+                              const TextStyle(fontSize: 12, color: Colors.grey),
                         ),
                       ],
                     ),
-                  ),
-                if (previousLog != null) const SizedBox(height: 8),
-                if (isCardio) ...[
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: distanceController,
-                          decoration:
-                              const InputDecoration(labelText: '距離 (km)'),
-                          keyboardType: const TextInputType.numberWithOptions(
-                              decimal: true),
-                          onChanged: (_) => setState(updatePreview),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: TextField(
-                          controller: durationController,
-                          decoration:
-                              const InputDecoration(labelText: '時間 (分)'),
-                          keyboardType: TextInputType.number,
-                          onChanged: (_) => setState(updatePreview),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-                if (!isCardio) ...[
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: weightController,
-                          decoration: InputDecoration(
-                            labelText: exerciseType == ExerciseType.bodyweight
-                                ? '追加重量 (kg)'
-                                : '重量 (kg)',
-                            hintText: exerciseType == ExerciseType.bodyweight
-                                ? '0 = 自体重のみ'
-                                : '',
+                    const SizedBox(height: 8),
+                    const Text('部位で絞り込み',
+                        style: TextStyle(fontSize: 12, color: Colors.grey)),
+                    const SizedBox(height: 4),
+                    SizedBox(
+                      height: 36,
+                      child: ListView(
+                        scrollDirection: Axis.horizontal,
+                        children: [
+                          ChoiceChip(
+                            label: const Text('すべて'),
+                            selected: selectedBodyPart == null,
+                            onSelected: (_) =>
+                                setState(() => selectedBodyPart = null),
+                            visualDensity: VisualDensity.compact,
                           ),
-                          keyboardType: const TextInputType.numberWithOptions(
-                              decimal: true),
-                          onChanged: (_) => setState(updatePreview),
+                          const SizedBox(width: 6),
+                          ...BodyPartCategory.values.map((cat) => Padding(
+                                padding: const EdgeInsets.only(right: 6),
+                                child: ChoiceChip(
+                                  label: Text(cat.label),
+                                  selected: selectedBodyPart == cat,
+                                  onSelected: (_) =>
+                                      setState(() => selectedBodyPart = cat),
+                                  visualDensity: VisualDensity.compact,
+                                ),
+                              )),
+                        ],
+                      ),
+                    ),
+                    if (selectedBodyPart != null) ...[
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 4,
+                        children: filterExercisesByBodyPart(
+                                selectedBodyPart!, suggestions, muscleOverrides)
+                            .map((name) => ActionChip(
+                                  label: Text(name,
+                                      style: const TextStyle(fontSize: 12)),
+                                  onPressed: () => selectExerciseFromChip(name),
+                                  visualDensity: VisualDensity.compact,
+                                ))
+                            .toList(),
+                      ),
+                      const SizedBox(height: 4),
+                    ],
+                    const SizedBox(height: 4),
+                    Autocomplete<String>(
+                      initialValue: TextEditingValue(text: exerciseName),
+                      optionsBuilder: (v) {
+                        exerciseName = v.text;
+                        final pool = selectedBodyPart != null
+                            ? filterExercisesByBodyPart(
+                                selectedBodyPart!, suggestions, muscleOverrides)
+                            : suggestions;
+                        if (v.text.isEmpty) return pool.take(20);
+                        return pool.where((n) =>
+                            n.toLowerCase().contains(v.text.toLowerCase()));
+                      },
+                      onSelected: (sel) {
+                        exerciseName = sel;
+                        fillFromPreviousLog(sel);
+                      },
+                      fieldViewBuilder:
+                          (ctx, controller, focusNode, onFieldSubmitted) {
+                        exerciseFieldController = controller;
+                        return TextField(
+                          controller: controller,
+                          focusNode: focusNode,
+                          decoration: const InputDecoration(labelText: '種目名'),
+                          onChanged: (v) {
+                            exerciseName = v;
+                            exerciseType = inferExerciseTypeWithCommunity(
+                                v, communityDefs);
+                            setState(updatePreview);
+                          },
+                        );
+                      },
+                    ),
+                    Builder(
+                      builder: (shareBtnCtx) {
+                        final tn = exerciseName.trim();
+                        final nk = normalizeExerciseStorageKey(tn);
+                        final showShare = nk.isNotEmpty &&
+                            !ExercisePresets.allPresetExerciseNames
+                                .contains(tn) &&
+                            !communityDefs.any((d) => d.normalizedKey == nk);
+                        if (!showShare) return const SizedBox.shrink();
+                        return Padding(
+                          padding: const EdgeInsets.only(top: 6),
+                          child: OutlinedButton.icon(
+                            onPressed: () async {
+                              if (AuthService().userId == null) {
+                                ScaffoldMessenger.of(dialogContext)
+                                    .showSnackBar(
+                                  const SnackBar(
+                                    content: Text('共有するにはアカウントでログインしてください'),
+                                  ),
+                                );
+                                return;
+                              }
+                              await showDialog<void>(
+                                context: shareBtnCtx,
+                                builder: (_) => _CommunityExerciseShareDialog(
+                                  displayName: tn,
+                                  initialType: exerciseType,
+                                  messengerContext: dialogContext,
+                                ),
+                              );
+                              setState(updatePreview);
+                            },
+                            icon: const Icon(Icons.people_outline, size: 18),
+                            label: const Text('部位・器具を登録して全員と共有'),
+                          ),
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 10),
+                    const Text('器具・種別',
+                        style: TextStyle(fontSize: 12, color: Colors.grey)),
+                    const SizedBox(height: 4),
+                    Wrap(
+                      spacing: 8,
+                      children: ExerciseType.values.map((t) {
+                        return ChoiceChip(
+                          label: Text(t.label),
+                          selected: exerciseType == t,
+                          onSelected: (_) => setState(() {
+                            exerciseType = t;
+                            updatePreview();
+                          }),
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      _exerciseTypeHint(exerciseType),
+                      style: const TextStyle(fontSize: 11, color: Colors.grey),
+                    ),
+                    const SizedBox(height: 8),
+                    if (previousLog != null)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.shade50,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.history,
+                                size: 14, color: Colors.blue),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                previousLog!.exerciseType == ExerciseType.cardio
+                                    ? '前回: ${previousLog!.durationMinutes}分'
+                                        '${previousLog!.distanceKm > 0 ? '  ${previousLog!.distanceKm.toStringAsFixed(1)}km' : ''}'
+                                        '${previousLog!.rpe != null ? '  RPE ${previousLog!.rpe}' : ''}'
+                                        '  (${DateFormat('M/d').format(previousLog!.date)})'
+                                    : '前回: ${previousLog!.weight}kg × ${previousLog!.reps}回 × ${previousLog!.sets}セット'
+                                        '${previousLog!.rpe != null ? '  RPE ${previousLog!.rpe}' : ''}'
+                                        '  (${DateFormat('M/d').format(previousLog!.date)})',
+                                style: const TextStyle(
+                                    fontSize: 12, color: Colors.blue),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: TextField(
-                          controller: repsController,
-                          decoration: const InputDecoration(labelText: '回数'),
-                          keyboardType: TextInputType.number,
-                          onChanged: (_) => setState(updatePreview),
-                        ),
+                    if (previousLog != null) const SizedBox(height: 8),
+                    if (isCardio) ...[
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: distanceController,
+                              decoration:
+                                  const InputDecoration(labelText: '距離 (km)'),
+                              keyboardType:
+                                  const TextInputType.numberWithOptions(
+                                      decimal: true),
+                              onChanged: (_) => setState(updatePreview),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: TextField(
+                              controller: durationController,
+                              decoration:
+                                  const InputDecoration(labelText: '時間 (分)'),
+                              keyboardType: TextInputType.number,
+                              onChanged: (_) => setState(updatePreview),
+                            ),
+                          ),
+                        ],
                       ),
                     ],
-                  ),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: setsController,
-                          decoration: const InputDecoration(labelText: 'セット数'),
-                          keyboardType: TextInputType.number,
-                          onChanged: (_) => setState(updatePreview),
-                        ),
+                    if (!isCardio) ...[
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: weightController,
+                              decoration: InputDecoration(
+                                labelText:
+                                    exerciseType == ExerciseType.bodyweight
+                                        ? '追加重量 (kg)'
+                                        : '重量 (kg)',
+                                hintText:
+                                    exerciseType == ExerciseType.bodyweight
+                                        ? '0 = 自体重のみ'
+                                        : '',
+                              ),
+                              keyboardType:
+                                  const TextInputType.numberWithOptions(
+                                      decimal: true),
+                              onChanged: (_) => setState(updatePreview),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: TextField(
+                              controller: repsController,
+                              decoration:
+                                  const InputDecoration(labelText: '回数'),
+                              keyboardType: TextInputType.number,
+                              onChanged: (_) => setState(updatePreview),
+                            ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: TextField(
-                          controller: intervalController,
-                          decoration:
-                              const InputDecoration(labelText: 'インターバル (秒)'),
-                          keyboardType: TextInputType.number,
-                          onChanged: (_) => setState(updatePreview),
-                        ),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: setsController,
+                              decoration:
+                                  const InputDecoration(labelText: 'セット数'),
+                              keyboardType: TextInputType.number,
+                              onChanged: (_) => setState(updatePreview),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: TextField(
+                              controller: intervalController,
+                              decoration: const InputDecoration(
+                                  labelText: 'インターバル (秒)'),
+                              keyboardType: TextInputType.number,
+                              onChanged: (_) => setState(updatePreview),
+                            ),
+                          ),
+                        ],
                       ),
                     ],
-                  ),
-                ],
-                const SizedBox(height: 8),
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('RPEを記録（主観的運動強度 1〜10）'),
-                  subtitle: const Text(
-                    'そのセット・セッションのきつさ。有酸素・筋トレどちらにも使えます。',
-                    style: TextStyle(fontSize: 11),
-                  ),
-                  value: recordRpe,
-                  onChanged: (v) => setState(() => recordRpe = v),
+                    const SizedBox(height: 8),
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('RPEを記録（主観的運動強度 1〜10）'),
+                      subtitle: const Text(
+                        'そのセット・セッションのきつさ。有酸素・筋トレどちらにも使えます。',
+                        style: TextStyle(fontSize: 11),
+                      ),
+                      value: recordRpe,
+                      onChanged: (v) => setState(() => recordRpe = v),
+                    ),
+                    if (recordRpe) ...[
+                      Row(
+                        children: [
+                          Text(
+                            rpeSlider.round().toString(),
+                            style: const TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          const Expanded(
+                            child: Text(
+                              '1=非常に楽 … 10=限界に近い',
+                              style:
+                                  TextStyle(fontSize: 11, color: Colors.grey),
+                            ),
+                          ),
+                        ],
+                      ),
+                      Slider(
+                        value: rpeSlider.clamp(1, 10),
+                        min: 1,
+                        max: 10,
+                        divisions: 9,
+                        label: rpeSlider.round().toString(),
+                        onChanged: (v) => setState(() => rpeSlider = v),
+                      ),
+                    ],
+                    TextField(
+                      controller: noteController,
+                      decoration: const InputDecoration(labelText: 'メモ'),
+                    ),
+                    const SizedBox(height: 14),
+                    if (previewKcal > 0)
+                      _CaloriePreviewChip(
+                        kcal: previewKcal,
+                        isCardio: isCardio,
+                        weight: double.tryParse(weightController.text) ?? 0,
+                        reps: int.tryParse(repsController.text) ?? 0,
+                        sets: int.tryParse(setsController.text) ?? 0,
+                        exerciseType: exerciseType,
+                        distanceKm:
+                            double.tryParse(distanceController.text) ?? 0,
+                        durationMinutes:
+                            int.tryParse(durationController.text) ?? 0,
+                      ),
+                  ],
                 ),
-                if (recordRpe) ...[
-                  Row(
-                    children: [
-                      Text(
-                        rpeSlider.round().toString(),
-                        style: const TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      const Expanded(
-                        child: Text(
-                          '1=非常に楽 … 10=限界に近い',
-                          style: TextStyle(fontSize: 11, color: Colors.grey),
-                        ),
-                      ),
-                    ],
-                  ),
-                  Slider(
-                    value: rpeSlider.clamp(1, 10),
-                    min: 1,
-                    max: 10,
-                    divisions: 9,
-                    label: rpeSlider.round().toString(),
-                    onChanged: (v) => setState(() => rpeSlider = v),
-                  ),
-                ],
-                TextField(
-                  controller: noteController,
-                  decoration: const InputDecoration(labelText: 'メモ'),
+              ),
+              actions: [
+                TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('キャンセル')),
+                TextButton(
+                  onPressed: () {
+                    if (exerciseName.isEmpty) return;
+                    int? intervalToStart;
+                    if (isCardio) {
+                      final dist =
+                          double.tryParse(distanceController.text) ?? 0;
+                      final dur = int.tryParse(durationController.text) ?? 0;
+                      if (isEdit) {
+                        notifier.updateLog(existingLog.copyWith(
+                          exerciseName: exerciseName,
+                          exerciseType: exerciseType,
+                          weight: 0,
+                          reps: 0,
+                          sets: 0,
+                          interval: 0,
+                          distanceKm: dist,
+                          durationMinutes: dur,
+                          rpe: recordRpe ? rpeSlider.round() : null,
+                          clearRpe: !recordRpe,
+                          note: noteController.text,
+                        ));
+                      } else {
+                        notifier.addLog(
+                          exerciseName: exerciseName,
+                          exerciseType: exerciseType,
+                          weight: 0,
+                          reps: 0,
+                          sets: 0,
+                          interval: 0,
+                          distanceKm: dist,
+                          durationMinutes: dur,
+                          rpe: recordRpe ? rpeSlider.round() : null,
+                          note: noteController.text,
+                        );
+                      }
+                    } else {
+                      final w = double.tryParse(weightController.text) ?? 0;
+                      final r = int.tryParse(repsController.text) ?? 0;
+                      final s = int.tryParse(setsController.text) ?? 0;
+                      final iv = int.tryParse(intervalController.text) ?? 0;
+                      if (isEdit) {
+                        notifier.updateLog(existingLog.copyWith(
+                          exerciseName: exerciseName,
+                          exerciseType: exerciseType,
+                          weight: w,
+                          reps: r,
+                          sets: s,
+                          interval: iv,
+                          distanceKm: 0,
+                          durationMinutes: 0,
+                          rpe: recordRpe ? rpeSlider.round() : null,
+                          clearRpe: !recordRpe,
+                          note: noteController.text,
+                        ));
+                      } else {
+                        notifier.addLog(
+                          exerciseName: exerciseName,
+                          exerciseType: exerciseType,
+                          weight: w,
+                          reps: r,
+                          sets: s,
+                          interval: iv,
+                          rpe: recordRpe ? rpeSlider.round() : null,
+                          note: noteController.text,
+                        );
+                        if (iv > 0) intervalToStart = iv;
+                      }
+                    }
+                    Navigator.pop(context);
+                    if (intervalToStart != null) {
+                      onIntervalTimerStart?.call(intervalToStart);
+                    }
+                  },
+                  child: Text(isEdit ? '保存' : '記録'),
                 ),
-                const SizedBox(height: 14),
-                if (previewKcal > 0)
-                  _CaloriePreviewChip(
-                    kcal: previewKcal,
-                    isCardio: isCardio,
-                    weight: double.tryParse(weightController.text) ?? 0,
-                    reps: int.tryParse(repsController.text) ?? 0,
-                    sets: int.tryParse(setsController.text) ?? 0,
-                    exerciseType: exerciseType,
-                    distanceKm: double.tryParse(distanceController.text) ?? 0,
-                    durationMinutes: int.tryParse(durationController.text) ?? 0,
-                  ),
               ],
-            ),
-          ),
-          actions: [
-            TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('キャンセル')),
-            TextButton(
-              onPressed: () {
-                if (exerciseName.isEmpty) return;
-                int? intervalToStart;
-                if (isCardio) {
-                  final dist = double.tryParse(distanceController.text) ?? 0;
-                  final dur = int.tryParse(durationController.text) ?? 0;
-                  if (isEdit) {
-                    notifier.updateLog(existingLog.copyWith(
-                      exerciseName: exerciseName,
-                      exerciseType: exerciseType,
-                      weight: 0,
-                      reps: 0,
-                      sets: 0,
-                      interval: 0,
-                      distanceKm: dist,
-                      durationMinutes: dur,
-                      rpe: recordRpe ? rpeSlider.round() : null,
-                      clearRpe: !recordRpe,
-                      note: noteController.text,
-                    ));
-                  } else {
-                    notifier.addLog(
-                      exerciseName: exerciseName,
-                      exerciseType: exerciseType,
-                      weight: 0,
-                      reps: 0,
-                      sets: 0,
-                      interval: 0,
-                      distanceKm: dist,
-                      durationMinutes: dur,
-                      rpe: recordRpe ? rpeSlider.round() : null,
-                      note: noteController.text,
-                    );
-                  }
-                } else {
-                  final w = double.tryParse(weightController.text) ?? 0;
-                  final r = int.tryParse(repsController.text) ?? 0;
-                  final s = int.tryParse(setsController.text) ?? 0;
-                  final iv = int.tryParse(intervalController.text) ?? 0;
-                  if (isEdit) {
-                    notifier.updateLog(existingLog.copyWith(
-                      exerciseName: exerciseName,
-                      exerciseType: exerciseType,
-                      weight: w,
-                      reps: r,
-                      sets: s,
-                      interval: iv,
-                      distanceKm: 0,
-                      durationMinutes: 0,
-                      rpe: recordRpe ? rpeSlider.round() : null,
-                      clearRpe: !recordRpe,
-                      note: noteController.text,
-                    ));
-                  } else {
-                    notifier.addLog(
-                      exerciseName: exerciseName,
-                      exerciseType: exerciseType,
-                      weight: w,
-                      reps: r,
-                      sets: s,
-                      interval: iv,
-                      rpe: recordRpe ? rpeSlider.round() : null,
-                      note: noteController.text,
-                    );
-                    if (iv > 0) intervalToStart = iv;
-                  }
-                }
-                Navigator.pop(context);
-                if (intervalToStart != null) {
-                  onIntervalTimerStart?.call(intervalToStart);
-                }
-              },
-              child: Text(isEdit ? '保存' : '記録'),
-            ),
-          ],
+            );
+          },
         );
       },
     ),
   );
+}
+
+class _CommunityExerciseShareDialog extends StatefulWidget {
+  const _CommunityExerciseShareDialog({
+    required this.displayName,
+    required this.initialType,
+    required this.messengerContext,
+  });
+
+  final String displayName;
+  final ExerciseType initialType;
+  final BuildContext messengerContext;
+
+  @override
+  State<_CommunityExerciseShareDialog> createState() =>
+      _CommunityExerciseShareDialogState();
+}
+
+class _CommunityExerciseShareDialogState
+    extends State<_CommunityExerciseShareDialog> {
+  late ExerciseType _type = widget.initialType;
+  late final Set<MuscleGroup> _selected = {..._defaults(widget.initialType)};
+
+  static Set<MuscleGroup> _defaults(ExerciseType t) {
+    if (t == ExerciseType.cardio) return {MuscleGroup.cardio};
+    return {MuscleGroup.chest};
+  }
+
+  Future<void> _submit() async {
+    final hostMessenger = ScaffoldMessenger.of(widget.messengerContext);
+    if (_selected.isEmpty) {
+      hostMessenger.showSnackBar(
+        const SnackBar(content: Text('鍛える部位を1つ以上選んでください')),
+      );
+      return;
+    }
+    try {
+      await CommunityExerciseService().contribute(
+        displayName: widget.displayName,
+        exerciseType: _type,
+        muscleGroups: _selected.toList(),
+      );
+      if (!mounted) return;
+      Navigator.pop(context);
+      hostMessenger.showSnackBar(
+        const SnackBar(content: Text('共通リストに登録しました。他のユーザーにも表示されます')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      hostMessenger.showSnackBar(
+        SnackBar(content: Text('登録できませんでした: $e')),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('種目を全員と共有'),
+      content: SizedBox(
+        width: double.maxFinite,
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                '「${widget.displayName}」',
+                style:
+                    const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+              ),
+              const SizedBox(height: 6),
+              const Text(
+                '主な鍛える部位（複数可）。後から他ユーザーの提案とマージされます。',
+                style: TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: MuscleGroup.values.map((g) {
+                  final on = _selected.contains(g);
+                  return FilterChip(
+                    label: Text(g.label),
+                    selected: on,
+                    onSelected: (v) {
+                      setState(() {
+                        if (v) {
+                          _selected.add(g);
+                        } else if (_selected.length > 1) {
+                          _selected.remove(g);
+                        }
+                      });
+                    },
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                '器具のカテゴリ',
+                style: TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+              const SizedBox(height: 4),
+              Wrap(
+                spacing: 8,
+                children: ExerciseType.values.map((t) {
+                  return ChoiceChip(
+                    label: Text(t.label),
+                    selected: _type == t,
+                    onSelected: (_) => setState(() => _type = t),
+                  );
+                }).toList(),
+              ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('キャンセル'),
+        ),
+        FilledButton(
+          onPressed: _submit,
+          child: const Text('共有する'),
+        ),
+      ],
+    );
+  }
 }
 
 String _exerciseTypeHint(ExerciseType type) {
