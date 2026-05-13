@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/food_item.dart';
 import '../providers/settings_provider.dart';
+import '../services/ai_proxy_service.dart';
 
 class NutritionAdviceService {
   static const _maxTokens = 1024;
@@ -84,6 +85,7 @@ $fiberLine$sodiumLine
     double fiberGoal = 25,
     double sodiumGoal = 2300,
     required String adviceLevel,
+    bool useSystemAi = false,
     required String apiKey,
     required AiProviderType provider,
     String? model,
@@ -99,6 +101,15 @@ $fiberLine$sodiumLine
       fiberGoal: fiberGoal,
       sodiumGoal: sodiumGoal,
     );
+
+    if (useSystemAi) {
+      return AiProxyService.callText(
+        systemPrompt: systemPrompt,
+        userMessage: userMessage,
+        maxTokens: _maxTokens,
+      );
+    }
+
     final resolvedModel = model ?? provider.defaultModel;
     switch (provider) {
       case AiProviderType.anthropic:

@@ -8,10 +8,12 @@ import '../providers/settings_provider.dart';
 import '../providers/water_provider.dart';
 import 'achievements_screen.dart';
 import 'faq_screen.dart';
+import '../providers/subscription_provider.dart';
 import '../services/auth_service.dart';
 import '../services/energy_goal_calculator.dart';
 import '../services/export_service.dart';
 import '../services/notification_service.dart';
+import '../widgets/paywall_sheet.dart';
 
 class ProfileSidebar extends ConsumerWidget {
   final GlobalKey<ScaffoldState> scaffoldKey;
@@ -832,7 +834,76 @@ class ProfileSidebar extends ConsumerWidget {
     );
   }
 
+  // ── サブスクリプション情報ダイアログ ─────────────────────────────────────
+
+  void _showSubscriptionInfoDialog(BuildContext context, WidgetRef ref) {
+    final subscription = ref.read(subscriptionProvider);
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.workspace_premium_outlined,
+                color: Theme.of(context).colorScheme.primary),
+            const SizedBox(width: 8),
+            const Text('プレミアムプラン'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _infoRow('ステータス', 'アクティブ'),
+            if (subscription.productId != null)
+              _infoRow(
+                'プラン',
+                subscription.productId!.contains('annual') ? '年額プラン' : '月額プラン',
+              ),
+            if (subscription.expiresAt != null)
+              _infoRow('次回更新', _formatDate(subscription.expiresAt!)),
+            if (subscription.platform != null)
+              _infoRow('ストア', subscription.platform == 'ios' ? 'App Store' : 'Google Play'),
+            const SizedBox(height: 12),
+            Text(
+              'サブスクリプションの解約・管理は各ストアのアカウント設定から行えます。',
+              style: TextStyle(fontSize: 12, color: Colors.grey[600], height: 1.5),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('閉じる'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _infoRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 80,
+            child: Text(label,
+                style: const TextStyle(fontSize: 12, color: Colors.grey)),
+          ),
+          Expanded(
+            child: Text(value,
+                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+          ),
+        ],
+      ),
+    );
+  }
+
   // ── ヘルパー ──────────────────────────────────────────────────────────────
+
+  String _formatDate(DateTime dt) {
+    return '${dt.year}/${dt.month.toString().padLeft(2, '0')}/${dt.day.toString().padLeft(2, '0')}';
+  }
 
   String _appliedEnergyBalanceLabel(int delta) {
     if (delta.abs() < 8) {
@@ -895,6 +966,8 @@ class ProfileSidebar extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final email = AuthService().userEmail ?? '';
+    final subscription = ref.watch(subscriptionProvider);
+    final isSubscribed = subscription.hasActiveAccess;
 
     return Drawer(
       child: SafeArea(
@@ -910,17 +983,96 @@ class ProfileSidebar extends ConsumerWidget {
                       size: 48, color: Colors.teal),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: Text(
-                      email,
-                      style: const TextStyle(fontSize: 14),
-                      overflow: TextOverflow.ellipsis,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          email,
+                          style: const TextStyle(fontSize: 14),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        if (isSubscribed) ...[
+                          const SizedBox(height: 2),
+                          Row(
+                            children: [
+                              Icon(Icons.auto_awesome_rounded,
+                                  size: 12,
+                                  color: Theme.of(context).colorScheme.primary),
+                              const SizedBox(width: 4),
+                              Text(
+                                'プレミアム',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Theme.of(context).colorScheme.primary,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ],
                     ),
                   ),
                 ],
               ),
             ),
             const Divider(height: 1),
-            const SizedBox(height: 8),
+
+            // ── サブスクリプションバナー（未加入時） ──
+            if (!isSubscribed)
+              InkWell(
+                onTap: () {
+                  scaffoldKey.currentState?.closeEndDrawer();
+                  PaywallSheet.show(context);
+                },
+                child: Container(
+                  margin: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        Theme.of(context).colorScheme.primaryContainer,
+                        Theme.of(context).colorScheme.secondaryContainer,
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.auto_awesome_rounded,
+                          size: 20,
+                          color: Theme.of(context).colorScheme.primary),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'プレミアムプランを試す',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                                color: Theme.of(context).colorScheme.onPrimaryContainer,
+                              ),
+                            ),
+                            Text(
+                              'AI機能が自動で使えるようになります',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Theme.of(context).colorScheme.onPrimaryContainer,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Icon(Icons.chevron_right,
+                          color: Theme.of(context).colorScheme.primary),
+                    ],
+                  ),
+                ),
+              ),
+
+            const SizedBox(height: 4),
 
             // ── セクションラベル ──
             Padding(
@@ -949,10 +1101,10 @@ class ProfileSidebar extends ConsumerWidget {
               },
             ),
 
-            // ── AIキー・トレーニングアドバイス設定 ──
+            // ── AIキー・トレーニングアドバイス設定（サブスク未加入時のみAPIキー設定を表示） ──
             ListTile(
               leading: const Icon(Icons.psychology_outlined),
-              title: const Text('AIキー・トレーニングアドバイス設定'),
+              title: Text(isSubscribed ? 'AIアドバイス設定' : 'AIキー・トレーニングアドバイス設定'),
               trailing:
                   const Icon(Icons.chevron_right, size: 20, color: Colors.grey),
               onTap: () {
@@ -961,6 +1113,27 @@ class ProfileSidebar extends ConsumerWidget {
                 _showAISettingsDialog(ctx, ref);
               },
             ),
+
+            // ── サブスクリプション管理（加入済みのみ） ──
+            if (isSubscribed)
+              ListTile(
+                leading: Icon(Icons.workspace_premium_outlined,
+                    color: Theme.of(context).colorScheme.primary),
+                title: const Text('プレミアムプラン'),
+                subtitle: subscription.expiresAt != null
+                    ? Text(
+                        '次回更新: ${_formatDate(subscription.expiresAt!)}',
+                        style:
+                            const TextStyle(fontSize: 11, color: Colors.grey),
+                      )
+                    : null,
+                trailing:
+                    const Icon(Icons.chevron_right, size: 20, color: Colors.grey),
+                onTap: () {
+                  scaffoldKey.currentState?.closeEndDrawer();
+                  _showSubscriptionInfoDialog(context, ref);
+                },
+              ),
 
             // ── リマインダー通知 ──
             ListTile(

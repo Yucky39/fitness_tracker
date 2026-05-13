@@ -4,6 +4,7 @@ import '../models/energy_profile.dart';
 import '../models/training_log.dart';
 import '../models/training_plan.dart';
 import '../providers/settings_provider.dart';
+import '../services/ai_proxy_service.dart';
 
 class TrainingPlanService {
   static const _maxTokens = 8192;
@@ -229,11 +230,12 @@ class TrainingPlanService {
     required EquipmentOption equipment,
     required EnergyProfile? profile,
     required List<TrainingLog> recentLogs,
+    bool useSystemAi = false,
     required String apiKey,
     required AiProviderType provider,
     String? model,
   }) async {
-    if (apiKey.isEmpty) {
+    if (!useSystemAi && apiKey.isEmpty) {
       throw Exception('APIキーが設定されていません。設定画面から入力してください。');
     }
 
@@ -249,18 +251,26 @@ class TrainingPlanService {
       recentLogs: recentLogs,
     );
 
-    final resolvedModel = model ?? provider.defaultModel;
     final String raw;
-    switch (provider) {
-      case AiProviderType.anthropic:
-        raw = await _callAnthropic(
-            systemPrompt, userMessage, apiKey, resolvedModel);
-      case AiProviderType.openai:
-        raw =
-            await _callOpenAi(systemPrompt, userMessage, apiKey, resolvedModel);
-      case AiProviderType.gemini:
-        raw =
-            await _callGemini(systemPrompt, userMessage, apiKey, resolvedModel);
+    if (useSystemAi) {
+      raw = await AiProxyService.callText(
+        systemPrompt: systemPrompt,
+        userMessage: userMessage,
+        maxTokens: _maxTokens,
+      );
+    } else {
+      final resolvedModel = model ?? provider.defaultModel;
+      switch (provider) {
+        case AiProviderType.anthropic:
+          raw = await _callAnthropic(
+              systemPrompt, userMessage, apiKey, resolvedModel);
+        case AiProviderType.openai:
+          raw =
+              await _callOpenAi(systemPrompt, userMessage, apiKey, resolvedModel);
+        case AiProviderType.gemini:
+          raw =
+              await _callGemini(systemPrompt, userMessage, apiKey, resolvedModel);
+      }
     }
 
     final jsonText = _extractJson(raw);

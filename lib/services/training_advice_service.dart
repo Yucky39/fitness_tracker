@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import '../models/training_log.dart';
 import '../providers/settings_provider.dart';
+import '../services/ai_proxy_service.dart';
 
 class TrainingAdviceService {
   /// 出力が途中で切れないよう、十分な余裕を持たせる（プロンプトが長い場合も同様）。
@@ -281,6 +282,7 @@ class TrainingAdviceService {
     required DateTime date,
     required double bodyWeightKg,
     required String adviceLevel,
+    bool useSystemAi = false,
     required String apiKey,
     required AiProviderType provider,
     String? model,
@@ -298,6 +300,15 @@ class TrainingAdviceService {
       sleepContext: sleepContext,
       weeklyLoadContext: weeklyContext,
     );
+
+    if (useSystemAi) {
+      return AiProxyService.callText(
+        systemPrompt: systemPrompt,
+        userMessage: userMessage,
+        maxTokens: _maxTokens,
+      );
+    }
+
     final resolvedModel = model ?? provider.defaultModel;
     switch (provider) {
       case AiProviderType.anthropic:
@@ -315,6 +326,7 @@ class TrainingAdviceService {
     required List<TrainingLog> focusLogs,
     required Map<String, List<TrainingLog>> historyByExercise,
     required String adviceLevel,
+    bool useSystemAi = false,
     required String apiKey,
     required AiProviderType provider,
     String? model,
@@ -331,6 +343,15 @@ class TrainingAdviceService {
       sleepContext: sleepContext,
       weeklyLoadContext: weeklyLoadContext,
     );
+
+    if (useSystemAi) {
+      return AiProxyService.callText(
+        systemPrompt: systemPrompt,
+        userMessage: userMessage,
+        maxTokens: _maxTokens,
+      );
+    }
+
     final resolvedModel = model ?? provider.defaultModel;
     switch (provider) {
       case AiProviderType.anthropic:

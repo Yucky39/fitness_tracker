@@ -1,9 +1,11 @@
 import 'dart:convert';
 
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod/legacy.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/food_item.dart';
 import '../providers/settings_provider.dart';
+import '../providers/subscription_provider.dart';
 import '../services/nutrition_advice_service.dart';
 
 class AdviceState {
@@ -41,7 +43,9 @@ class AdviceState {
 }
 
 class AdviceNotifier extends StateNotifier<AdviceState> {
-  AdviceNotifier() : super(const AdviceState()) {
+  final Ref _ref;
+
+  AdviceNotifier(this._ref) : super(const AdviceState()) {
     _loadCachedAdvice();
   }
 
@@ -83,30 +87,35 @@ class AdviceNotifier extends StateNotifier<AdviceState> {
     double fiberGoal = 25,
     double sodiumGoal = 2300,
     required String adviceLevel,
-    required String apiKey,
-    required AiProviderType provider,
-    String? model,
     bool forceRefresh = false,
+    String? apiKey,
+    AiProviderType? provider,
+    String? model,
   }) async {
-    final dateKey = AdviceNotifier.dateKey(date);
-    if (!forceRefresh && state.adviceByDate.containsKey(dateKey)) return;
+    final isSubscribed = _ref.read(isSubscribedProvider);
+    final settings = _ref.read(settingsProvider);
+    final effectiveApiKey = apiKey ?? settings.currentApiKey;
+    final effectiveProvider = provider ?? settings.selectedProvider;
+    final modelStr = model ?? settings.currentModel;
 
-    if (apiKey.isEmpty) {
-      state = state.copyWith(
-        error: '${provider.label} のAPIキーが設定されていません。⚙️設定から入力してください。',
-        errorDateKey: dateKey,
-        isLoading: false,
-        clearLoadingDate: true,
-      );
+    if (!isSubscribed && effectiveApiKey.isEmpty) {
+      state = const AdviceState(error: '__paywall__');
       return;
     }
 
-    final resolvedModel = model ?? provider.defaultModel;
+    final dk = AdviceNotifier.dateKey(date);
+    if (!forceRefresh && state.adviceByDate.containsKey(dk)) return;
+
+    final resolvedModel = modelStr.isNotEmpty
+        ? modelStr
+        : effectiveProvider.defaultModel;
+
     state = state.copyWith(
       isLoading: true,
-      loadingDateKey: dateKey,
+      loadingDateKey: dk,
       clearError: true,
     );
+
     try {
       final text = await _service.getAdvice(
         items: items,
@@ -118,11 +127,12 @@ class AdviceNotifier extends StateNotifier<AdviceState> {
         fiberGoal: fiberGoal,
         sodiumGoal: sodiumGoal,
         adviceLevel: adviceLevel,
-        apiKey: apiKey,
-        provider: provider,
+        useSystemAi: isSubscribed,
+        apiKey: effectiveApiKey,
+        provider: effectiveProvider,
         model: resolvedModel,
       );
-      final updated = {...state.adviceByDate, dateKey: text};
+      final updated = {...state.adviceByDate, dk: text};
       await _saveCachedAdvice(updated);
       state = state.copyWith(
         adviceByDate: updated,
@@ -135,7 +145,7 @@ class AdviceNotifier extends StateNotifier<AdviceState> {
         isLoading: false,
         clearLoadingDate: true,
         error: e.toString().replaceFirst('Exception: ', ''),
-        errorDateKey: dateKey,
+        errorDateKey: dk,
       );
     }
   }
@@ -147,6 +157,5 @@ class AdviceNotifier extends StateNotifier<AdviceState> {
   }
 }
 
-final adviceProvider = StateNotifierProvider<AdviceNotifier, AdviceState>(
-  (_) => AdviceNotifier(),
-);
+final adviceProvider =
+    StateNotifierProvider<AdviceNotifier, AdviceState>((ref) => AdviceNotifier(ref));

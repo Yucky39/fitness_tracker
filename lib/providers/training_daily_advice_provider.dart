@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/training_log.dart';
 import '../providers/energy_profile_provider.dart';
 import '../providers/settings_provider.dart';
+import '../providers/subscription_provider.dart';
 import '../services/training_advice_service.dart';
 import '../services/training_calorie_calculator.dart';
 
@@ -96,9 +97,11 @@ class TrainingDailyAdviceNotifier
 
     if (!forceRefresh && state.adviceByDate.containsKey(key)) return;
 
-    if (apiKey.isEmpty) {
+    final isSubscribed = _ref.read(isSubscribedProvider);
+
+    if (!isSubscribed && apiKey.isEmpty) {
       state = state.copyWith(
-        error: '${provider.label} のAPIキーが設定されていません。⚙️設定から入力してください。',
+        error: '__paywall__',
         errorDateKey: key,
         clearLoadingDate: true,
         isLoading: false,
@@ -128,15 +131,19 @@ class TrainingDailyAdviceNotifier
           ? bodyWeightKg
           : TrainingCalorieCalculator.defaultBodyWeightKg;
 
+      final effectiveModel =
+          (model != null && model.isNotEmpty) ? model : null;
+
       final text = await TrainingAdviceService().getDailyAdvice(
         dayLogs: dayLogs,
         allLogs: allLogs,
         date: date,
         bodyWeightKg: effectiveBw,
         adviceLevel: adviceLevel,
+        useSystemAi: isSubscribed,
         apiKey: apiKey,
         provider: provider,
-        model: model,
+        model: effectiveModel,
         sleepContext: sleepContext,
       );
 

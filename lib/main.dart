@@ -15,6 +15,7 @@ import 'screens/home_screen.dart';
 import 'screens/onboarding_screen.dart';
 import 'screens/splash_screen.dart';
 import 'services/notification_service.dart';
+import 'services/subscription_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -80,6 +81,7 @@ class _BootstrapAppState extends State<_BootstrapApp> {
     }
 
     await NotificationService().initialize();
+    SubscriptionService().initialize();
   }
 
   @override

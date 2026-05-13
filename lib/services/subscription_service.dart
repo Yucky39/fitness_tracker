@@ -1,0 +1,100 @@
+import 'dart:async';
+import 'dart:io';
+import 'package:cloud_functions/cloud_functions.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:in_app_purchase/in_app_purchase.dart';
+import '../models/subscription.dart';
+
+class SubscriptionService {
+  static final SubscriptionService _instance = SubscriptionService._();
+  factory SubscriptionService() => _instance;
+  SubscriptionService._();
+
+  final _iap = InAppPurchase.instance;
+
+  StreamSubscription<List<PurchaseDetails>>? _purchaseSub;
+
+  /// アプリ起動時に呼ぶ。購入完了イベントを監視してFirestoreに反映する。
+  void initialize() {
+    _purchaseSub?.cancel();
+    _purchaseSub = _iap.purchaseStream.listen(_onPurchaseUpdate);
+  }
+
+  void dispose() {
+    _purchaseSub?.cancel();
+  }
+
+  Future<void> _onPurchaseUpdate(List<PurchaseDetails> purchases) async {
+    for (final purchase in purchases) {
+      if (purchase.status == PurchaseStatus.pending) continue;
+
+      if (purchase.status == PurchaseStatus.purchased ||
+          purchase.status == PurchaseStatus.restored) {
+        await _activateOnServer(purchase);
+        await _iap.completePurchase(purchase);
+      } else if (purchase.status == PurchaseStatus.error) {
+        await _iap.completePurchase(purchase);
+      }
+    }
+  }
+
+  Future<void> _activateOnServer(PurchaseDetails purchase) async {
+    try {
+      final callable = FirebaseFunctions.instanceFor(region: 'asia-northeast1')
+          .httpsCallable('activateSubscription');
+      await callable.call({
+        'productId': purchase.productID,
+        'purchaseToken': purchase.verificationData.serverVerificationData,
+        'platform': Platform.isIOS ? 'ios' : 'android',
+      });
+    } catch (_) {
+      // サーバー側の活性化に失敗してもアプリはクラッシュしない。
+      // 次回起動時にリストア機能で再試行できる。
+    }
+  }
+
+  /// 商品情報を取得する
+  Future<List<ProductDetails>> fetchProducts() async {
+    final available = await _iap.isAvailable();
+    if (!available) return [];
+
+    final response = await _iap.queryProductDetails(
+      SubscriptionProducts.all.toSet(),
+    );
+    return response.productDetails;
+  }
+
+  /// サブスクを購入する
+  Future<void> purchase(ProductDetails product) async {
+    final purchaseParam = PurchaseParam(productDetails: product);
+    await _iap.buyNonConsumable(purchaseParam: purchaseParam);
+  }
+
+  /// 過去の購入をリストアする
+  Future<void> restorePurchases() async {
+    await _iap.restorePurchases();
+  }
+
+  /// プロモコードを適用してサブスクを有効化する。
+  /// 成功時は有効日数を返す。失敗時は例外をスロー。
+  Future<int> redeemPromoCode(String code) async {
+    final callable = FirebaseFunctions.instanceFor(region: 'asia-northeast1')
+        .httpsCallable('redeemPromoCode');
+    final result = await callable.call({'code': code});
+    return (result.data['durationDays'] as num).toInt();
+  }
+
+  /// Firestoreのサブスク状態を直接確認する（起動時の整合性チェック用）
+  Future<bool> checkSubscriptionActive() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return false;
+    try {
+      final callable = FirebaseFunctions.instanceFor(region: 'asia-northeast1')
+          .httpsCallable('checkSubscription');
+      final result = await callable.call();
+      return result.data['active'] == true;
+    } catch (_) {
+      return false;
+    }
+  }
+}
