@@ -37,12 +37,37 @@ class FaqScreen extends StatelessWidget {
     ),
   ];
 
+  static const _sources = [
+    _SourceItem(
+      title: 'World Health Organization: Physical activity',
+      url: 'https://www.who.int/news-room/fact-sheets/detail/physical-activity',
+    ),
+    _SourceItem(
+      title: 'U.S. Department of Health and Human Services: Physical Activity Guidelines',
+      url:
+          'https://health.gov/our-work/nutrition-physical-activity/physical-activity-guidelines',
+    ),
+    _SourceItem(
+      title: 'CDC: Healthy Weight, Nutrition, and Physical Activity',
+      url: 'https://www.cdc.gov/healthy-weight-growth/',
+    ),
+    _SourceItem(
+      title:
+          'Mifflin MD et al. A new predictive equation for resting energy expenditure in healthy individuals',
+      url: 'https://pubmed.ncbi.nlm.nih.gov/2305711/',
+    ),
+    _SourceItem(
+      title: 'National Academies: Dietary Reference Intakes',
+      url: 'https://nap.nationalacademies.org/topic/380/food-and-nutrition',
+    ),
+  ];
+
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('よくある質問')),
+      appBar: AppBar(title: const Text('よくある質問・免責事項')),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -82,6 +107,26 @@ class FaqScreen extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           ..._faqs.map((item) => _FaqTile(item: item)),
+          const SizedBox(height: 24),
+          Text(
+            '情報源・参考資料',
+            style: Theme.of(context)
+                .textTheme
+                .titleMedium
+                ?.copyWith(fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '本アプリ内のカロリー推定、身体活動、栄養、健康管理に関する一般情報は、'
+            '以下の公開資料を参考にしています。',
+            style: TextStyle(
+              fontSize: 13,
+              height: 1.55,
+              color: colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 8),
+          ..._sources.map((source) => _SourceTile(source: source)),
         ],
       ),
     );
@@ -92,6 +137,12 @@ class _FaqItem {
   final String question;
   final String answer;
   const _FaqItem({required this.question, required this.answer});
+}
+
+class _SourceItem {
+  final String title;
+  final String url;
+  const _SourceItem({required this.title, required this.url});
 }
 
 class _FaqTile extends StatelessWidget {
@@ -117,6 +168,40 @@ class _FaqTile extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _SourceTile extends StatelessWidget {
+  final _SourceItem source;
+  const _SourceTile({required this.source});
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Card(
+      elevation: 0,
+      margin: const EdgeInsets.only(bottom: 8),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              source.title,
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 4),
+            SelectableText(
+              source.url,
+              style: TextStyle(
+                fontSize: 12,
+                color: colorScheme.primary,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

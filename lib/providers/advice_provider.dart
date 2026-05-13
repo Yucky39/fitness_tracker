@@ -1,43 +1,76 @@
+import 'dart:convert';
+
 import 'package:riverpod/legacy.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/food_item.dart';
 import '../providers/settings_provider.dart';
 import '../services/nutrition_advice_service.dart';
 
 class AdviceState {
-  final String? adviceText;
+  final Map<String, String> adviceByDate;
   final bool isLoading;
   final String? error;
+  final String? loadingDateKey;
+  final String? errorDateKey;
 
-  const AdviceState({this.adviceText, this.isLoading = false, this.error});
+  const AdviceState({
+    this.adviceByDate = const {},
+    this.isLoading = false,
+    this.error,
+    this.loadingDateKey,
+    this.errorDateKey,
+  });
 
-  AdviceState copyWith({String? adviceText, bool? isLoading, String? error}) => AdviceState(
-        adviceText: adviceText ?? this.adviceText,
+  AdviceState copyWith({
+    Map<String, String>? adviceByDate,
+    bool? isLoading,
+    String? error,
+    String? loadingDateKey,
+    String? errorDateKey,
+    bool clearError = false,
+    bool clearLoadingDate = false,
+  }) =>
+      AdviceState(
+        adviceByDate: adviceByDate ?? this.adviceByDate,
         isLoading: isLoading ?? this.isLoading,
-        error: error ?? this.error,
+        error: clearError ? null : (error ?? this.error),
+        loadingDateKey:
+            clearLoadingDate ? null : (loadingDateKey ?? this.loadingDateKey),
+        errorDateKey: clearError ? null : (errorDateKey ?? this.errorDateKey),
       );
 }
 
 class AdviceNotifier extends StateNotifier<AdviceState> {
-  AdviceNotifier() : super(const AdviceState());
+  AdviceNotifier() : super(const AdviceState()) {
+    _loadCachedAdvice();
+  }
 
+  static const _prefsKey = 'nutritionAdviceByDate';
   final _service = NutritionAdviceService();
-  String? _cachedKey;
 
-  String _cacheKey(
-    List<FoodItem> items,
-    String adviceLevel,
-    AiProviderType provider,
-    String model,
-  ) {
-    final totalCal = items.fold(0, (s, i) => s + i.calories);
-    final totalP = items.fold(0.0, (s, i) => s + i.protein);
-    final totalF = items.fold(0.0, (s, i) => s + i.fat);
-    final totalC = items.fold(0.0, (s, i) => s + i.carbs);
-    return '${items.length}_${totalCal}_'
-        '${totalP.toStringAsFixed(1)}_'
-        '${totalF.toStringAsFixed(1)}_'
-        '${totalC.toStringAsFixed(1)}_'
-        '${adviceLevel}_${provider.name}_$model';
+  static String dateKey(DateTime date) {
+    final d = date.toLocal();
+    return '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+  }
+
+  Future<void> _loadCachedAdvice() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_prefsKey);
+    if (raw == null || raw.isEmpty) return;
+    try {
+      final decoded = jsonDecode(raw) as Map<String, dynamic>;
+      final cached = decoded.map(
+        (key, value) => MapEntry(key, value.toString()),
+      );
+      state = state.copyWith(adviceByDate: cached);
+    } catch (_) {
+      // 壊れたキャッシュは無視して、次回生成時に上書きする。
+    }
+  }
+
+  Future<void> _saveCachedAdvice(Map<String, String> adviceByDate) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_prefsKey, jsonEncode(adviceByDate));
   }
 
   Future<void> fetchAdvice({
@@ -55,21 +88,25 @@ class AdviceNotifier extends StateNotifier<AdviceState> {
     String? model,
     bool forceRefresh = false,
   }) async {
+    final dateKey = AdviceNotifier.dateKey(date);
+    if (!forceRefresh && state.adviceByDate.containsKey(dateKey)) return;
+
     if (apiKey.isEmpty) {
-      state = AdviceState(
+      state = state.copyWith(
         error: '${provider.label} のAPIキーが設定されていません。⚙️設定から入力してください。',
+        errorDateKey: dateKey,
+        isLoading: false,
+        clearLoadingDate: true,
       );
       return;
     }
 
     final resolvedModel = model ?? provider.defaultModel;
-    final key = _cacheKey(items, adviceLevel, provider, resolvedModel);
-    if (!forceRefresh && key == _cachedKey && state.adviceText != null) {
-      // キャッシュヒット — 食事内容が変わっていないため再取得をスキップ
-      return;
-    }
-
-    state = const AdviceState(isLoading: true);
+    state = state.copyWith(
+      isLoading: true,
+      loadingDateKey: dateKey,
+      clearError: true,
+    );
     try {
       final text = await _service.getAdvice(
         items: items,
@@ -85,15 +122,27 @@ class AdviceNotifier extends StateNotifier<AdviceState> {
         provider: provider,
         model: resolvedModel,
       );
-      _cachedKey = key;
-      state = AdviceState(adviceText: text);
+      final updated = {...state.adviceByDate, dateKey: text};
+      await _saveCachedAdvice(updated);
+      state = state.copyWith(
+        adviceByDate: updated,
+        isLoading: false,
+        clearLoadingDate: true,
+        clearError: true,
+      );
     } catch (e) {
-      state = AdviceState(error: e.toString().replaceFirst('Exception: ', ''));
+      state = state.copyWith(
+        isLoading: false,
+        clearLoadingDate: true,
+        error: e.toString().replaceFirst('Exception: ', ''),
+        errorDateKey: dateKey,
+      );
     }
   }
 
-  void clear() {
-    _cachedKey = null;
+  Future<void> clear() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_prefsKey);
     state = const AdviceState();
   }
 }

@@ -12,8 +12,13 @@ class SleepState {
   final bool isLoading;
   final bool isSupported;
   final bool permissionGranted;
+
   /// 過去14日間の睡眠履歴
   final List<SleepLog> recentLogs;
+
+  /// 日付（yyyy-MM-dd）ごとの睡眠ログ。AI評価で選択日の睡眠を参照するために使う。
+  final Map<String, SleepLog> logsByDate;
+
   /// 睡眠目標（分）
   final int goalMinutes;
 
@@ -23,6 +28,7 @@ class SleepState {
     this.isSupported = true,
     this.permissionGranted = false,
     this.recentLogs = const [],
+    this.logsByDate = const {},
     this.goalMinutes = 420,
   });
 
@@ -36,15 +42,24 @@ class SleepState {
   SleepQuality get quality {
     final total = sleepMinutes ?? 0;
     if (total <= 0) return SleepQuality.unknown;
-    if (total >= 420) return SleepQuality.good;   // 7時間以上
-    if (total >= 360) return SleepQuality.fair;   // 6〜7時間
-    return SleepQuality.poor;                      // 6時間未満
+    if (total >= 420) return SleepQuality.good; // 7時間以上
+    if (total >= 360) return SleepQuality.fair; // 6〜7時間
+    return SleepQuality.poor; // 6時間未満
   }
 
   /// AIアドバイスに渡す睡眠情報テキスト（未取得時は null）
   String? get adviceContext {
     if (sleepMinutes == null) return null;
-    return '昨夜の睡眠: ${hours}時間${minutes}分（${quality.label}）';
+    return '昨夜の睡眠: $hours時間$minutes分（${quality.label}）';
+  }
+
+  /// 選択日のAI評価に渡す睡眠情報テキスト。
+  String? adviceContextForDate(DateTime date) {
+    final log = logsByDate[_dateKey(date)];
+    if (log == null) return null;
+    final h = log.durationMinutes ~/ 60;
+    final m = log.durationMinutes % 60;
+    return '評価対象日の睡眠: $h時間$m分（${_qualityForMinutes(log.durationMinutes).label}）';
   }
 
   SleepState copyWith({
@@ -54,6 +69,7 @@ class SleepState {
     bool? isSupported,
     bool? permissionGranted,
     List<SleepLog>? recentLogs,
+    Map<String, SleepLog>? logsByDate,
     int? goalMinutes,
   }) =>
       SleepState(
@@ -62,8 +78,21 @@ class SleepState {
         isSupported: isSupported ?? this.isSupported,
         permissionGranted: permissionGranted ?? this.permissionGranted,
         recentLogs: recentLogs ?? this.recentLogs,
+        logsByDate: logsByDate ?? this.logsByDate,
         goalMinutes: goalMinutes ?? this.goalMinutes,
       );
+}
+
+String _dateKey(DateTime date) {
+  final d = date.toLocal();
+  return '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+}
+
+SleepQuality _qualityForMinutes(int total) {
+  if (total <= 0) return SleepQuality.unknown;
+  if (total >= 420) return SleepQuality.good;
+  if (total >= 360) return SleepQuality.fair;
+  return SleepQuality.poor;
 }
 
 enum SleepQuality {
@@ -174,6 +203,7 @@ class SleepNotifier extends StateNotifier<SleepState> {
 
     // 14日間履歴をロード
     final recentLogs = await _load14DayLogs();
+    final logsByDate = await _loadLogsByDate();
 
     state = SleepState(
       sleepMinutes: minutes,
@@ -181,6 +211,7 @@ class SleepNotifier extends StateNotifier<SleepState> {
       isSupported: state.isSupported,
       permissionGranted: granted,
       recentLogs: recentLogs,
+      logsByDate: logsByDate,
       goalMinutes: state.goalMinutes,
     );
   }
@@ -189,8 +220,8 @@ class SleepNotifier extends StateNotifier<SleepState> {
     try {
       final adapter = await DatabaseService().database;
       final today = DateTime.now();
-      final dateKey = DateTime(today.year, today.month, today.day)
-          .toIso8601String();
+      final dateKey =
+          DateTime(today.year, today.month, today.day).toIso8601String();
 
       // 既存レコードを確認（upsert）
       final existing = await adapter.query(
@@ -223,9 +254,8 @@ class SleepNotifier extends StateNotifier<SleepState> {
   Future<List<SleepLog>> _load14DayLogs() async {
     try {
       final adapter = await DatabaseService().database;
-      final since = DateTime.now()
-          .subtract(const Duration(days: 14))
-          .toIso8601String();
+      final since =
+          DateTime.now().subtract(const Duration(days: 14)).toIso8601String();
       final maps = await adapter.query(
         'sleep_logs',
         where: 'date >= ?',
@@ -238,9 +268,25 @@ class SleepNotifier extends StateNotifier<SleepState> {
     }
   }
 
+  Future<Map<String, SleepLog>> _loadLogsByDate() async {
+    try {
+      final adapter = await DatabaseService().database;
+      final maps = await adapter.query(
+        'sleep_logs',
+        orderBy: 'date ASC',
+      );
+      return {
+        for (final log in maps.map(SleepLog.fromMap)) _dateKey(log.date): log,
+      };
+    } catch (_) {
+      return {};
+    }
+  }
+
   Future<void> load14DayTrend() async {
     final logs = await _load14DayLogs();
-    state = state.copyWith(recentLogs: logs);
+    final logsByDate = await _loadLogsByDate();
+    state = state.copyWith(recentLogs: logs, logsByDate: logsByDate);
   }
 }
 

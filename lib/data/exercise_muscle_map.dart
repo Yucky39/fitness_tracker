@@ -54,7 +54,7 @@ const Map<String, List<MuscleGroup>> exerciseMuscleMap = {
   'バーベルカール': [MuscleGroup.biceps, MuscleGroup.forearms],
   'ダンベルカール': [MuscleGroup.biceps, MuscleGroup.forearms],
   'ハンマーカール': [MuscleGroup.biceps, MuscleGroup.forearms],
-  'ケーブルカール': [MuscleGroup.biceps],
+  'ケーブルカール': [MuscleGroup.biceps, MuscleGroup.forearms],
   'トライセプスエクステンション': [MuscleGroup.triceps],
   'トライセプスプッシュダウン': [MuscleGroup.triceps],
   'ライイングトライセプス': [MuscleGroup.triceps],
@@ -82,6 +82,12 @@ const Map<String, List<MuscleGroup>> exerciseMuscleMap = {
   'アブローラー': [MuscleGroup.abs],
   'バーピー': [MuscleGroup.abs, MuscleGroup.cardio],
 
+  // 腕（前腕）
+  'リストカール': [MuscleGroup.forearms],
+  'リバースカール': [MuscleGroup.forearms, MuscleGroup.biceps],
+  'コンセントレーションカール': [MuscleGroup.biceps],
+  'インクラインダンベルカール': [MuscleGroup.biceps],
+
   // 有酸素
   'ランニング': [MuscleGroup.cardio, MuscleGroup.calves, MuscleGroup.quads],
   'ウォーキング': [MuscleGroup.cardio, MuscleGroup.calves],
@@ -90,11 +96,56 @@ const Map<String, List<MuscleGroup>> exerciseMuscleMap = {
   'hiit': [MuscleGroup.cardio],
   'HIIT': [MuscleGroup.cardio],
   'ジャンプロープ': [MuscleGroup.cardio, MuscleGroup.calves],
+  '縄跳び': [MuscleGroup.cardio, MuscleGroup.calves],
   'エアロビクス': [MuscleGroup.cardio],
   'ローイングマシン': [MuscleGroup.cardio, MuscleGroup.back],
   'エリプティカル': [MuscleGroup.cardio, MuscleGroup.quads],
   'トレッドミル': [MuscleGroup.cardio, MuscleGroup.calves, MuscleGroup.quads],
+  'エアロバイク': [MuscleGroup.cardio, MuscleGroup.quads, MuscleGroup.calves],
 };
+
+/// 部位カテゴリの列挙型（UIフィルター用）
+enum BodyPartCategory {
+  chest('胸'),
+  back('背中'),
+  shoulders('肩'),
+  biceps('二の腕'),
+  triceps('三頭筋'),
+  forearms('前腕'),
+  abs('腹筋'),
+  legs('脚'),
+  cardio('有酸素');
+
+  const BodyPartCategory(this.label);
+  final String label;
+}
+
+const Map<BodyPartCategory, List<MuscleGroup>> _bodyPartMuscleGroups = {
+  BodyPartCategory.chest: [MuscleGroup.chest],
+  BodyPartCategory.back: [MuscleGroup.back],
+  BodyPartCategory.shoulders: [MuscleGroup.shoulders],
+  BodyPartCategory.biceps: [MuscleGroup.biceps],
+  BodyPartCategory.triceps: [MuscleGroup.triceps],
+  BodyPartCategory.forearms: [MuscleGroup.forearms],
+  BodyPartCategory.abs: [MuscleGroup.abs],
+  BodyPartCategory.legs: [
+    MuscleGroup.quads,
+    MuscleGroup.hamstrings,
+    MuscleGroup.glutes,
+    MuscleGroup.calves,
+  ],
+  BodyPartCategory.cardio: [MuscleGroup.cardio],
+};
+
+/// 種目リストを部位カテゴリでフィルタリング
+List<String> filterExercisesByBodyPart(
+    BodyPartCategory category, Iterable<String> exercises) {
+  final targetGroups = _bodyPartMuscleGroups[category]!;
+  return exercises.where((exercise) {
+    final muscles = getMuscleGroups(exercise);
+    return muscles.any((m) => targetGroups.contains(m));
+  }).toList();
+}
 
 /// 種目名から筋肉部位リストを取得（部分一致で検索）
 List<MuscleGroup> getMuscleGroups(String exerciseName) {

@@ -1,5 +1,8 @@
+import 'dart:convert';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod/legacy.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/training_log.dart';
 import '../providers/energy_profile_provider.dart';
 import '../providers/settings_provider.dart';
@@ -12,12 +15,14 @@ class TrainingDailyAdviceState {
   final bool isLoading;
   final String? error;
   final String? loadingDateKey;
+  final String? errorDateKey;
 
   const TrainingDailyAdviceState({
     this.adviceByDate = const {},
     this.isLoading = false,
     this.error,
     this.loadingDateKey,
+    this.errorDateKey,
   });
 
   TrainingDailyAdviceState copyWith({
@@ -25,6 +30,7 @@ class TrainingDailyAdviceState {
     bool? isLoading,
     String? error,
     String? loadingDateKey,
+    String? errorDateKey,
     bool clearError = false,
     bool clearLoadingDate = false,
   }) {
@@ -32,18 +38,45 @@ class TrainingDailyAdviceState {
       adviceByDate: adviceByDate ?? this.adviceByDate,
       isLoading: isLoading ?? this.isLoading,
       error: clearError ? null : (error ?? this.error),
-      loadingDateKey: clearLoadingDate ? null : (loadingDateKey ?? this.loadingDateKey),
+      loadingDateKey:
+          clearLoadingDate ? null : (loadingDateKey ?? this.loadingDateKey),
+      errorDateKey: clearError ? null : (errorDateKey ?? this.errorDateKey),
     );
   }
 }
 
-class TrainingDailyAdviceNotifier extends StateNotifier<TrainingDailyAdviceState> {
+class TrainingDailyAdviceNotifier
+    extends StateNotifier<TrainingDailyAdviceState> {
   final Ref _ref;
+  static const _prefsKey = 'trainingDailyAdviceByDate';
 
-  TrainingDailyAdviceNotifier(this._ref) : super(const TrainingDailyAdviceState());
+  TrainingDailyAdviceNotifier(this._ref)
+      : super(const TrainingDailyAdviceState()) {
+    _loadCachedAdvice();
+  }
 
   static String _dateKey(DateTime date) {
     return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+  }
+
+  Future<void> _loadCachedAdvice() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_prefsKey);
+    if (raw == null || raw.isEmpty) return;
+    try {
+      final decoded = jsonDecode(raw) as Map<String, dynamic>;
+      final cached = decoded.map(
+        (key, value) => MapEntry(key, value.toString()),
+      );
+      state = state.copyWith(adviceByDate: cached);
+    } catch (_) {
+      // 壊れたキャッシュは無視して、次回生成時に上書きする。
+    }
+  }
+
+  Future<void> _saveCachedAdvice(Map<String, String> adviceByDate) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_prefsKey, jsonEncode(adviceByDate));
   }
 
   /// 指定日のトレーニングセッション全体のAIアドバイスを取得する。
@@ -66,6 +99,7 @@ class TrainingDailyAdviceNotifier extends StateNotifier<TrainingDailyAdviceState
     if (apiKey.isEmpty) {
       state = state.copyWith(
         error: '${provider.label} のAPIキーが設定されていません。⚙️設定から入力してください。',
+        errorDateKey: key,
         clearLoadingDate: true,
         isLoading: false,
       );
@@ -75,6 +109,7 @@ class TrainingDailyAdviceNotifier extends StateNotifier<TrainingDailyAdviceState
     if (dayLogs.isEmpty) {
       state = state.copyWith(
         error: 'この日のトレーニング記録がありません。',
+        errorDateKey: key,
         clearLoadingDate: true,
         isLoading: false,
       );
@@ -105,8 +140,11 @@ class TrainingDailyAdviceNotifier extends StateNotifier<TrainingDailyAdviceState
         sleepContext: sleepContext,
       );
 
+      final updated = {...state.adviceByDate, key: text};
+      await _saveCachedAdvice(updated);
+
       state = state.copyWith(
-        adviceByDate: {...state.adviceByDate, key: text},
+        adviceByDate: updated,
         isLoading: false,
         clearLoadingDate: true,
         clearError: true,
@@ -116,6 +154,7 @@ class TrainingDailyAdviceNotifier extends StateNotifier<TrainingDailyAdviceState
         isLoading: false,
         clearLoadingDate: true,
         error: e.toString().replaceFirst('Exception: ', ''),
+        errorDateKey: key,
       );
     }
   }
@@ -124,11 +163,12 @@ class TrainingDailyAdviceNotifier extends StateNotifier<TrainingDailyAdviceState
   void clearAdviceForDate(DateTime date) {
     final key = _dateKey(date);
     final updated = Map<String, String>.from(state.adviceByDate)..remove(key);
+    _saveCachedAdvice(updated);
     state = state.copyWith(adviceByDate: updated, clearError: true);
   }
 }
 
-final trainingDailyAdviceProvider =
-    StateNotifierProvider<TrainingDailyAdviceNotifier, TrainingDailyAdviceState>(
+final trainingDailyAdviceProvider = StateNotifierProvider<
+    TrainingDailyAdviceNotifier, TrainingDailyAdviceState>(
   (ref) => TrainingDailyAdviceNotifier(ref),
 );

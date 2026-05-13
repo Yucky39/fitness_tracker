@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../../data/exercise_muscle_map.dart';
 import '../../models/training_log.dart';
 import '../../providers/training_provider.dart';
 import '../../services/training_calorie_calculator.dart';
@@ -18,14 +19,17 @@ void showTrainingLogDialog({
   void Function(int intervalSeconds)? onIntervalTimerStart,
 }) {
   final isEdit = existingLog != null;
+  final targetDate = isEdit
+      ? existingLog.date.toLocal()
+      : ref.read(trainingProvider).selectedDate.toLocal();
   final weightController = TextEditingController(
       text: isEdit && existingLog.weight > 0
           ? existingLog.weight.toString()
           : '');
-  final repsController = TextEditingController(
-      text: isEdit ? existingLog.reps.toString() : '');
-  final setsController = TextEditingController(
-      text: isEdit ? existingLog.sets.toString() : '');
+  final repsController =
+      TextEditingController(text: isEdit ? existingLog.reps.toString() : '');
+  final setsController =
+      TextEditingController(text: isEdit ? existingLog.sets.toString() : '');
   final intervalController = TextEditingController(
       text: isEdit ? existingLog.interval.toString() : '');
   final distanceController = TextEditingController(
@@ -45,6 +49,8 @@ void showTrainingLogDialog({
   String exerciseName = existingLog?.exerciseName ?? '';
   ExerciseType exerciseType =
       existingLog?.exerciseType ?? ExerciseType.freeWeight;
+  BodyPartCategory? selectedBodyPart;
+  TextEditingController? exerciseFieldController;
 
   final allExerciseNames = [
     for (final list in ExercisePresets.byCategory.values) ...list
@@ -67,6 +73,41 @@ void showTrainingLogDialog({
       builder: (context, setState) {
         TrainingLog? previousLog;
         double previewKcal = 0;
+
+        void selectExerciseFromChip(String name) {
+          exerciseName = name;
+          exerciseFieldController?.value = TextEditingValue(
+            text: name,
+            selection: TextSelection.collapsed(offset: name.length),
+          );
+          final prev = notifier.getPreviousLog(name, excludeId: existingLog?.id);
+          setState(() {
+            selectedBodyPart = null;
+            if (prev != null) {
+              previousLog = prev;
+              if (prev.exerciseType == ExerciseType.cardio) {
+                distanceController.text =
+                    prev.distanceKm > 0 ? prev.distanceKm.toString() : '';
+                durationController.text = prev.durationMinutes > 0
+                    ? prev.durationMinutes.toString()
+                    : '';
+              } else {
+                weightController.text = prev.weight.toString();
+                repsController.text = prev.reps.toString();
+                setsController.text = prev.sets.toString();
+                intervalController.text = prev.interval.toString();
+              }
+              exerciseType = prev.exerciseType;
+              if (prev.rpe != null) {
+                recordRpe = true;
+                rpeSlider = prev.rpe!.toDouble();
+              }
+            } else {
+              previousLog = null;
+              exerciseType = ExercisePresets.inferType(name);
+            }
+          });
+        }
 
         void updatePreview() {
           if (exerciseType == ExerciseType.cardio) {
@@ -141,13 +182,75 @@ void showTrainingLogDialog({
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                Row(
+                  children: [
+                    const Icon(Icons.event, size: 16, color: Colors.grey),
+                    const SizedBox(width: 6),
+                    Text(
+                      '記録日: ${DateFormat('yyyy/M/d').format(targetDate)}',
+                      style: const TextStyle(fontSize: 12, color: Colors.grey),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                const Text('部位で絞り込み',
+                    style: TextStyle(fontSize: 12, color: Colors.grey)),
+                const SizedBox(height: 4),
+                SizedBox(
+                  height: 36,
+                  child: ListView(
+                    scrollDirection: Axis.horizontal,
+                    children: [
+                      ChoiceChip(
+                        label: const Text('すべて'),
+                        selected: selectedBodyPart == null,
+                        onSelected: (_) =>
+                            setState(() => selectedBodyPart = null),
+                        visualDensity: VisualDensity.compact,
+                      ),
+                      const SizedBox(width: 6),
+                      ...BodyPartCategory.values.map((cat) => Padding(
+                            padding: const EdgeInsets.only(right: 6),
+                            child: ChoiceChip(
+                              label: Text(cat.label),
+                              selected: selectedBodyPart == cat,
+                              onSelected: (_) =>
+                                  setState(() => selectedBodyPart = cat),
+                              visualDensity: VisualDensity.compact,
+                            ),
+                          )),
+                    ],
+                  ),
+                ),
+                if (selectedBodyPart != null) ...[
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 4,
+                    children: filterExercisesByBodyPart(
+                            selectedBodyPart!, suggestions)
+                        .map((name) => ActionChip(
+                              label: Text(name,
+                                  style: const TextStyle(fontSize: 12)),
+                              onPressed: () => selectExerciseFromChip(name),
+                              visualDensity: VisualDensity.compact,
+                            ))
+                        .toList(),
+                  ),
+                  const SizedBox(height: 4),
+                ],
+                const SizedBox(height: 4),
                 Autocomplete<String>(
                   initialValue: TextEditingValue(text: exerciseName),
                   optionsBuilder: (v) {
                     exerciseName = v.text;
-                    if (v.text.isEmpty) return suggestions.take(20);
-                    return suggestions.where((n) =>
-                        n.toLowerCase().contains(v.text.toLowerCase()));
+                    final pool = selectedBodyPart != null
+                        ? filterExercisesByBodyPart(
+                            selectedBodyPart!, suggestions)
+                        : suggestions;
+                    if (v.text.isEmpty) return pool.take(20);
+                    return pool.where(
+                        (n) => n.toLowerCase().contains(v.text.toLowerCase()));
                   },
                   onSelected: (sel) {
                     exerciseName = sel;
@@ -155,6 +258,7 @@ void showTrainingLogDialog({
                   },
                   fieldViewBuilder:
                       (ctx, controller, focusNode, onFieldSubmitted) {
+                    exerciseFieldController = controller;
                     return TextField(
                       controller: controller,
                       focusNode: focusNode,
@@ -192,8 +296,8 @@ void showTrainingLogDialog({
                 const SizedBox(height: 8),
                 if (previousLog != null)
                   Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 6),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                     decoration: BoxDecoration(
                       color: Colors.blue.shade50,
                       borderRadius: BorderRadius.circular(8),
@@ -269,8 +373,7 @@ void showTrainingLogDialog({
                       Expanded(
                         child: TextField(
                           controller: repsController,
-                          decoration:
-                              const InputDecoration(labelText: '回数'),
+                          decoration: const InputDecoration(labelText: '回数'),
                           keyboardType: TextInputType.number,
                           onChanged: (_) => setState(updatePreview),
                         ),
@@ -282,8 +385,7 @@ void showTrainingLogDialog({
                       Expanded(
                         child: TextField(
                           controller: setsController,
-                          decoration:
-                              const InputDecoration(labelText: 'セット数'),
+                          decoration: const InputDecoration(labelText: 'セット数'),
                           keyboardType: TextInputType.number,
                           onChanged: (_) => setState(updatePreview),
                         ),
@@ -292,8 +394,8 @@ void showTrainingLogDialog({
                       Expanded(
                         child: TextField(
                           controller: intervalController,
-                          decoration: const InputDecoration(
-                              labelText: 'インターバル (秒)'),
+                          decoration:
+                              const InputDecoration(labelText: 'インターバル (秒)'),
                           keyboardType: TextInputType.number,
                           onChanged: (_) => setState(updatePreview),
                         ),
@@ -354,8 +456,7 @@ void showTrainingLogDialog({
                     sets: int.tryParse(setsController.text) ?? 0,
                     exerciseType: exerciseType,
                     distanceKm: double.tryParse(distanceController.text) ?? 0,
-                    durationMinutes:
-                        int.tryParse(durationController.text) ?? 0,
+                    durationMinutes: int.tryParse(durationController.text) ?? 0,
                   ),
               ],
             ),

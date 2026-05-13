@@ -186,7 +186,8 @@ class _TrainingScreenState extends ConsumerState<TrainingScreen> {
         actions: [
           if (isToday && todaysRoutines.isNotEmpty)
             FilledButton.tonal(
-              onPressed: () => _startSession(todaysRoutines.first, trainingState.logs),
+              onPressed: () =>
+                  _startSession(todaysRoutines.first, trainingState.logs),
               child: const Text('セッション開始'),
             ),
           if (HealthService.isSupported)
@@ -289,7 +290,7 @@ class _TrainingScreenState extends ConsumerState<TrainingScreen> {
               selectedDate: state.selectedDate,
               dayLogs: selectedDateLogs,
               allLogs: state.logs,
-              sleepContext: sleepState.adviceContext,
+              sleepContext: sleepState.adviceContextForDate(state.selectedDate),
             ),
           ),
 
@@ -298,7 +299,8 @@ class _TrainingScreenState extends ConsumerState<TrainingScreen> {
           SliverToBoxAdapter(
             child: Center(
               child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 24),
+                padding:
+                    const EdgeInsets.symmetric(vertical: 32, horizontal: 24),
                 child: Text(
                   isToday
                       ? (HealthService.isSupported
@@ -385,7 +387,8 @@ class _TrainingScreenState extends ConsumerState<TrainingScreen> {
                           apiKey: settings.currentApiKey,
                           provider: settings.selectedProvider,
                           model: settings.currentModel,
-                          sleepContext: sleepState.adviceContext,
+                          sleepContext:
+                              sleepState.adviceContextForDate(log.date),
                         )
                     : null,
               );
@@ -494,24 +497,24 @@ class _DailyAdviceCard extends ConsumerWidget {
     final dailyAdviceState = ref.watch(trainingDailyAdviceProvider);
     final key = _dateKey(selectedDate);
 
-    final isLoading = dailyAdviceState.isLoading && dailyAdviceState.loadingDateKey == key;
+    final isLoading =
+        dailyAdviceState.isLoading && dailyAdviceState.loadingDateKey == key;
     final adviceText = dailyAdviceState.adviceByDate[key];
-    final error = dailyAdviceState.loadingDateKey == null && dailyAdviceState.error != null
-        ? dailyAdviceState.error
-        : null;
+    final error =
+        dailyAdviceState.errorDateKey == key ? dailyAdviceState.error : null;
 
     void fetch({bool force = false}) {
       ref.read(trainingDailyAdviceProvider.notifier).fetchDailyAdvice(
-        dayLogs: dayLogs,
-        allLogs: allLogs,
-        date: selectedDate,
-        adviceLevel: settings.adviceLevel,
-        apiKey: settings.currentApiKey,
-        provider: settings.selectedProvider,
-        model: settings.currentModel,
-        sleepContext: sleepContext,
-        forceRefresh: force,
-      );
+            dayLogs: dayLogs,
+            allLogs: allLogs,
+            date: selectedDate,
+            adviceLevel: settings.adviceLevel,
+            apiKey: settings.currentApiKey,
+            provider: settings.selectedProvider,
+            model: settings.currentModel,
+            sleepContext: sleepContext,
+            forceRefresh: force,
+          );
     }
 
     return Card(
@@ -523,7 +526,8 @@ class _DailyAdviceCard extends ConsumerWidget {
           children: [
             Row(
               children: [
-                const Icon(Icons.auto_awesome, size: 16, color: Colors.deepOrange),
+                const Icon(Icons.auto_awesome,
+                    size: 16, color: Colors.deepOrange),
                 const SizedBox(width: 6),
                 const Text(
                   'AI デイリーアドバイス',
@@ -552,7 +556,8 @@ class _DailyAdviceCard extends ConsumerWidget {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(error, style: const TextStyle(color: Colors.red, fontSize: 13)),
+                  Text(error,
+                      style: const TextStyle(color: Colors.red, fontSize: 13)),
                   const SizedBox(height: 6),
                   OutlinedButton.icon(
                     onPressed: () => fetch(),
@@ -565,12 +570,13 @@ class _DailyAdviceCard extends ConsumerWidget {
                 ],
               )
             else if (adviceText != null)
-              Text(adviceText, style: const TextStyle(fontSize: 13, height: 1.6))
+              Text(adviceText,
+                  style: const TextStyle(fontSize: 13, height: 1.6))
             else
               FilledButton.icon(
                 onPressed: () => fetch(),
                 icon: const Icon(Icons.auto_awesome, size: 14),
-                label: const Text('今日のセッション全体を AI 評価'),
+                label: const Text('この日のセッション全体を AI 評価'),
                 style: FilledButton.styleFrom(
                   visualDensity: VisualDensity.compact,
                 ),
