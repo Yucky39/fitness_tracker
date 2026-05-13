@@ -177,6 +177,30 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "5.3.0"
+  cloud_functions:
+    dependency: "direct main"
+    description:
+      name: cloud_functions
+      sha256: "036aa4f3b880935bda48fd6ab516e0f11686c328a46313226b9cbad9220b4c59"
+      url: "https://pub.dev"
+    source: hosted
+    version: "6.2.0"
+  cloud_functions_platform_interface:
+    dependency: transitive
+    description:
+      name: cloud_functions_platform_interface
+      sha256: "2a52ee909011b0f33ae2074b7a431bc2d7fff4618948d93d5e71830688e0733f"
+      url: "https://pub.dev"
+    source: hosted
+    version: "5.8.12"
+  cloud_functions_web:
+    dependency: transitive
+    description:
+      name: cloud_functions_web
+      sha256: be032545ca1621248ffd251930952835593a9b8136895379930cecea766379a4
+      url: "https://pub.dev"
+    source: hosted
+    version: "5.1.5"
   code_assets:
     dependency: transitive
     description:
@@ -672,6 +696,38 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.2.2"
+  in_app_purchase:
+    dependency: "direct main"
+    description:
+      name: in_app_purchase
+      sha256: "5cddd7f463f3bddb1d37a72b95066e840d5822d66291331d7f8f05ce32c24b6c"
+      url: "https://pub.dev"
+    source: hosted
+    version: "3.2.3"
+  in_app_purchase_android:
+    dependency: transitive
+    description:
+      name: in_app_purchase_android
+      sha256: "634bee4734b17fe55f370f0ac07a22431a9666e0f3a870c6d20350856e8bbf71"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.4.0+10"
+  in_app_purchase_platform_interface:
+    dependency: transitive
+    description:
+      name: in_app_purchase_platform_interface
+      sha256: "1d353d38251da5b9fea6635c0ebfc6bb17a2d28d0e86ea5e083bf64244f1fb4c"
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.4.0"
+  in_app_purchase_storekit:
+    dependency: transitive
+    description:
+      name: in_app_purchase_storekit
+      sha256: "1d512809edd9f12ff88fce4596a13a18134e2499013f4d6a8894b04699363c93"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.4.8+1"
   intl:
     dependency: "direct main"
     description:
