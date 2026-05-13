@@ -25,14 +25,19 @@ class SubscriptionNotifier extends StateNotifier<SubscriptionStatus> {
           .collection('subscription')
           .doc('status')
           .snapshots()
-          .listen((snap) {
-        if (!snap.exists || snap.data() == null) {
+          .listen(
+        (snap) {
+          if (!snap.exists || snap.data() == null) {
+            state = SubscriptionStatus.empty;
+            return;
+          }
+          state = SubscriptionStatus.fromFirestore(
+              snap.data() as Map<String, dynamic>);
+        },
+        onError: (_) {
           state = SubscriptionStatus.empty;
-          return;
-        }
-        state = SubscriptionStatus.fromFirestore(
-            snap.data() as Map<String, dynamic>);
-      });
+        },
+      );
     });
   }
 

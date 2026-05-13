@@ -41,6 +41,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
     _tabController.addListener(() {
+      if (!mounted) return;
       setState(() => _errorMessage = null);
     });
   }
@@ -82,6 +83,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
 
   Future<void> _login() async {
     if (!_loginFormKey.currentState!.validate()) return;
+    if (!mounted) return;
     setState(() {
       _isLoading = true;
       _errorMessage = null;
@@ -92,13 +94,17 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
         email: _loginEmailController.text.trim(),
         password: _loginPasswordController.text,
       );
+      if (!mounted) return;
       // Merge Firestore data (SQLite + SharedPreferences) into local storage
       await SyncService().downloadAndMergeData();
+      if (!mounted) return;
       // Reload providers so they pick up the downloaded data
       _reloadProviders();
     } on FirebaseAuthException catch (e) {
+      if (!mounted) return;
       setState(() => _errorMessage = _localizeAuthError(e.code));
     } catch (e) {
+      if (!mounted) return;
       setState(() => _errorMessage = 'ログインに失敗しました。もう一度お試しください。');
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -108,9 +114,11 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
   Future<void> _register() async {
     if (!_registerFormKey.currentState!.validate()) return;
     if (_registerPasswordController.text != _registerConfirmController.text) {
+      if (!mounted) return;
       setState(() => _errorMessage = 'パスワードが一致しません');
       return;
     }
+    if (!mounted) return;
     setState(() {
       _isLoading = true;
       _errorMessage = null;
@@ -121,11 +129,14 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
         email: _registerEmailController.text.trim(),
         password: _registerPasswordController.text,
       );
+      if (!mounted) return;
       // Upload existing local data (SQLite + SharedPreferences) to Firestore
       await SyncService().uploadAllData();
     } on FirebaseAuthException catch (e) {
+      if (!mounted) return;
       setState(() => _errorMessage = _localizeAuthError(e.code));
     } catch (e) {
+      if (!mounted) return;
       setState(() => _errorMessage = 'アカウント作成に失敗しました。もう一度お試しください。');
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -135,9 +146,11 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
   Future<void> _resetPassword() async {
     final email = _loginEmailController.text.trim();
     if (email.isEmpty) {
+      if (!mounted) return;
       setState(() => _errorMessage = 'パスワードリセットにはメールアドレスを入力してください');
       return;
     }
+    if (!mounted) return;
     setState(() {
       _isLoading = true;
       _errorMessage = null;
@@ -150,6 +163,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
         );
       }
     } on FirebaseAuthException catch (e) {
+      if (!mounted) return;
       setState(() => _errorMessage = _localizeAuthError(e.code));
     } finally {
       if (mounted) setState(() => _isLoading = false);

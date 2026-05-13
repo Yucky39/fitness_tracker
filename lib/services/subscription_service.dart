@@ -5,6 +5,22 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 import '../models/subscription.dart';
 
+/// [InAppPurchase.queryProductDetails] の結果。
+/// リストが空の理由を画面で示すために [notFoundProductIds] 等を保持する。
+class SubscriptionProductQueryResult {
+  const SubscriptionProductQueryResult({
+    required this.products,
+    this.storeBillingUnavailable = false,
+    this.notFoundProductIds = const [],
+    this.queryError,
+  });
+
+  final List<ProductDetails> products;
+  final bool storeBillingUnavailable;
+  final List<String> notFoundProductIds;
+  final IAPError? queryError;
+}
+
 class SubscriptionService {
   static final SubscriptionService _instance = SubscriptionService._();
   factory SubscriptionService() => _instance;
@@ -31,9 +47,15 @@ class SubscriptionService {
       if (purchase.status == PurchaseStatus.purchased ||
           purchase.status == PurchaseStatus.restored) {
         await _activateOnServer(purchase);
-        await _iap.completePurchase(purchase);
-      } else if (purchase.status == PurchaseStatus.error) {
-        await _iap.completePurchase(purchase);
+      }
+
+      if (purchase.pendingCompletePurchase) {
+        try {
+          await _iap.completePurchase(purchase);
+        } catch (_) {
+          // SK2トランザクションでSK1の内部オブジェクトがnullの場合にスローされる。
+          // テスト環境のmissingCertificateが原因。本番では発生しない。
+        }
       }
     }
   }
@@ -53,15 +75,24 @@ class SubscriptionService {
     }
   }
 
-  /// 商品情報を取得する
-  Future<List<ProductDetails>> fetchProducts() async {
+  /// 商品情報を取得する（空になった理由は [SubscriptionProductQueryResult] を参照）
+  Future<SubscriptionProductQueryResult> queryStoreProducts() async {
     final available = await _iap.isAvailable();
-    if (!available) return [];
+    if (!available) {
+      return const SubscriptionProductQueryResult(
+        products: [],
+        storeBillingUnavailable: true,
+      );
+    }
 
     final response = await _iap.queryProductDetails(
       SubscriptionProducts.all.toSet(),
     );
-    return response.productDetails;
+    return SubscriptionProductQueryResult(
+      products: response.productDetails,
+      notFoundProductIds: response.notFoundIDs,
+      queryError: response.error,
+    );
   }
 
   /// サブスクを購入する

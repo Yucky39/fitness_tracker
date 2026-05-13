@@ -19,6 +19,8 @@ import 'services/subscription_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // プラグイン／ネイティブが起動直後に触るため、スプラッシュ待ちより先に初期化する
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   runApp(
     const ProviderScope(
       child: _BootstrapApp(),
@@ -68,9 +70,6 @@ class _BootstrapAppState extends State<_BootstrapApp> {
 
   Future<void> _runCoreInit() async {
     await initializeDateFormatting('ja');
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    );
 
     tz.initializeTimeZones();
     try {

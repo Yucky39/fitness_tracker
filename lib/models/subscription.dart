@@ -40,7 +40,7 @@ class SubscriptionStatus {
 // アプリ内課金の商品ID
 class SubscriptionProducts {
   static const monthlyId = 'premium_monthly_2500';
-  static const annualId = 'premium_annual_25500';
+  static const annualId = 'premium_annual_25400';
 
   static const all = [monthlyId, annualId];
 }

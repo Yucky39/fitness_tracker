@@ -30,6 +30,8 @@ class _PaywallSheetState extends ConsumerState<PaywallSheet> {
   bool _loading = true;
   bool _purchasing = false;
   String? _error;
+  /// 商品が0件のときの説明（StoreKit の notFound / 課金不可など）
+  String? _emptyStoreMessage;
 
   // プロモコード入力
   final _promoController = TextEditingController();
@@ -51,17 +53,46 @@ class _PaywallSheetState extends ConsumerState<PaywallSheet> {
 
   Future<void> _loadProducts() async {
     try {
-      final products = await SubscriptionService().fetchProducts();
+      final result = await SubscriptionService().queryStoreProducts();
+      final products = List<ProductDetails>.from(result.products);
       // 月額を先に表示
       products.sort((a, b) {
         if (a.id == SubscriptionProducts.monthlyId) return -1;
         if (b.id == SubscriptionProducts.monthlyId) return 1;
         return 0;
       });
-      if (mounted) setState(() { _products = products; _loading = false; });
+      if (!mounted) return;
+      setState(() {
+        _products = products;
+        _loading = false;
+        _emptyStoreMessage = products.isEmpty
+            ? _messageForEmptyProductQuery(result)
+            : null;
+      });
     } catch (e) {
       if (mounted) setState(() { _error = e.toString(); _loading = false; });
     }
+  }
+
+  String _messageForEmptyProductQuery(SubscriptionProductQueryResult r) {
+    if (r.storeBillingUnavailable) {
+      return 'この端末ではApp内課金を利用できません。\n'
+          '「スクリーンタイム」の購入制限や、App Store の国・地域設定をご確認ください。';
+    }
+    if (r.queryError != null) {
+      final code = r.queryError!.code;
+      final msg = r.queryError!.message;
+      return 'ストアと通信できませんでした（$code: $msg）。\n'
+          '通信状況を確認して再度お試しください。';
+    }
+    if (r.notFoundProductIds.isNotEmpty) {
+      final ids = SubscriptionProducts.all.join(', ');
+      return 'App Store 上に次の商品IDのサブスクリプションが見つかりませんでした。\n$ids\n\n'
+          'App Store Connect で商品IDが完全一致しているか、'
+          '「販売の準備ができました」になるまで待ってから再度お試しください。';
+    }
+    return 'ストア情報を取得できませんでした。\n'
+        'ネットワーク接続を確認するか、しばらく時間をおいて再度お試しください。';
   }
 
   Future<void> _purchase(ProductDetails product) async {
@@ -166,7 +197,8 @@ class _PaywallSheetState extends ConsumerState<PaywallSheet> {
             else if (_products.isEmpty)
               Center(
                 child: Text(
-                  'ストア情報を取得できませんでした。\nネットワーク接続を確認してください。',
+                  _emptyStoreMessage ??
+                      'ストア情報を取得できませんでした。\nネットワーク接続を確認してください。',
                   textAlign: TextAlign.center,
                   style: TextStyle(color: cs.error),
                 ),

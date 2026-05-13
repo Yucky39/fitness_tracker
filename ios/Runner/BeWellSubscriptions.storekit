@@ -1,0 +1,67 @@
+{
+  "subscriptionGroups" : [
+    {
+      "id" : "B9E281C3",
+      "localizations" : [
+
+      ],
+      "name" : "BeWell Premium",
+      "subscriptions" : [
+        {
+          "adHocOffers" : [
+
+          ],
+          "codeOffers" : [
+
+          ],
+          "displayPrice" : "2,500",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "6743245601",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "月額プレミアム",
+              "displayName" : "プレミアム（月額）",
+              "locale" : "ja_JP"
+            }
+          ],
+          "productID" : "premium_monthly_2500",
+          "recurringSubscriptionPeriod" : "P1M",
+          "referenceName" : "Premium Monthly",
+          "subscriptionGroupID" : "B9E281C3",
+          "type" : "RecurringSubscription"
+        },
+        {
+          "adHocOffers" : [
+
+          ],
+          "codeOffers" : [
+
+          ],
+          "displayPrice" : "25,500",
+          "familyShareable" : false,
+          "groupNumber" : 2,
+          "internalID" : "6743245602",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "年額プレミアム",
+              "displayName" : "プレミアム（年額）",
+              "locale" : "ja_JP"
+            }
+          ],
+          "productID" : "premium_annual_25400",
+          "recurringSubscriptionPeriod" : "P1Y",
+          "referenceName" : "Premium Annual",
+          "subscriptionGroupID" : "B9E281C3",
+          "type" : "RecurringSubscription"
+        }
+      ]
+    }
+  ],
+  "version" : {
+    "major" : 3,
+    "minor" : 0
+  }
+}

@@ -51,11 +51,11 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions ios = FirebaseOptions(
     apiKey: 'AIzaSyD_g54xQLocP_tWo0Nl5Nl6nDw1bOrEY2U',
-    appId: '1:1041203655666:ios:84e5c91a60f5ca76bdf16b',
+    appId: '1:1041203655666:ios:4bd4fbb35dcdedbfbdf16b',
     messagingSenderId: '1041203655666',
     projectId: 'fitness-tracker-828df',
     storageBucket: 'fitness-tracker-828df.firebasestorage.app',
-    iosBundleId: 'com.takayukimasaki.fitnessTracker',
+    iosBundleId: 'com.yucky.fitnessTracker',
   );
 
 }
