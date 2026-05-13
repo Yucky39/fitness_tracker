@@ -56,7 +56,8 @@ class ReviewAdviceService {
   }) {
     final fmt = DateFormat('M/d');
     final buffer = StringBuffer();
-    buffer.writeln('【週間振り返り: ${fmt.format(weekStart)} 〜 ${fmt.format(weekEnd)}】');
+    buffer
+        .writeln('【週間振り返り: ${fmt.format(weekStart)} 〜 ${fmt.format(weekEnd)}】');
     buffer.writeln();
 
     // ── トレーニングサマリー
@@ -69,11 +70,15 @@ class ReviewAdviceService {
         final d = l.date.toLocal();
         daySet.add('${d.year}-${d.month}-${d.day}');
       }
-      final strengthLogs = logs.where((l) => l.exerciseType != ExerciseType.cardio).toList();
-      final cardioLogs = logs.where((l) => l.exerciseType == ExerciseType.cardio).toList();
-      final totalKcal = TrainingCalorieCalculator.total(logs, bodyWeightKg: bodyWeightKg);
+      final strengthLogs =
+          logs.where((l) => l.exerciseType != ExerciseType.cardio).toList();
+      final cardioLogs =
+          logs.where((l) => l.exerciseType == ExerciseType.cardio).toList();
+      final totalKcal =
+          TrainingCalorieCalculator.total(logs, bodyWeightKg: bodyWeightKg);
       final totalVolume = strengthLogs.fold(0.0, (s, l) => s + l.totalVolume);
-      final totalCardioMin = cardioLogs.fold(0, (s, l) => s + l.durationMinutes);
+      final totalCardioMin =
+          cardioLogs.fold(0, (s, l) => s + l.durationMinutes);
       final totalCardioKm = cardioLogs.fold(0.0, (s, l) => s + l.distanceKm);
       final exerciseNames = logs.map((l) => l.exerciseName).toSet();
       final rpes = logs.where((l) => l.rpe != null).map((l) => l.rpe!).toList();
@@ -88,7 +93,8 @@ class ReviewAdviceService {
         buffer.writeln('  筋トレ総ボリューム: $label（重量×回数×セット）');
       }
       if (cardioLogs.isNotEmpty) {
-        buffer.writeln('  有酸素: ${totalCardioKm.toStringAsFixed(1)} km / ${totalCardioMin} 分');
+        buffer.writeln(
+            '  有酸素: ${totalCardioKm.toStringAsFixed(1)} km / $totalCardioMin 分');
       }
       if (rpes.isNotEmpty) {
         final avgRpe = rpes.fold(0, (s, v) => s + v) / rpes.length;
@@ -100,13 +106,15 @@ class ReviewAdviceService {
       final byDay = <String, List<TrainingLog>>{};
       for (final l in logs) {
         final d = l.date.toLocal();
-        final key = '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+        final key =
+            '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
         byDay.putIfAbsent(key, () => []).add(l);
       }
-      for (final entry in (byDay.entries.toList()..sort((a, b) => a.key.compareTo(b.key)))) {
+      for (final entry in (byDay.entries.toList()
+        ..sort((a, b) => a.key.compareTo(b.key)))) {
         final dayLogs = entry.value;
         final names = dayLogs.map((l) => l.exerciseName).toSet().join('・');
-        buffer.writeln('  ${entry.key}: ${names}（${dayLogs.length}件）');
+        buffer.writeln('  ${entry.key}: $names（${dayLogs.length}件）');
       }
     }
 
@@ -130,8 +138,10 @@ class ReviewAdviceService {
       final avgC = foodItems.fold(0.0, (s, i) => s + i.carbs) / recordedDays;
 
       buffer.writeln('  食事記録日数: $recordedDays 日');
-      buffer.writeln('  1日平均カロリー: ${avgCal.round()} kcal（目標: $calorieGoal kcal）');
-      buffer.writeln('  1日平均PFC: P ${avgP.toStringAsFixed(1)}g（目標: ${proteinGoal}g） /'
+      buffer
+          .writeln('  1日平均カロリー: ${avgCal.round()} kcal（目標: $calorieGoal kcal）');
+      buffer.writeln(
+          '  1日平均PFC: P ${avgP.toStringAsFixed(1)}g（目標: ${proteinGoal}g） /'
           ' F ${avgF.toStringAsFixed(1)}g（目標: ${fatGoal}g） /'
           ' C ${avgC.toStringAsFixed(1)}g（目標: ${carbsGoal}g）');
     }
@@ -167,11 +177,15 @@ class ReviewAdviceService {
         final d = l.date.toLocal();
         daySet.add('${d.year}-${d.month}-${d.day}');
       }
-      final strengthLogs = logs.where((l) => l.exerciseType != ExerciseType.cardio).toList();
-      final cardioLogs = logs.where((l) => l.exerciseType == ExerciseType.cardio).toList();
-      final totalKcal = TrainingCalorieCalculator.total(logs, bodyWeightKg: bodyWeightKg);
+      final strengthLogs =
+          logs.where((l) => l.exerciseType != ExerciseType.cardio).toList();
+      final cardioLogs =
+          logs.where((l) => l.exerciseType == ExerciseType.cardio).toList();
+      final totalKcal =
+          TrainingCalorieCalculator.total(logs, bodyWeightKg: bodyWeightKg);
       final totalVolume = strengthLogs.fold(0.0, (s, l) => s + l.totalVolume);
-      final totalCardioMin = cardioLogs.fold(0, (s, l) => s + l.durationMinutes);
+      final totalCardioMin =
+          cardioLogs.fold(0, (s, l) => s + l.durationMinutes);
       final totalCardioKm = cardioLogs.fold(0.0, (s, l) => s + l.distanceKm);
       final exerciseNames = logs.map((l) => l.exerciseName).toSet();
       final rpes = logs.where((l) => l.rpe != null).map((l) => l.rpe!).toList();
@@ -180,7 +194,8 @@ class ReviewAdviceService {
       final weekCount = (daysInMonth / 7).ceil();
 
       buffer.writeln('  ワークアウト日数: ${daySet.length} 日 / $daysInMonth日');
-      buffer.writeln('  週平均ワークアウト日数: ${(daySet.length / weekCount).toStringAsFixed(1)} 日/週');
+      buffer.writeln(
+          '  週平均ワークアウト日数: ${(daySet.length / weekCount).toStringAsFixed(1)} 日/週');
       buffer.writeln('  総記録数: ${logs.length} 件 / ${exerciseNames.length} 種目');
       buffer.writeln('  推定消費カロリー合計: ${totalKcal.round()} kcal');
       if (strengthLogs.isNotEmpty) {
@@ -190,7 +205,8 @@ class ReviewAdviceService {
         buffer.writeln('  筋トレ総ボリューム: $label');
       }
       if (cardioLogs.isNotEmpty) {
-        buffer.writeln('  有酸素合計: ${totalCardioKm.toStringAsFixed(1)} km / ${totalCardioMin} 分');
+        buffer.writeln(
+            '  有酸素合計: ${totalCardioKm.toStringAsFixed(1)} km / $totalCardioMin 分');
       }
       if (rpes.isNotEmpty) {
         final avgRpe = rpes.fold(0, (s, v) => s + v) / rpes.length;
@@ -236,11 +252,13 @@ class ReviewAdviceService {
       final avgC = foodItems.fold(0.0, (s, i) => s + i.carbs) / recordedDays;
 
       buffer.writeln('  食事記録日数: $recordedDays 日');
-      buffer.writeln('  1日平均カロリー: ${avgCal.round()} kcal（目標: $calorieGoal kcal）');
+      buffer
+          .writeln('  1日平均カロリー: ${avgCal.round()} kcal（目標: $calorieGoal kcal）');
       buffer.writeln('  1日平均PFC: P ${avgP.toStringAsFixed(1)}g /'
           ' F ${avgF.toStringAsFixed(1)}g /'
           ' C ${avgC.toStringAsFixed(1)}g');
-      buffer.writeln('  目標: P ${proteinGoal}g / F ${fatGoal}g / C ${carbsGoal}g');
+      buffer
+          .writeln('  目標: P ${proteinGoal}g / F ${fatGoal}g / C ${carbsGoal}g');
     }
 
     buffer.writeln();
@@ -348,8 +366,8 @@ class ReviewAdviceService {
     );
     if (response.statusCode != 200) {
       final body = jsonDecode(utf8.decode(response.bodyBytes));
-      throw Exception(
-          body['error']?['message'] ?? 'Anthropic APIエラー (${response.statusCode})');
+      throw Exception(body['error']?['message'] ??
+          'Anthropic APIエラー (${response.statusCode})');
     }
     final data = jsonDecode(utf8.decode(response.bodyBytes));
     return data['content'][0]['text'] as String;
@@ -374,8 +392,8 @@ class ReviewAdviceService {
     );
     if (response.statusCode != 200) {
       final body = jsonDecode(utf8.decode(response.bodyBytes));
-      throw Exception(
-          body['error']?['message'] ?? 'OpenAI APIエラー (${response.statusCode})');
+      throw Exception(body['error']?['message'] ??
+          'OpenAI APIエラー (${response.statusCode})');
     }
     final data = jsonDecode(utf8.decode(response.bodyBytes));
     return data['choices'][0]['message']['content'] as String;
@@ -407,8 +425,8 @@ class ReviewAdviceService {
     );
     if (response.statusCode != 200) {
       final body = jsonDecode(utf8.decode(response.bodyBytes));
-      throw Exception(
-          body['error']?['message'] ?? 'Gemini APIエラー (${response.statusCode})');
+      throw Exception(body['error']?['message'] ??
+          'Gemini APIエラー (${response.statusCode})');
     }
     final data = jsonDecode(utf8.decode(response.bodyBytes));
     return data['candidates'][0]['content']['parts'][0]['text'] as String;

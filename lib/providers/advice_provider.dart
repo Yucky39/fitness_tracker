@@ -1,47 +1,80 @@
+import 'dart:convert';
+
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod/legacy.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/food_item.dart';
 import '../providers/settings_provider.dart';
 import '../providers/subscription_provider.dart';
 import '../services/nutrition_advice_service.dart';
 
 class AdviceState {
-  final String? adviceText;
+  final Map<String, String> adviceByDate;
   final bool isLoading;
   final String? error;
+  final String? loadingDateKey;
+  final String? errorDateKey;
 
-  const AdviceState({this.adviceText, this.isLoading = false, this.error});
+  const AdviceState({
+    this.adviceByDate = const {},
+    this.isLoading = false,
+    this.error,
+    this.loadingDateKey,
+    this.errorDateKey,
+  });
 
-  AdviceState copyWith({String? adviceText, bool? isLoading, String? error}) =>
+  AdviceState copyWith({
+    Map<String, String>? adviceByDate,
+    bool? isLoading,
+    String? error,
+    String? loadingDateKey,
+    String? errorDateKey,
+    bool clearError = false,
+    bool clearLoadingDate = false,
+  }) =>
       AdviceState(
-        adviceText: adviceText ?? this.adviceText,
+        adviceByDate: adviceByDate ?? this.adviceByDate,
         isLoading: isLoading ?? this.isLoading,
-        error: error ?? this.error,
+        error: clearError ? null : (error ?? this.error),
+        loadingDateKey:
+            clearLoadingDate ? null : (loadingDateKey ?? this.loadingDateKey),
+        errorDateKey: clearError ? null : (errorDateKey ?? this.errorDateKey),
       );
 }
 
 class AdviceNotifier extends StateNotifier<AdviceState> {
   final Ref _ref;
-  AdviceNotifier(this._ref) : super(const AdviceState());
 
+  AdviceNotifier(this._ref) : super(const AdviceState()) {
+    _loadCachedAdvice();
+  }
+
+  static const _prefsKey = 'nutritionAdviceByDate';
   final _service = NutritionAdviceService();
-  String? _cachedKey;
 
-  String _cacheKey(
-    List<FoodItem> items,
-    String adviceLevel,
-    bool useSystemAi,
-    AiProviderType provider,
-    String model,
-  ) {
-    final totalCal = items.fold(0, (s, i) => s + i.calories);
-    final totalP = items.fold(0.0, (s, i) => s + i.protein);
-    final totalF = items.fold(0.0, (s, i) => s + i.fat);
-    final totalC = items.fold(0.0, (s, i) => s + i.carbs);
-    return '${items.length}_${totalCal}_'
-        '${totalP.toStringAsFixed(1)}_'
-        '${totalF.toStringAsFixed(1)}_'
-        '${totalC.toStringAsFixed(1)}_'
-        '${adviceLevel}_${useSystemAi ? 'system' : '${provider.name}_$model'}';
+  static String dateKey(DateTime date) {
+    final d = date.toLocal();
+    return '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+  }
+
+  Future<void> _loadCachedAdvice() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_prefsKey);
+    if (raw == null || raw.isEmpty) return;
+    try {
+      final decoded = jsonDecode(raw) as Map<String, dynamic>;
+      final cached = decoded.map(
+        (key, value) => MapEntry(key, value.toString()),
+      );
+      state = state.copyWith(adviceByDate: cached);
+    } catch (_) {
+      // 壊れたキャッシュは無視して、次回生成時に上書きする。
+    }
+  }
+
+  Future<void> _saveCachedAdvice(Map<String, String> adviceByDate) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_prefsKey, jsonEncode(adviceByDate));
   }
 
   Future<void> fetchAdvice({
@@ -55,26 +88,34 @@ class AdviceNotifier extends StateNotifier<AdviceState> {
     double sodiumGoal = 2300,
     required String adviceLevel,
     bool forceRefresh = false,
+    String? apiKey,
+    AiProviderType? provider,
+    String? model,
   }) async {
     final isSubscribed = _ref.read(isSubscribedProvider);
     final settings = _ref.read(settingsProvider);
-    final apiKey = settings.currentApiKey;
-    final provider = settings.selectedProvider;
-    final model = settings.currentModel;
+    final effectiveApiKey = apiKey ?? settings.currentApiKey;
+    final effectiveProvider = provider ?? settings.selectedProvider;
+    final modelStr = model ?? settings.currentModel;
 
-    // サブスク未加入 かつ APIキー未設定
-    if (!isSubscribed && apiKey.isEmpty) {
+    if (!isSubscribed && effectiveApiKey.isEmpty) {
       state = const AdviceState(error: '__paywall__');
       return;
     }
 
-    final resolvedModel = model.isNotEmpty ? model : provider.defaultModel;
-    final key = _cacheKey(items, adviceLevel, isSubscribed, provider, resolvedModel);
-    if (!forceRefresh && key == _cachedKey && state.adviceText != null) {
-      return;
-    }
+    final dk = AdviceNotifier.dateKey(date);
+    if (!forceRefresh && state.adviceByDate.containsKey(dk)) return;
 
-    state = const AdviceState(isLoading: true);
+    final resolvedModel = modelStr.isNotEmpty
+        ? modelStr
+        : effectiveProvider.defaultModel;
+
+    state = state.copyWith(
+      isLoading: true,
+      loadingDateKey: dk,
+      clearError: true,
+    );
+
     try {
       final text = await _service.getAdvice(
         items: items,
@@ -87,24 +128,34 @@ class AdviceNotifier extends StateNotifier<AdviceState> {
         sodiumGoal: sodiumGoal,
         adviceLevel: adviceLevel,
         useSystemAi: isSubscribed,
-        apiKey: apiKey,
-        provider: provider,
+        apiKey: effectiveApiKey,
+        provider: effectiveProvider,
         model: resolvedModel,
       );
-      _cachedKey = key;
-      state = AdviceState(adviceText: text);
+      final updated = {...state.adviceByDate, dk: text};
+      await _saveCachedAdvice(updated);
+      state = state.copyWith(
+        adviceByDate: updated,
+        isLoading: false,
+        clearLoadingDate: true,
+        clearError: true,
+      );
     } catch (e) {
-      state = AdviceState(error: e.toString().replaceFirst('Exception: ', ''));
+      state = state.copyWith(
+        isLoading: false,
+        clearLoadingDate: true,
+        error: e.toString().replaceFirst('Exception: ', ''),
+        errorDateKey: dk,
+      );
     }
   }
 
-  void clear() {
-    _cachedKey = null;
+  Future<void> clear() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_prefsKey);
     state = const AdviceState();
   }
 }
 
 final adviceProvider =
-    StateNotifierProvider<AdviceNotifier, AdviceState>(
-  (ref) => AdviceNotifier(ref),
-);
+    StateNotifierProvider<AdviceNotifier, AdviceState>((ref) => AdviceNotifier(ref));

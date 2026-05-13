@@ -42,7 +42,10 @@ enum AiProviderType {
           (id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash（高速）'),
           (id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro（高性能）'),
           (id: 'gemini-3-flash-preview', label: 'Gemini 3 Flash プレビュー（最新・高速）'),
-          (id: 'gemini-3.1-pro-preview', label: 'Gemini 3.1 Pro プレビュー（最新・最高性能）'),
+          (
+            id: 'gemini-3.1-pro-preview',
+            label: 'Gemini 3.1 Pro プレビュー（最新・最高性能）'
+          ),
         ];
     }
   }
@@ -196,10 +199,12 @@ class SettingsState {
 
   String get currentModelLabel {
     final models = selectedProvider.availableModels;
-    return models.firstWhere(
-      (m) => m.id == currentModel,
-      orElse: () => (id: currentModel, label: currentModel),
-    ).label;
+    return models
+        .firstWhere(
+          (m) => m.id == currentModel,
+          orElse: () => (id: currentModel, label: currentModel),
+        )
+        .label;
   }
 
   String get adviceLevelLabel =>
@@ -244,8 +249,8 @@ class SettingsState {
             workoutReminderMinute ?? this.workoutReminderMinute,
         trainingAdviceEnabled:
             trainingAdviceEnabled ?? this.trainingAdviceEnabled,
-        communityFoodContributeEnabled:
-            communityFoodContributeEnabled ?? this.communityFoodContributeEnabled,
+        communityFoodContributeEnabled: communityFoodContributeEnabled ??
+            this.communityFoodContributeEnabled,
         mealSuggestionEnabled:
             mealSuggestionEnabled ?? this.mealSuggestionEnabled,
       );
@@ -259,9 +264,7 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
   /// `ref` が使えないコールバック（例: Dropdown の非同期 onChanged）から現在状態を読む用。
   SettingsState get currentSettings => state;
 
-  static const _secureStorage = FlutterSecureStorage(
-    aOptions: AndroidOptions(encryptedSharedPreferences: true),
-  );
+  static const _secureStorage = FlutterSecureStorage();
 
   Future<void> _load() async {
     final prefs = await SharedPreferences.getInstance();
@@ -311,8 +314,7 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
       trainingAdviceEnabled: prefs.getBool('trainingAdviceEnabled') ?? true,
       communityFoodContributeEnabled:
           prefs.getBool('communityFoodContributeEnabled') ?? true,
-      mealSuggestionEnabled:
-          prefs.getBool('mealSuggestionEnabled') ?? false,
+      mealSuggestionEnabled: prefs.getBool('mealSuggestionEnabled') ?? false,
     );
   }
 

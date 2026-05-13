@@ -222,7 +222,7 @@ class ProfileSidebar extends ConsumerWidget {
                       style: TextStyle(fontSize: 12, color: Colors.grey)),
                   const SizedBox(height: 4),
                   DropdownButtonFormField<ActivityLevel>(
-                    value: dialogActivity,
+                    initialValue: dialogActivity,
                     decoration: const InputDecoration(
                       border: OutlineInputBorder(),
                       contentPadding:

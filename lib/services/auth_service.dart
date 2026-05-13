@@ -1,5 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'database_service.dart';
 
 class AuthService {
@@ -9,6 +11,7 @@ class AuthService {
 
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  static const _secureStorage = FlutterSecureStorage();
 
   static const _tables = [
     'food_items',
@@ -90,6 +93,11 @@ class AuthService {
     for (final table in _tables) {
       await adapter.delete(table);
     }
+
+    // Clear local preferences and device-only API keys tied to the account.
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.clear();
+    await _secureStorage.deleteAll();
 
     // Delete Firebase Auth account
     await user.delete();

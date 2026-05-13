@@ -97,9 +97,10 @@ class _FoodSearchResultTileState extends State<_FoodSearchResultTile> {
                     children: [
                       Builder(
                         builder: (context) {
-                          final h = (24 * MediaQuery.textScalerOf(context).scale(1))
-                              .clamp(22.0, 56.0)
-                              .toDouble();
+                          final h =
+                              (24 * MediaQuery.textScalerOf(context).scale(1))
+                                  .clamp(22.0, 56.0)
+                                  .toDouble();
                           return SizedBox(
                             height: h,
                             child: Align(
@@ -171,7 +172,8 @@ class MealScreen extends ConsumerWidget {
               ),
             ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () => _showAddMethodSheet(context, ref, mealState, mealNotifier),
+        onPressed: () =>
+            _showAddMethodSheet(context, ref, mealState, mealNotifier),
         child: const Icon(Icons.add),
       ),
     );
@@ -179,7 +181,8 @@ class MealScreen extends ConsumerWidget {
 
   // ── Date navigation ────────────────────────────────────────────────────────
 
-  Widget _buildDateNavigation(BuildContext context, MealState state, MealNotifier notifier) {
+  Widget _buildDateNavigation(
+      BuildContext context, MealState state, MealNotifier notifier) {
     final today = DateTime.now();
     final isToday = state.selectedDate.year == today.year &&
         state.selectedDate.month == today.month &&
@@ -256,7 +259,9 @@ class MealScreen extends ConsumerWidget {
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
-                    color: state.totalCalories > state.calorieGoal ? Colors.red : Colors.green,
+                    color: state.totalCalories > state.calorieGoal
+                        ? Colors.red
+                        : Colors.green,
                   ),
                 ),
               ],
@@ -281,7 +286,9 @@ class MealScreen extends ConsumerWidget {
                           '${type.label} ${state.caloriesByMealType[type]} kcal',
                           style: const TextStyle(fontSize: 12),
                         ),
-                        backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+                        backgroundColor: Theme.of(context)
+                            .colorScheme
+                            .surfaceContainerHighest,
                       ),
                 ],
               ),
@@ -331,7 +338,8 @@ class MealScreen extends ConsumerWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.start,
                 children: [
-                  _microNutrientChip('糖質', '${state.totalSugar.toStringAsFixed(1)}g', Colors.amber),
+                  _microNutrientChip('糖質',
+                      '${state.totalSugar.toStringAsFixed(1)}g', Colors.amber),
                 ],
               ),
             ],
@@ -353,7 +361,8 @@ class MealScreen extends ConsumerWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          for (final line in state.totalMicronutrients.summaryLines())
+                          for (final line
+                              in state.totalMicronutrients.summaryLines())
                             Text(line, style: const TextStyle(fontSize: 12)),
                         ],
                       ),
@@ -379,7 +388,8 @@ class MealScreen extends ConsumerWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          for (final line in state.totalDetailedNutrients.summaryLines())
+                          for (final line
+                              in state.totalDetailedNutrients.summaryLines())
                             Text(line, style: const TextStyle(fontSize: 12)),
                         ],
                       ),
@@ -396,7 +406,8 @@ class MealScreen extends ConsumerWidget {
 
   // ── Weekly calorie trend card ───────────────────────────────────────────────
 
-  Widget _buildTrendCard(BuildContext context, WidgetRef ref, MealState mealState) {
+  Widget _buildTrendCard(
+      BuildContext context, WidgetRef ref, MealState mealState) {
     final trendAsync = ref.watch(nutritionTrendProvider);
 
     return trendAsync.when(
@@ -412,14 +423,15 @@ class MealScreen extends ConsumerWidget {
         if (last7.every((s) => s.calories == 0)) return const SizedBox.shrink();
 
         final maxCal = last7
-            .map((s) => s.calories.toDouble())
-            .fold(0.0, max)
-            .clamp(mealState.calorieGoal * 0.5, double.infinity) *
+                .map((s) => s.calories.toDouble())
+                .fold(0.0, max)
+                .clamp(mealState.calorieGoal * 0.5, double.infinity) *
             1.25;
 
         return Card(
           elevation: 2,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
             child: Column(
@@ -432,7 +444,8 @@ class MealScreen extends ConsumerWidget {
                     const Expanded(
                       child: Text(
                         '週間カロリートレンド',
-                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                        style: TextStyle(
+                            fontSize: 15, fontWeight: FontWeight.bold),
                       ),
                     ),
                     Text(
@@ -453,7 +466,8 @@ class MealScreen extends ConsumerWidget {
                             final cal = rod.toY.toInt();
                             return BarTooltipItem(
                               '$cal kcal',
-                              const TextStyle(color: Colors.white, fontSize: 12),
+                              const TextStyle(
+                                  color: Colors.white, fontSize: 12),
                             );
                           },
                         ),
@@ -471,11 +485,13 @@ class MealScreen extends ConsumerWidget {
                               color: s.calories == 0
                                   ? Colors.grey.shade200
                                   : over
-                                      ? Colors.red.withValues(alpha: isToday ? 1.0 : 0.7)
-                                      : Colors.indigo.withValues(alpha: isToday ? 1.0 : 0.7),
+                                      ? Colors.red.withValues(
+                                          alpha: isToday ? 1.0 : 0.7)
+                                      : Colors.indigo.withValues(
+                                          alpha: isToday ? 1.0 : 0.7),
                               width: 22,
-                              borderRadius:
-                                  const BorderRadius.vertical(top: Radius.circular(4)),
+                              borderRadius: const BorderRadius.vertical(
+                                  top: Radius.circular(4)),
                             ),
                           ],
                         );
@@ -487,26 +503,31 @@ class MealScreen extends ConsumerWidget {
                             reservedSize: 22,
                             getTitlesWidget: (value, _) {
                               final i = value.toInt();
-                              if (i < 0 || i >= last7.length) return const Text('');
+                              if (i < 0 || i >= last7.length) {
+                                return const Text('');
+                              }
                               final isToday = i == last7.length - 1;
                               return Text(
-                                isToday ? '今日' : DateFormat('M/d').format(last7[i].date),
+                                isToday
+                                    ? '今日'
+                                    : DateFormat('M/d').format(last7[i].date),
                                 style: TextStyle(
                                   fontSize: 10,
-                                  fontWeight:
-                                      isToday ? FontWeight.bold : FontWeight.normal,
+                                  fontWeight: isToday
+                                      ? FontWeight.bold
+                                      : FontWeight.normal,
                                   color: isToday ? Colors.indigo : Colors.grey,
                                 ),
                               );
                             },
                           ),
                         ),
-                        leftTitles:
-                            const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                        topTitles:
-                            const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                        rightTitles:
-                            const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                        leftTitles: const AxisTitles(
+                            sideTitles: SideTitles(showTitles: false)),
+                        topTitles: const AxisTitles(
+                            sideTitles: SideTitles(showTitles: false)),
+                        rightTitles: const AxisTitles(
+                            sideTitles: SideTitles(showTitles: false)),
                       ),
                       gridData: const FlGridData(show: false),
                       borderData: FlBorderData(show: false),
@@ -536,7 +557,9 @@ class MealScreen extends ConsumerWidget {
       children: [
         Text(label, style: TextStyle(fontSize: 11, color: Colors.grey[600])),
         const SizedBox(height: 2),
-        Text(value, style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: color)),
+        Text(value,
+            style: TextStyle(
+                fontSize: 13, fontWeight: FontWeight.bold, color: color)),
       ],
     );
   }
@@ -610,9 +633,16 @@ class MealScreen extends ConsumerWidget {
 
   // ── AI Advice card ─────────────────────────────────────────────────────────
 
-  Widget _buildAdviceCard(BuildContext context, WidgetRef ref, MealState mealState) {
+  Widget _buildAdviceCard(
+      BuildContext context, WidgetRef ref, MealState mealState) {
     final adviceState = ref.watch(adviceProvider);
     final settings = ref.watch(settingsProvider);
+    final dateKey = AdviceNotifier.dateKey(mealState.selectedDate);
+    final adviceText = adviceState.adviceByDate[dateKey];
+    final isLoading =
+        adviceState.isLoading && adviceState.loadingDateKey == dateKey;
+    final error =
+        adviceState.errorDateKey == dateKey ? adviceState.error : null;
 
     return Card(
       elevation: 2,
@@ -630,13 +660,13 @@ class MealScreen extends ConsumerWidget {
                 const SizedBox(width: 8),
                 const Expanded(
                   child: Text(
-                    'AIアドバイス',
+                    '選択日のAIアドバイス',
                     style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                if (adviceState.isLoading)
+                if (isLoading)
                   const SizedBox(
                     width: 24,
                     height: 24,
@@ -645,22 +675,23 @@ class MealScreen extends ConsumerWidget {
                 else
                   IconButton(
                     icon: const Icon(Icons.refresh),
-                    tooltip: adviceState.adviceText != null ? '再取得（更新）' : 'アドバイスを取得',
-                    onPressed: () => ref.read(adviceProvider.notifier).fetchAdvice(
-                          items: mealState.todayItems,
-                          date: mealState.selectedDate,
-                          calorieGoal: mealState.calorieGoal,
-                          proteinGoal: mealState.proteinGoal,
-                          fatGoal: mealState.fatGoal,
-                          carbsGoal: mealState.carbsGoal,
-                          fiberGoal: mealState.fiberGoal,
-                          sodiumGoal: mealState.sodiumGoal,
-                          adviceLevel: settings.adviceLevel,
-                          apiKey: settings.currentApiKey,
-                          provider: settings.selectedProvider,
-                          model: settings.currentModel,
-                          forceRefresh: true,
-                        ),
+                    tooltip: adviceText != null ? '再生成' : 'アドバイスを生成',
+                    onPressed: () =>
+                        ref.read(adviceProvider.notifier).fetchAdvice(
+                              items: mealState.todayItems,
+                              date: mealState.selectedDate,
+                              calorieGoal: mealState.calorieGoal,
+                              proteinGoal: mealState.proteinGoal,
+                              fatGoal: mealState.fatGoal,
+                              carbsGoal: mealState.carbsGoal,
+                              fiberGoal: mealState.fiberGoal,
+                              sodiumGoal: mealState.sodiumGoal,
+                              adviceLevel: settings.adviceLevel,
+                              apiKey: settings.currentApiKey,
+                              provider: settings.selectedProvider,
+                              model: settings.currentModel,
+                              forceRefresh: true,
+                            ),
                   ),
               ],
             ),
@@ -674,24 +705,27 @@ class MealScreen extends ConsumerWidget {
               ),
               child: Text(
                 '${settings.selectedProvider.label} · ${settings.currentModelLabel} · ${settings.adviceLevelLabel}',
-                style: const TextStyle(fontSize: 12, color: Colors.teal, height: 1.35),
+                style: const TextStyle(
+                    fontSize: 12, color: Colors.teal, height: 1.35),
               ),
             ),
-            if (adviceState.error != null) ...[
+            if (error != null) ...[
               const SizedBox(height: 8),
-              Text(adviceState.error!, style: const TextStyle(color: Colors.red, fontSize: 13)),
+              Text(error,
+                  style: const TextStyle(color: Colors.red, fontSize: 13)),
             ],
-            if (adviceState.adviceText != null) ...[
+            if (adviceText != null) ...[
               const SizedBox(height: 8),
               const Divider(),
               const SizedBox(height: 4),
-              Text(adviceState.adviceText!, style: const TextStyle(fontSize: 14, height: 1.6)),
+              Text(adviceText,
+                  style: const TextStyle(fontSize: 14, height: 1.6)),
             ],
-            if (adviceState.adviceText == null && adviceState.error == null && !adviceState.isLoading)
+            if (adviceText == null && error == null && !isLoading)
               const Padding(
                 padding: EdgeInsets.only(top: 4),
                 child: Text(
-                  '↑ ボタンを押してアドバイスを取得',
+                  '↑ ボタンを押して、この日のアドバイスを生成',
                   style: TextStyle(color: Colors.grey, fontSize: 13),
                 ),
               ),
@@ -703,14 +737,15 @@ class MealScreen extends ConsumerWidget {
 
   // ── Food list grouped by meal type ─────────────────────────────────────────
 
-  Widget _buildFoodList(
-      BuildContext context, WidgetRef ref, MealState state, MealNotifier notifier) {
+  Widget _buildFoodList(BuildContext context, WidgetRef ref, MealState state,
+      MealNotifier notifier) {
     if (state.todayItems.isEmpty) {
       return const Center(
         child: Padding(
           padding: EdgeInsets.all(32.0),
           child: Text('まだ記録がありません\n右下の + ボタンで追加できます',
-              textAlign: TextAlign.center, style: TextStyle(color: Colors.grey)),
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.grey)),
         ),
       );
     }
@@ -730,7 +765,7 @@ class MealScreen extends ConsumerWidget {
         Row(
           children: [
             Text(
-              '今日の記録 (${state.todayItems.length}件)',
+              '選択日の記録 (${state.todayItems.length}件)',
               style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
             ),
             const Spacer(),
@@ -738,11 +773,14 @@ class MealScreen extends ConsumerWidget {
               message: isTimeline ? 'グループ表示に切替' : 'タイムライン表示に切替',
               child: IconButton(
                 icon: Icon(
-                  isTimeline ? Icons.view_list_outlined : Icons.view_timeline_outlined,
+                  isTimeline
+                      ? Icons.view_list_outlined
+                      : Icons.view_timeline_outlined,
                   size: 20,
                 ),
-                onPressed: () =>
-                    ref.read(_timelineViewProvider.notifier).state = !isTimeline,
+                onPressed: () => ref
+                    .read(_timelineViewProvider.notifier)
+                    .state = !isTimeline,
               ),
             ),
           ],
@@ -768,8 +806,9 @@ class MealScreen extends ConsumerWidget {
           children: [
             OutlinedButton.icon(
               icon: const Icon(Icons.bookmark_add, size: 18),
-              label: const Text('今日の食事をプリセット保存'),
-              onPressed: () => _showSavePresetDialog(context, ref, state.todayItems),
+              label: const Text('選択日の食事をプリセット保存'),
+              onPressed: () =>
+                  _showSavePresetDialog(context, ref, state.todayItems),
             ),
             OutlinedButton.icon(
               icon: const Icon(Icons.restaurant_menu, size: 18),
@@ -784,8 +823,8 @@ class MealScreen extends ConsumerWidget {
 
   // ── Timeline view ──────────────────────────────────────────────────────────
 
-  Widget _buildTimelineView(
-      BuildContext context, WidgetRef ref, MealState state, MealNotifier notifier) {
+  Widget _buildTimelineView(BuildContext context, WidgetRef ref,
+      MealState state, MealNotifier notifier) {
     final sorted = List<FoodItem>.from(state.todayItems)
       ..sort((a, b) => a.date.compareTo(b.date));
 
@@ -814,7 +853,8 @@ class MealScreen extends ConsumerWidget {
               Column(
                 children: [
                   if (i > 0)
-                    Container(width: 1.5, height: 14, color: Colors.grey.shade300),
+                    Container(
+                        width: 1.5, height: 14, color: Colors.grey.shade300),
                   Container(
                     width: 10,
                     height: 10,
@@ -825,7 +865,8 @@ class MealScreen extends ConsumerWidget {
                   ),
                   if (!isLast)
                     Expanded(
-                        child: Container(width: 1.5, color: Colors.grey.shade300)),
+                        child:
+                            Container(width: 1.5, color: Colors.grey.shade300)),
                 ],
               ),
               const SizedBox(width: 10),
@@ -923,25 +964,26 @@ class MealScreen extends ConsumerWidget {
                               onPressed: () async {
                                 final ok = await showDialog<bool>(
                                   context: context,
-                                  builder: (_) => AlertDialog(
+                                  builder: (dialogContext) => AlertDialog(
                                     title: const Text('削除の確認'),
-                                    content:
-                                        Text('「${item.name}」を削除しますか？'),
+                                    content: Text('「${item.name}」を削除しますか？'),
                                     actions: [
                                       TextButton(
-                                          onPressed: () =>
-                                              Navigator.pop(_, false),
+                                          onPressed: () => Navigator.pop(
+                                              dialogContext, false),
                                           child: const Text('キャンセル')),
                                       TextButton(
-                                          onPressed: () =>
-                                              Navigator.pop(_, true),
+                                          onPressed: () => Navigator.pop(
+                                              dialogContext, true),
                                           child: const Text('削除',
                                               style: TextStyle(
                                                   color: Colors.red))),
                                     ],
                                   ),
                                 );
-                                if (ok == true) notifier.deleteFoodItem(item.id);
+                                if (ok == true) {
+                                  notifier.deleteFoodItem(item.id);
+                                }
                               },
                             ),
                           ],
@@ -965,16 +1007,18 @@ class MealScreen extends ConsumerWidget {
       child: Row(
         children: [
           Text(type.label,
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+              style:
+                  const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
           const SizedBox(width: 8),
-          Text('$totalCal kcal', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+          Text('$totalCal kcal',
+              style: const TextStyle(fontSize: 12, color: Colors.grey)),
         ],
       ),
     );
   }
 
-  Widget _buildFoodTile(
-      BuildContext context, WidgetRef ref, FoodItem item, MealState mealState, MealNotifier notifier) {
+  Widget _buildFoodTile(BuildContext context, WidgetRef ref, FoodItem item,
+      MealState mealState, MealNotifier notifier) {
     final hasMicro = item.sugar > 0 ||
         item.fiber > 0 ||
         item.sodium > 0 ||
@@ -986,22 +1030,23 @@ class MealScreen extends ConsumerWidget {
       direction: DismissDirection.endToStart,
       confirmDismiss: (_) async {
         return await showDialog<bool>(
-          context: context,
-          builder: (_) => AlertDialog(
-            title: const Text('削除の確認'),
-            content: Text('「${item.name}」を削除しますか？'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text('キャンセル'),
+              context: context,
+              builder: (_) => AlertDialog(
+                title: const Text('削除の確認'),
+                content: Text('「${item.name}」を削除しますか？'),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context, false),
+                    child: const Text('キャンセル'),
+                  ),
+                  TextButton(
+                    onPressed: () => Navigator.pop(context, true),
+                    child:
+                        const Text('削除', style: TextStyle(color: Colors.red)),
+                  ),
+                ],
               ),
-              TextButton(
-                onPressed: () => Navigator.pop(context, true),
-                child: const Text('削除', style: TextStyle(color: Colors.red)),
-              ),
-            ],
-          ),
-        ) ??
+            ) ??
             false;
       },
       onDismissed: (_) => notifier.deleteFoodItem(item.id),
@@ -1034,7 +1079,8 @@ class MealScreen extends ConsumerWidget {
               }
             },
             leading: isSupplement
-                ? Icon(Icons.medication_outlined, color: Theme.of(context).colorScheme.primary, size: 22)
+                ? Icon(Icons.medication_outlined,
+                    color: Theme.of(context).colorScheme.primary, size: 22)
                 : null,
             title: Text(isSupplement ? '[サプリ] ${item.name}' : item.name),
             subtitle: Column(
@@ -1058,8 +1104,10 @@ class MealScreen extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Text('${item.calories}',
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                const Text('kcal', style: TextStyle(fontSize: 10, color: Colors.grey)),
+                    style: const TextStyle(
+                        fontWeight: FontWeight.bold, fontSize: 16)),
+                const Text('kcal',
+                    style: TextStyle(fontSize: 10, color: Colors.grey)),
               ],
             ),
             isThreeLine: hasMicro,
@@ -1079,15 +1127,18 @@ class MealScreen extends ConsumerWidget {
     FoodItem? existingItem,
   }) {
     final isEdit = existingItem != null;
-    final nameController = TextEditingController(text: existingItem?.name ?? '');
-    final calorieController =
-        TextEditingController(text: existingItem != null ? existingItem.calories.toString() : '');
-    final proteinController =
-        TextEditingController(text: existingItem != null ? existingItem.protein.toString() : '');
-    final fatController =
-        TextEditingController(text: existingItem != null ? existingItem.fat.toString() : '');
-    final carbsController =
-        TextEditingController(text: existingItem != null ? existingItem.carbs.toString() : '');
+    final targetDate =
+        (isEdit ? existingItem.date : mealState.selectedDate).toLocal();
+    final nameController =
+        TextEditingController(text: existingItem?.name ?? '');
+    final calorieController = TextEditingController(
+        text: existingItem != null ? existingItem.calories.toString() : '');
+    final proteinController = TextEditingController(
+        text: existingItem != null ? existingItem.protein.toString() : '');
+    final fatController = TextEditingController(
+        text: existingItem != null ? existingItem.fat.toString() : '');
+    final carbsController = TextEditingController(
+        text: existingItem != null ? existingItem.carbs.toString() : '');
     final sugarController = TextEditingController(
         text: existingItem != null && existingItem.sugar > 0
             ? existingItem.sugar.toString()
@@ -1112,8 +1163,7 @@ class MealScreen extends ConsumerWidget {
       proteinController.text =
           (result.proteinPer100g * ratio).toStringAsFixed(1);
       fatController.text = (result.fatPer100g * ratio).toStringAsFixed(1);
-      carbsController.text =
-          (result.carbsPer100g * ratio).toStringAsFixed(1);
+      carbsController.text = (result.carbsPer100g * ratio).toStringAsFixed(1);
     }
 
     void fillFromCommunity(CommunityFoodEntry entry) {
@@ -1122,9 +1172,15 @@ class MealScreen extends ConsumerWidget {
       proteinController.text = entry.protein.toStringAsFixed(1);
       fatController.text = entry.fat.toStringAsFixed(1);
       carbsController.text = entry.carbs.toStringAsFixed(1);
-      if (entry.sugar > 0) sugarController.text = entry.sugar.toStringAsFixed(1);
-      if (entry.fiber > 0) fiberController.text = entry.fiber.toStringAsFixed(1);
-      if (entry.sodium > 0) sodiumController.text = entry.sodium.toStringAsFixed(0);
+      if (entry.sugar > 0) {
+        sugarController.text = entry.sugar.toStringAsFixed(1);
+      }
+      if (entry.fiber > 0) {
+        fiberController.text = entry.fiber.toStringAsFixed(1);
+      }
+      if (entry.sodium > 0) {
+        sodiumController.text = entry.sodium.toStringAsFixed(0);
+      }
     }
 
     showDialog(
@@ -1138,8 +1194,21 @@ class MealScreen extends ConsumerWidget {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.event, size: 16, color: Colors.grey),
+                      const SizedBox(width: 6),
+                      Text(
+                        '記録日: ${DateFormat('yyyy/M/d').format(targetDate)}',
+                        style:
+                            const TextStyle(fontSize: 12, color: Colors.grey),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
                   // ── Meal type selector ─────────────────────────────────
-                  const Text('食事の種類', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                  const Text('食事の種類',
+                      style: TextStyle(fontSize: 12, color: Colors.grey)),
                   const SizedBox(height: 6),
                   Wrap(
                     spacing: 8,
@@ -1150,7 +1219,8 @@ class MealScreen extends ConsumerWidget {
                       return ChoiceChip(
                         label: Text(t.label),
                         selected: selected,
-                        onSelected: (_) => setDialogState(() => selectedMealType = t),
+                        onSelected: (_) =>
+                            setDialogState(() => selectedMealType = t),
                       );
                     }).toList(),
                   ),
@@ -1174,16 +1244,19 @@ class MealScreen extends ConsumerWidget {
                             onPressed: () {
                               setDialogState(() {
                                 nameController.text = food.name;
-                                calorieController.text = food.calories.toString();
-                                proteinController.text = food.protein.toString();
+                                calorieController.text =
+                                    food.calories.toString();
+                                proteinController.text =
+                                    food.protein.toString();
                                 fatController.text = food.fat.toString();
                                 carbsController.text = food.carbs.toString();
                                 sugarController.text =
                                     food.sugar > 0 ? food.sugar.toString() : '';
                                 fiberController.text =
                                     food.fiber > 0 ? food.fiber.toString() : '';
-                                sodiumController.text =
-                                    food.sodium > 0 ? food.sodium.toString() : '';
+                                sodiumController.text = food.sodium > 0
+                                    ? food.sodium.toString()
+                                    : '';
                                 selectedMealType = food.mealType;
                               });
                             },
@@ -1225,23 +1298,27 @@ class MealScreen extends ConsumerWidget {
                   TextField(
                     controller: proteinController,
                     decoration: const InputDecoration(labelText: 'タンパク質 (g)'),
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
                   ),
                   TextField(
                     controller: fatController,
                     decoration: const InputDecoration(labelText: '脂質 (g)'),
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
                   ),
                   TextField(
                     controller: carbsController,
                     decoration: const InputDecoration(labelText: '炭水化物 (g)'),
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
                   ),
                   const SizedBox(height: 4),
 
                   // ── Micronutrients (expandable) ────────────────────────
                   Theme(
-                    data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+                    data: Theme.of(context)
+                        .copyWith(dividerColor: Colors.transparent),
                     child: ExpansionTile(
                       tilePadding: EdgeInsets.zero,
                       title: const Text('その他栄養素',
@@ -1249,19 +1326,22 @@ class MealScreen extends ConsumerWidget {
                       children: [
                         TextField(
                           controller: sugarController,
-                          decoration: const InputDecoration(labelText: '糖質 (g)'),
-                          keyboardType:
-                              const TextInputType.numberWithOptions(decimal: true),
+                          decoration:
+                              const InputDecoration(labelText: '糖質 (g)'),
+                          keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true),
                         ),
                         TextField(
                           controller: fiberController,
-                          decoration: const InputDecoration(labelText: '食物繊維 (g)'),
-                          keyboardType:
-                              const TextInputType.numberWithOptions(decimal: true),
+                          decoration:
+                              const InputDecoration(labelText: '食物繊維 (g)'),
+                          keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true),
                         ),
                         TextField(
                           controller: sodiumController,
-                          decoration: const InputDecoration(labelText: 'ナトリウム (mg)'),
+                          decoration:
+                              const InputDecoration(labelText: 'ナトリウム (mg)'),
                           keyboardType: TextInputType.number,
                         ),
                       ],
@@ -1583,7 +1663,11 @@ class MealScreen extends ConsumerWidget {
                 title: const Text('手動で入力'),
                 onTap: () {
                   Navigator.pop(ctx);
-                  _showFoodDialog(context: context, ref: ref, mealState: mealState, notifier: notifier);
+                  _showFoodDialog(
+                      context: context,
+                      ref: ref,
+                      mealState: mealState,
+                      notifier: notifier);
                 },
               ),
               ListTile(
@@ -1660,7 +1744,8 @@ class MealScreen extends ConsumerWidget {
       context: context,
       isScrollControlled: true,
       builder: (ctx) => _BarcodeScanSheet(
-        onScanned: (barcode) => _handleBarcodeResult(context, ref, mealState, notifier, barcode),
+        onScanned: (barcode) =>
+            _handleBarcodeResult(context, ref, mealState, notifier, barcode),
       ),
     );
   }
@@ -1798,7 +1883,9 @@ class MealScreen extends ConsumerWidget {
         padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(ctx).bottom),
         child: RecipePresetEditorSheet(
           onSave: (name, lines, mealType) {
-            ref.read(presetProvider.notifier).saveRecipePreset(name, lines, mealType);
+            ref
+                .read(presetProvider.notifier)
+                .saveRecipePreset(name, lines, mealType);
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(content: Text('レシピ「$name」をプリセットに保存しました')),
             );
@@ -1822,12 +1909,14 @@ class MealScreen extends ConsumerWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('${items.length}品目・合計${items.fold(0, (s, i) => s + i.calories)} kcal を保存します',
+            Text(
+                '${items.length}品目・合計${items.fold(0, (s, i) => s + i.calories)} kcal を保存します',
                 style: const TextStyle(fontSize: 13, color: Colors.grey)),
             const SizedBox(height: 12),
             TextField(
               controller: nameController,
-              decoration: const InputDecoration(labelText: 'プリセット名', hintText: '例：いつもの昼食'),
+              decoration: const InputDecoration(
+                  labelText: 'プリセット名', hintText: '例：いつもの昼食'),
               autofocus: true,
             ),
           ],
@@ -1846,7 +1935,8 @@ class MealScreen extends ConsumerWidget {
                   );
               Navigator.pop(ctx);
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('「${nameController.text.trim()}」を保存しました')),
+                SnackBar(
+                    content: Text('「${nameController.text.trim()}」を保存しました')),
               );
             },
             child: const Text('保存'),
@@ -1919,7 +2009,9 @@ class MealScreen extends ConsumerWidget {
         onAdd: (items, mealType) {
           for (final item in items) {
             notifier.addFoodItem(
-              name: item.amount.isNotEmpty ? '${item.name}（${item.amount}）' : item.name,
+              name: item.amount.isNotEmpty
+                  ? '${item.name}（${item.amount}）'
+                  : item.name,
               calories: item.calories,
               protein: item.protein,
               fat: item.fat,
@@ -1970,7 +2062,8 @@ class _BarcodeScanSheetState extends State<_BarcodeScanSheet> {
                   const Expanded(
                     child: Text(
                       'バーコードをスキャン',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      style:
+                          TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                     ),
                   ),
                   IconButton(
@@ -2058,7 +2151,8 @@ class _BarcodeResultDialogState extends State<_BarcodeResultDialog> {
     super.initState();
     _nameController = TextEditingController(text: widget.result.name);
     final defaultGrams = widget.result.defaultServingGrams ?? 100.0;
-    _gramsController = TextEditingController(text: defaultGrams.toStringAsFixed(0));
+    _gramsController =
+        TextEditingController(text: defaultGrams.toStringAsFixed(0));
   }
 
   @override
@@ -2099,7 +2193,8 @@ class _BarcodeResultDialogState extends State<_BarcodeResultDialog> {
                           labelText: '量 (g)',
                           suffixText: 'g',
                         ),
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true),
                         onChanged: (_) => setDialogState(() {}),
                       ),
                     ),
@@ -2107,8 +2202,9 @@ class _BarcodeResultDialogState extends State<_BarcodeResultDialog> {
                       const SizedBox(width: 8),
                       TextButton(
                         onPressed: () {
-                          _gramsController.text =
-                              widget.result.defaultServingGrams!.toStringAsFixed(0);
+                          _gramsController.text = widget
+                              .result.defaultServingGrams!
+                              .toStringAsFixed(0);
                           setDialogState(() {});
                         },
                         child: const Text('1食分'),
@@ -2128,16 +2224,19 @@ class _BarcodeResultDialogState extends State<_BarcodeResultDialog> {
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                    color:
+                        Theme.of(context).colorScheme.surfaceContainerHighest,
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text('${n['calories']} kcal',
-                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                          style: const TextStyle(
+                              fontSize: 18, fontWeight: FontWeight.bold)),
                       const SizedBox(height: 4),
-                      Text('P: ${n['protein']}g  F: ${n['fat']}g  C: ${n['carbs']}g',
+                      Text(
+                          'P: ${n['protein']}g  F: ${n['fat']}g  C: ${n['carbs']}g',
                           style: const TextStyle(fontSize: 13)),
                       if ((n['sugar'] as num) > 0 ||
                           (n['fiber'] as num) > 0 ||
@@ -2147,17 +2246,21 @@ class _BarcodeResultDialogState extends State<_BarcodeResultDialog> {
                           child: Text(
                             [
                               if ((n['sugar'] as num) > 0) '糖質: ${n['sugar']}g',
-                              if ((n['fiber'] as num) > 0) '食物繊維: ${n['fiber']}g',
-                              if ((n['sodium'] as num) > 0) 'Na: ${n['sodium']}mg',
+                              if ((n['fiber'] as num) > 0)
+                                '食物繊維: ${n['fiber']}g',
+                              if ((n['sodium'] as num) > 0)
+                                'Na: ${n['sodium']}mg',
                             ].join('  '),
-                            style: const TextStyle(fontSize: 11, color: Colors.grey),
+                            style: const TextStyle(
+                                fontSize: 11, color: Colors.grey),
                           ),
                         ),
                     ],
                   ),
                 ),
                 const SizedBox(height: 12),
-                const Text('食事の種類', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                const Text('食事の種類',
+                    style: TextStyle(fontSize: 12, color: Colors.grey)),
                 const SizedBox(height: 6),
                 Wrap(
                   spacing: 8,
@@ -2391,7 +2494,8 @@ class _PresetSheet extends ConsumerWidget {
                 children: [
                   const Expanded(
                     child: Text('プリセットから追加',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                        style: TextStyle(
+                            fontSize: 16, fontWeight: FontWeight.bold)),
                   ),
                   IconButton(
                     icon: const Icon(Icons.close),
@@ -2419,31 +2523,37 @@ class _PresetSheet extends ConsumerWidget {
                   itemCount: presets.length,
                   itemBuilder: (ctx, i) {
                     final preset = presets[i];
-                    final subtitle = preset.isRecipe && preset.recipeLines != null
+                    final subtitle = preset.isRecipe &&
+                            preset.recipeLines != null
                         ? '${preset.recipeLines!.length}材料・${preset.totalCalories} kcal（レシピ）'
                         : '${preset.items.length}品目・${preset.totalCalories} kcal';
                     return ListTile(
-                      leading: Icon(preset.isRecipe ? Icons.restaurant_menu : Icons.bookmark),
+                      leading: Icon(preset.isRecipe
+                          ? Icons.restaurant_menu
+                          : Icons.bookmark),
                       title: Text(preset.name),
                       subtitle: Text(
                         subtitle,
                         style: const TextStyle(fontSize: 12),
                       ),
                       trailing: IconButton(
-                        icon: const Icon(Icons.delete_outline, color: Colors.red),
+                        icon:
+                            const Icon(Icons.delete_outline, color: Colors.red),
                         onPressed: () async {
                           final confirm = await showDialog<bool>(
                             context: ctx,
-                            builder: (_) => AlertDialog(
+                            builder: (dialogContext) => AlertDialog(
                               title: const Text('削除の確認'),
                               content: Text('「${preset.name}」を削除しますか？'),
                               actions: [
                                 TextButton(
-                                  onPressed: () => Navigator.pop(_, false),
+                                  onPressed: () =>
+                                      Navigator.pop(dialogContext, false),
                                   child: const Text('キャンセル'),
                                 ),
                                 TextButton(
-                                  onPressed: () => Navigator.pop(_, true),
+                                  onPressed: () =>
+                                      Navigator.pop(dialogContext, true),
                                   child: const Text('削除',
                                       style: TextStyle(color: Colors.red)),
                                 ),
@@ -2451,7 +2561,9 @@ class _PresetSheet extends ConsumerWidget {
                             ),
                           );
                           if (confirm == true) {
-                            ref.read(presetProvider.notifier).deletePreset(preset.id);
+                            ref
+                                .read(presetProvider.notifier)
+                                .deletePreset(preset.id);
                           }
                         },
                       ),
@@ -2580,7 +2692,9 @@ class _PhotoAnalysisDialogState extends State<_PhotoAnalysisDialog> {
     });
     try {
       final bytes = _imageBytes ?? await widget.imageFile.readAsBytes();
-      if (_imageBytes == null && mounted) setState(() => _imageBytes = bytes);
+      if (_imageBytes == null && mounted) {
+        setState(() => _imageBytes = bytes);
+      }
 
       final items = await MealImageAnalysisService().analyzeImage(
         imageBytes: bytes,
@@ -2590,7 +2704,12 @@ class _PhotoAnalysisDialogState extends State<_PhotoAnalysisDialog> {
         model: widget.model,
       );
 
-      if (mounted) setState(() { _items = items; _isLoading = false; });
+      if (mounted) {
+        setState(() {
+          _items = items;
+          _isLoading = false;
+        });
+      }
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -2623,7 +2742,8 @@ class _PhotoAnalysisDialogState extends State<_PhotoAnalysisDialog> {
               ),
             const SizedBox(height: 12),
             if (!_isLoading && _error == null && _items.isNotEmpty) ...[
-              const Text('食事の種類', style: TextStyle(fontSize: 12, color: Colors.grey)),
+              const Text('食事の種類',
+                  style: TextStyle(fontSize: 12, color: Colors.grey)),
               const SizedBox(height: 6),
               Wrap(
                 spacing: 8,
@@ -2669,7 +2789,8 @@ class _PhotoAnalysisDialogState extends State<_PhotoAnalysisDialog> {
           children: [
             const Icon(Icons.error_outline, color: Colors.red, size: 40),
             const SizedBox(height: 8),
-            Text(_error!, style: const TextStyle(color: Colors.red, fontSize: 13),
+            Text(_error!,
+                style: const TextStyle(color: Colors.red, fontSize: 13),
                 textAlign: TextAlign.center),
           ],
         ),
@@ -2699,7 +2820,8 @@ class _PhotoAnalysisDialogState extends State<_PhotoAnalysisDialog> {
               ],
             ),
             const SizedBox(height: 4),
-            ...List.generate(_items.length, (i) => _buildItemTile(_items[i], i)),
+            ...List.generate(
+                _items.length, (i) => _buildItemTile(_items[i], i)),
           ],
         ),
       ),
@@ -2721,8 +2843,10 @@ class _PhotoAnalysisDialogState extends State<_PhotoAnalysisDialog> {
             title: isEditing
                 ? TextField(
                     controller: _editControllers!['name'],
-                    decoration: const InputDecoration(isDense: true, labelText: '名前'),
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                    decoration:
+                        const InputDecoration(isDense: true, labelText: '名前'),
+                    style: const TextStyle(
+                        fontWeight: FontWeight.bold, fontSize: 14),
                   )
                 : Row(
                     children: [
@@ -2742,8 +2866,10 @@ class _PhotoAnalysisDialogState extends State<_PhotoAnalysisDialog> {
                     children: [
                       if (item.amount.isNotEmpty)
                         Text(item.amount,
-                            style: const TextStyle(color: Colors.grey, fontSize: 11)),
-                      Text('P: ${item.protein}g  F: ${item.fat}g  C: ${item.carbs}g',
+                            style: const TextStyle(
+                                color: Colors.grey, fontSize: 11)),
+                      Text(
+                          'P: ${item.protein}g  F: ${item.fat}g  C: ${item.carbs}g',
                           style: const TextStyle(fontSize: 12)),
                       if (item.sugar > 0 || item.fiber > 0 || item.sodium > 0)
                         Text(
@@ -2752,7 +2878,8 @@ class _PhotoAnalysisDialogState extends State<_PhotoAnalysisDialog> {
                             if (item.fiber > 0) '食物繊維: ${item.fiber}g',
                             if (item.sodium > 0) 'Na: ${item.sodium.toInt()}mg',
                           ].join('  '),
-                          style: const TextStyle(fontSize: 11, color: Colors.grey),
+                          style:
+                              const TextStyle(fontSize: 11, color: Colors.grey),
                         ),
                     ],
                   ),
@@ -2791,8 +2918,8 @@ class _PhotoAnalysisDialogState extends State<_PhotoAnalysisDialog> {
                           controller: _editControllers!['protein'],
                           decoration: const InputDecoration(
                               isDense: true, labelText: 'P (g)'),
-                          keyboardType:
-                              const TextInputType.numberWithOptions(decimal: true),
+                          keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true),
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -2801,8 +2928,8 @@ class _PhotoAnalysisDialogState extends State<_PhotoAnalysisDialog> {
                           controller: _editControllers!['fat'],
                           decoration: const InputDecoration(
                               isDense: true, labelText: 'F (g)'),
-                          keyboardType:
-                              const TextInputType.numberWithOptions(decimal: true),
+                          keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true),
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -2811,8 +2938,8 @@ class _PhotoAnalysisDialogState extends State<_PhotoAnalysisDialog> {
                           controller: _editControllers!['carbs'],
                           decoration: const InputDecoration(
                               isDense: true, labelText: 'C (g)'),
-                          keyboardType:
-                              const TextInputType.numberWithOptions(decimal: true),
+                          keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true),
                         ),
                       ),
                     ],
@@ -2825,8 +2952,8 @@ class _PhotoAnalysisDialogState extends State<_PhotoAnalysisDialog> {
                           controller: _editControllers!['sugar'],
                           decoration: const InputDecoration(
                               isDense: true, labelText: '糖質 (g)'),
-                          keyboardType:
-                              const TextInputType.numberWithOptions(decimal: true),
+                          keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true),
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -2835,8 +2962,8 @@ class _PhotoAnalysisDialogState extends State<_PhotoAnalysisDialog> {
                           controller: _editControllers!['fiber'],
                           decoration: const InputDecoration(
                               isDense: true, labelText: '繊維 (g)'),
-                          keyboardType:
-                              const TextInputType.numberWithOptions(decimal: true),
+                          keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true),
                         ),
                       ),
                       const SizedBox(width: 8),

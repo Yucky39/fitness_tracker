@@ -29,13 +29,18 @@ class TrainingAdviceNotifier extends StateNotifier<TrainingAdviceState> {
     required TrainingLog log,
     required List<TrainingLog> allLogs,
     required String adviceLevel,
+    String? apiKey,
+    AiProviderType? provider,
+    String? model,
     String? sleepContext,
   }) async {
     final isSubscribed = _ref.read(isSubscribedProvider);
     final settings = _ref.read(settingsProvider);
-    final apiKey = settings.currentApiKey;
+    final effectiveApiKey = apiKey ?? settings.currentApiKey;
+    final effectiveProvider = provider ?? settings.selectedProvider;
+    final modelStr = model ?? settings.currentModel;
 
-    if (!isSubscribed && apiKey.isEmpty) {
+    if (!isSubscribed && effectiveApiKey.isEmpty) {
       state = TrainingAdviceState(
         adviceByLogId: state.adviceByLogId,
         errorLogId: log.id,
@@ -63,9 +68,9 @@ class TrainingAdviceNotifier extends StateNotifier<TrainingAdviceState> {
         historyByExercise: {log.exerciseName: history},
         adviceLevel: adviceLevel,
         useSystemAi: isSubscribed,
-        apiKey: apiKey,
-        provider: settings.selectedProvider,
-        model: settings.currentModel.isNotEmpty ? settings.currentModel : null,
+        apiKey: effectiveApiKey,
+        provider: effectiveProvider,
+        model: modelStr.isNotEmpty ? modelStr : null,
         sleepContext: sleepContext,
         weeklyLoadContext: weeklyLoadContext,
       );

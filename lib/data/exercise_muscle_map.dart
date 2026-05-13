@@ -23,7 +23,11 @@ enum MuscleGroup {
 const Map<String, List<MuscleGroup>> exerciseMuscleMap = {
   // 胸
   'ベンチプレス': [MuscleGroup.chest, MuscleGroup.triceps, MuscleGroup.shoulders],
-  'インクラインベンチプレス': [MuscleGroup.chest, MuscleGroup.shoulders, MuscleGroup.triceps],
+  'インクラインベンチプレス': [
+    MuscleGroup.chest,
+    MuscleGroup.shoulders,
+    MuscleGroup.triceps
+  ],
   'ダンベルフライ': [MuscleGroup.chest, MuscleGroup.shoulders],
   'ダンベルプレス': [MuscleGroup.chest, MuscleGroup.triceps],
   'チェストプレス': [MuscleGroup.chest, MuscleGroup.triceps],
@@ -41,7 +45,11 @@ const Map<String, List<MuscleGroup>> exerciseMuscleMap = {
   '懸垂': [MuscleGroup.back, MuscleGroup.biceps],
   'チンアップ': [MuscleGroup.back, MuscleGroup.biceps],
   'プルアップ': [MuscleGroup.back, MuscleGroup.biceps],
-  'ルーマニアンデッドリフト': [MuscleGroup.back, MuscleGroup.hamstrings, MuscleGroup.glutes],
+  'ルーマニアンデッドリフト': [
+    MuscleGroup.back,
+    MuscleGroup.hamstrings,
+    MuscleGroup.glutes
+  ],
 
   // 肩
   'ショルダープレス': [MuscleGroup.shoulders, MuscleGroup.triceps],
@@ -54,7 +62,7 @@ const Map<String, List<MuscleGroup>> exerciseMuscleMap = {
   'バーベルカール': [MuscleGroup.biceps, MuscleGroup.forearms],
   'ダンベルカール': [MuscleGroup.biceps, MuscleGroup.forearms],
   'ハンマーカール': [MuscleGroup.biceps, MuscleGroup.forearms],
-  'ケーブルカール': [MuscleGroup.biceps],
+  'ケーブルカール': [MuscleGroup.biceps, MuscleGroup.forearms],
   'トライセプスエクステンション': [MuscleGroup.triceps],
   'トライセプスプッシュダウン': [MuscleGroup.triceps],
   'ライイングトライセプス': [MuscleGroup.triceps],
@@ -82,6 +90,12 @@ const Map<String, List<MuscleGroup>> exerciseMuscleMap = {
   'アブローラー': [MuscleGroup.abs],
   'バーピー': [MuscleGroup.abs, MuscleGroup.cardio],
 
+  // 腕（前腕）
+  'リストカール': [MuscleGroup.forearms],
+  'リバースカール': [MuscleGroup.forearms, MuscleGroup.biceps],
+  'コンセントレーションカール': [MuscleGroup.biceps],
+  'インクラインダンベルカール': [MuscleGroup.biceps],
+
   // 有酸素
   'ランニング': [MuscleGroup.cardio, MuscleGroup.calves, MuscleGroup.quads],
   'ウォーキング': [MuscleGroup.cardio, MuscleGroup.calves],
@@ -90,19 +104,69 @@ const Map<String, List<MuscleGroup>> exerciseMuscleMap = {
   'hiit': [MuscleGroup.cardio],
   'HIIT': [MuscleGroup.cardio],
   'ジャンプロープ': [MuscleGroup.cardio, MuscleGroup.calves],
+  '縄跳び': [MuscleGroup.cardio, MuscleGroup.calves],
   'エアロビクス': [MuscleGroup.cardio],
   'ローイングマシン': [MuscleGroup.cardio, MuscleGroup.back],
   'エリプティカル': [MuscleGroup.cardio, MuscleGroup.quads],
   'トレッドミル': [MuscleGroup.cardio, MuscleGroup.calves, MuscleGroup.quads],
+  'エアロバイク': [MuscleGroup.cardio, MuscleGroup.quads, MuscleGroup.calves],
 };
 
-/// 種目名から筋肉部位リストを取得（部分一致で検索）
-List<MuscleGroup> getMuscleGroups(String exerciseName) {
-  // 完全一致を優先
+/// 部位カテゴリの列挙型（UIフィルター用）
+enum BodyPartCategory {
+  chest('胸'),
+  back('背中'),
+  shoulders('肩'),
+  biceps('二の腕'),
+  triceps('三頭筋'),
+  forearms('前腕'),
+  abs('腹筋'),
+  legs('脚'),
+  cardio('有酸素');
+
+  const BodyPartCategory(this.label);
+  final String label;
+}
+
+const Map<BodyPartCategory, List<MuscleGroup>> _bodyPartMuscleGroups = {
+  BodyPartCategory.chest: [MuscleGroup.chest],
+  BodyPartCategory.back: [MuscleGroup.back],
+  BodyPartCategory.shoulders: [MuscleGroup.shoulders],
+  BodyPartCategory.biceps: [MuscleGroup.biceps],
+  BodyPartCategory.triceps: [MuscleGroup.triceps],
+  BodyPartCategory.forearms: [MuscleGroup.forearms],
+  BodyPartCategory.abs: [MuscleGroup.abs],
+  BodyPartCategory.legs: [
+    MuscleGroup.quads,
+    MuscleGroup.hamstrings,
+    MuscleGroup.glutes,
+    MuscleGroup.calves,
+  ],
+  BodyPartCategory.cardio: [MuscleGroup.cardio],
+};
+
+/// アプリ共通の種目キー（小文字・空白除去）。
+String normalizeExerciseStorageKey(String raw) =>
+    raw.trim().toLowerCase().replaceAll(RegExp(r'\s+'), '');
+
+/// 種目リストを部位カテゴリでフィルタリング
+List<String> filterExercisesByBodyPart(
+  BodyPartCategory category,
+  Iterable<String> exercises, [
+  Map<String, List<MuscleGroup>> communityMuscleOverrides = const {},
+]) {
+  final targetGroups = _bodyPartMuscleGroups[category]!;
+  return exercises.where((exercise) {
+    final muscles = muscleGroupsResolved(exercise, communityMuscleOverrides);
+    return muscles.any((m) => targetGroups.contains(m));
+  }).toList();
+}
+
+/// 埋め込みマップのみから筋肉部位を解決（部分一致）
+List<MuscleGroup> _muscleGroupsFromBuiltInMapOnly(String exerciseName) {
   if (exerciseMuscleMap.containsKey(exerciseName)) {
     return exerciseMuscleMap[exerciseName]!;
   }
-  // 部分一致で検索
   final lower = exerciseName.toLowerCase();
   for (final entry in exerciseMuscleMap.entries) {
     if (lower.contains(entry.key.toLowerCase()) ||
@@ -110,5 +174,24 @@ List<MuscleGroup> getMuscleGroups(String exerciseName) {
       return entry.value;
     }
   }
-  return [MuscleGroup.chest]; // フォールバック：不明種目は胸として扱う
+  return [MuscleGroup.chest];
 }
+
+/// 共通種目 DB の上書きを優先し、なければ埋め込みマップで解決する。
+List<MuscleGroup> muscleGroupsResolved(
+  String exerciseName,
+  Map<String, List<MuscleGroup>> communityByNormalizedKey,
+) {
+  final key = normalizeExerciseStorageKey(exerciseName);
+  if (key.isNotEmpty) {
+    final fromCommunity = communityByNormalizedKey[key];
+    if (fromCommunity != null && fromCommunity.isNotEmpty) {
+      return List<MuscleGroup>.from(fromCommunity);
+    }
+  }
+  return _muscleGroupsFromBuiltInMapOnly(exerciseName);
+}
+
+/// [muscleGroupsResolved] と同様だが、共通 DB を参照しない場合（テストなど）
+List<MuscleGroup> getMuscleGroups(String exerciseName) =>
+    muscleGroupsResolved(exerciseName, const {});

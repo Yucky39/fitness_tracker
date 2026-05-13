@@ -27,14 +27,18 @@ class TrainingLog {
   final int reps;
   final int sets;
   final int interval;
+
   /// 有酸素種目：走行距離 (km)。筋トレ種目では 0。
   final double distanceKm;
+
   /// 有酸素種目：運動時間 (分)。筋トレ種目では 0。
   final int durationMinutes;
+
   /// 主観的運動強度 (RPE)。Borg CR-10 風の 1〜10。未入力は null。
   final int? rpe;
   final String note;
   final DateTime date;
+
   /// AI評価テキスト（一度解析したものを永続保存）
   final String? aiAdvice;
 
@@ -210,12 +214,35 @@ class ExercisePresets {
       '水泳',
       'HIIT',
       'ジャンプロープ',
+      '縄跳び',
+      'エアロバイク',
       'エアロビクス',
       'ローイングマシン',
       'エリプティカル',
       'トレッドミル',
     ],
+    'フリーウェイト（腕）': [
+      'バーベルカール',
+      'ダンベルカール',
+      'ハンマーカール',
+      'インクラインダンベルカール',
+      'コンセントレーションカール',
+      'リバースカール',
+      'リストカール',
+      'トライセプスエクステンション',
+      'スカルクラッシャー',
+    ],
   };
+
+  static Set<String>? _allPresetNamesCache;
+
+  /// アプリ同梱テンプレートに含まれる種目名（完全一致照合用）
+  static Set<String> get allPresetExerciseNames {
+    _allPresetNamesCache ??= {
+      ...byCategory.values.expand((names) => names),
+    };
+    return _allPresetNamesCache!;
+  }
 
   /// 種目名から器具種別を推定
   static ExerciseType inferType(String name) {

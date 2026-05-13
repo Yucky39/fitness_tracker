@@ -36,10 +36,10 @@ class TrainingAdviceService {
     DateTime focusDate,
   ) {
     final anchor = focusDate.toLocal();
-    final end = DateTime(anchor.year, anchor.month, anchor.day, 23, 59, 59, 999);
-    final start =
-        DateTime(anchor.year, anchor.month, anchor.day)
-            .subtract(const Duration(days: 6));
+    final end =
+        DateTime(anchor.year, anchor.month, anchor.day, 23, 59, 59, 999);
+    final start = DateTime(anchor.year, anchor.month, anchor.day)
+        .subtract(const Duration(days: 6));
 
     final inWindow = allLogs.where((l) {
       final d = l.date.toLocal();
@@ -86,14 +86,12 @@ class TrainingAdviceService {
     if (rpes.isNotEmpty) {
       final sum = rpes.fold<int>(0, (a, b) => a + b);
       final avg = sum / rpes.length;
-      buffer.writeln(
-          'RPEの平均: ${avg.toStringAsFixed(1)}（1〜10。未記録の記録は平均から除外）');
+      buffer.writeln('RPEの平均: ${avg.toStringAsFixed(1)}（1〜10。未記録の記録は平均から除外）');
       buffer.writeln('RPEが記録されている件数: ${rpes.length} / ${inWindow.length}');
     } else {
       buffer.writeln('この期間のRPE記録はありません。');
     }
-    buffer.writeln(
-        '上記の負荷・頻度と今回の記録を照らし、運動科学の観点（過負荷、回復、適切な強度の設定）から言及してください。');
+    buffer.writeln('上記の負荷・頻度と今回の記録を照らし、運動科学の観点（過負荷、回復、適切な強度の設定）から言及してください。');
     return buffer.toString();
   }
 
@@ -121,9 +119,8 @@ class TrainingAdviceService {
         }
         buffer.writeln();
       } else {
-        final oneRm = log.reps > 0
-            ? (log.weight * (1 + log.reps / 30))
-            : log.weight;
+        final oneRm =
+            log.reps > 0 ? (log.weight * (1 + log.reps / 30)) : log.weight;
         buffer.writeln(
           '  重量: ${log.weight} kg × ${log.reps} 回 × ${log.sets} セット'
           '（推定1RM: ${oneRm.toStringAsFixed(1)} kg）',
@@ -140,17 +137,15 @@ class TrainingAdviceService {
 
       final history = historyByExercise[log.exerciseName] ?? [];
       if (history.isNotEmpty) {
-        final pastWeights = history
-            .map((l) {
-              final rpePart = l.rpe != null ? ' RPE${l.rpe}' : '';
-              if (l.exerciseType == ExerciseType.cardio) {
-                return '${l.distanceKm.toStringAsFixed(1)}km・${l.durationMinutes}分$rpePart'
-                    ' (${DateFormat('M/d').format(l.date.toLocal())})';
-              }
-              return '${l.weight}kg×${l.reps}×${l.sets}$rpePart'
-                  ' (${DateFormat('M/d').format(l.date.toLocal())})';
-            })
-            .join(' / ');
+        final pastWeights = history.map((l) {
+          final rpePart = l.rpe != null ? ' RPE${l.rpe}' : '';
+          if (l.exerciseType == ExerciseType.cardio) {
+            return '${l.distanceKm.toStringAsFixed(1)}km・${l.durationMinutes}分$rpePart'
+                ' (${DateFormat('M/d').format(l.date.toLocal())})';
+          }
+          return '${l.weight}kg×${l.reps}×${l.sets}$rpePart'
+              ' (${DateFormat('M/d').format(l.date.toLocal())})';
+        }).join(' / ');
         buffer.writeln('  同種目の過去（直近・本記録除く）: $pastWeights');
       } else {
         buffer.writeln('  同種目の過去記録: なし（初回または比較データなし）');
@@ -166,8 +161,7 @@ class TrainingAdviceService {
     if (sleepContext != null) {
       buffer.writeln('【コンディション情報】');
       buffer.writeln(sleepContext);
-      buffer.writeln(
-          '睡眠状態をトレーニングの質・強度設定・回復見込みへのアドバイスに反映してください。');
+      buffer.writeln('睡眠状態をトレーニングの質・強度設定・回復見込みへのアドバイスに反映してください。');
       buffer.writeln();
     }
 
@@ -210,8 +204,10 @@ class TrainingAdviceService {
     if (dayLogs.isEmpty) {
       buffer.writeln('この日のトレーニング記録はありません。');
     } else {
-      final strengthLogs = dayLogs.where((l) => l.exerciseType != ExerciseType.cardio).toList();
-      final cardioLogs = dayLogs.where((l) => l.exerciseType == ExerciseType.cardio).toList();
+      final strengthLogs =
+          dayLogs.where((l) => l.exerciseType != ExerciseType.cardio).toList();
+      final cardioLogs =
+          dayLogs.where((l) => l.exerciseType == ExerciseType.cardio).toList();
       final exerciseNames = dayLogs.map((l) => l.exerciseName).toSet();
 
       buffer.writeln('■ 実施種目一覧:');
@@ -226,7 +222,8 @@ class TrainingAdviceService {
             '${log.rpe != null ? " RPE${log.rpe}" : ""}',
           );
         } else {
-          final oneRm = log.reps > 0 ? log.weight * (1 + log.reps / 30) : log.weight;
+          final oneRm =
+              log.reps > 0 ? log.weight * (1 + log.reps / 30) : log.weight;
           buffer.writeln(
             '・${log.exerciseName}（${log.exerciseType.label}）: '
             '${log.weight} kg × ${log.reps} 回 × ${log.sets} セット'
@@ -243,18 +240,22 @@ class TrainingAdviceService {
       if (strengthLogs.isNotEmpty) {
         final totalSets = strengthLogs.fold(0, (s, l) => s + l.sets);
         final totalVolume = strengthLogs.fold(0.0, (s, l) => s + l.totalVolume);
-        buffer.writeln('  筋トレ: $totalSets セット合計 / 総ボリューム ${totalVolume.round()} kg');
+        buffer.writeln(
+            '  筋トレ: $totalSets セット合計 / 総ボリューム ${totalVolume.round()} kg');
       }
       if (cardioLogs.isNotEmpty) {
         final totalDist = cardioLogs.fold(0.0, (s, l) => s + l.distanceKm);
         final totalMin = cardioLogs.fold(0, (s, l) => s + l.durationMinutes);
-        buffer.writeln('  有酸素: ${totalDist.toStringAsFixed(1)} km / ${totalMin} 分');
+        buffer
+            .writeln('  有酸素: ${totalDist.toStringAsFixed(1)} km / $totalMin 分');
       }
 
-      final rpes = dayLogs.where((l) => l.rpe != null).map((l) => l.rpe!).toList();
+      final rpes =
+          dayLogs.where((l) => l.rpe != null).map((l) => l.rpe!).toList();
       if (rpes.isNotEmpty) {
         final avgRpe = rpes.fold(0, (s, v) => s + v) / rpes.length;
-        buffer.writeln('  平均RPE: ${avgRpe.toStringAsFixed(1)}（記録あり ${rpes.length}/${dayLogs.length} 件）');
+        buffer.writeln(
+            '  平均RPE: ${avgRpe.toStringAsFixed(1)}（記録あり ${rpes.length}/${dayLogs.length} 件）');
       }
     }
 
@@ -382,8 +383,8 @@ class TrainingAdviceService {
     );
     if (response.statusCode != 200) {
       final body = jsonDecode(utf8.decode(response.bodyBytes));
-      throw Exception(
-          body['error']?['message'] ?? 'Anthropic APIエラー (${response.statusCode})');
+      throw Exception(body['error']?['message'] ??
+          'Anthropic APIエラー (${response.statusCode})');
     }
     final data = jsonDecode(utf8.decode(response.bodyBytes));
     return data['content'][0]['text'] as String;
@@ -408,8 +409,8 @@ class TrainingAdviceService {
     );
     if (response.statusCode != 200) {
       final body = jsonDecode(utf8.decode(response.bodyBytes));
-      throw Exception(
-          body['error']?['message'] ?? 'OpenAI APIエラー (${response.statusCode})');
+      throw Exception(body['error']?['message'] ??
+          'OpenAI APIエラー (${response.statusCode})');
     }
     final data = jsonDecode(utf8.decode(response.bodyBytes));
     return data['choices'][0]['message']['content'] as String;
@@ -441,8 +442,8 @@ class TrainingAdviceService {
     );
     if (response.statusCode != 200) {
       final body = jsonDecode(utf8.decode(response.bodyBytes));
-      throw Exception(
-          body['error']?['message'] ?? 'Gemini APIエラー (${response.statusCode})');
+      throw Exception(body['error']?['message'] ??
+          'Gemini APIエラー (${response.statusCode})');
     }
     final data = jsonDecode(utf8.decode(response.bodyBytes));
     return data['candidates'][0]['content']['parts'][0]['text'] as String;

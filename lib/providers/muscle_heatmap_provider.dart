@@ -1,17 +1,17 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/exercise_muscle_map.dart';
+import '../providers/community_exercise_provider.dart';
 import '../providers/training_provider.dart';
 
 /// 過去7日間のトレーニングボリュームを筋肉部位ごとに正規化（0.0〜1.0）
-final muscleHeatmapProvider =
-    Provider<Map<MuscleGroup, double>>((ref) {
+final muscleHeatmapProvider = Provider<Map<MuscleGroup, double>>((ref) {
   final trainingState = ref.watch(trainingProvider);
+  final communityMuscles = ref.watch(communityMuscleOverridesProvider);
   final now = DateTime.now();
   final cutoff = now.subtract(const Duration(days: 7));
 
-  final recentLogs = trainingState.logs
-      .where((l) => l.date.isAfter(cutoff))
-      .toList();
+  final recentLogs =
+      trainingState.logs.where((l) => l.date.isAfter(cutoff)).toList();
 
   // 部位ごとの合計ボリューム（セット数ベース、有酸素は時間ベース）
   final volumeMap = <MuscleGroup, double>{};
@@ -20,7 +20,7 @@ final muscleHeatmapProvider =
   }
 
   for (final log in recentLogs) {
-    final groups = getMuscleGroups(log.exerciseName);
+    final groups = muscleGroupsResolved(log.exerciseName, communityMuscles);
     double contribution;
     if (log.exerciseType.key == 'cardio') {
       // 有酸素：時間（分）をボリュームとして使用
@@ -34,16 +34,16 @@ final muscleHeatmapProvider =
     // 複数筋肉に分散させる（主動筋に70%、補助筋に30%）
     for (var i = 0; i < groups.length; i++) {
       final factor = i == 0 ? 1.0 : 0.4;
-      volumeMap[groups[i]] = (volumeMap[groups[i]] ?? 0) + contribution * factor;
+      volumeMap[groups[i]] =
+          (volumeMap[groups[i]] ?? 0) + contribution * factor;
     }
   }
 
   // 最大値で正規化
-  final maxVolume = volumeMap.values
-      .fold<double>(0, (max, v) => v > max ? v : max);
+  final maxVolume =
+      volumeMap.values.fold<double>(0, (max, v) => v > max ? v : max);
 
   if (maxVolume == 0) return volumeMap;
 
-  return volumeMap
-      .map((k, v) => MapEntry(k, (v / maxVolume).clamp(0.0, 1.0)));
+  return volumeMap.map((k, v) => MapEntry(k, (v / maxVolume).clamp(0.0, 1.0)));
 });
