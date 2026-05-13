@@ -64,8 +64,7 @@ class RoutineScreen extends ConsumerWidget {
             : BorderSide.none,
       ),
       child: ListTile(
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         title: Row(
           children: [
             Expanded(
@@ -76,10 +75,9 @@ class RoutineScreen extends ConsumerWidget {
             ),
             if (isToday)
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                 decoration: BoxDecoration(
-                  color: Colors.teal.withOpacity(0.1),
+                  color: Colors.teal.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: const Text(
@@ -95,8 +93,7 @@ class RoutineScreen extends ConsumerWidget {
             const SizedBox(height: 4),
             Row(
               children: [
-                const Icon(Icons.calendar_today,
-                    size: 14, color: Colors.grey),
+                const Icon(Icons.calendar_today, size: 14, color: Colors.grey),
                 const SizedBox(width: 4),
                 Text(
                   routine.weekdayLabel,
@@ -108,8 +105,7 @@ class RoutineScreen extends ConsumerWidget {
               const SizedBox(height: 2),
               Text(
                 routine.note,
-                style:
-                    const TextStyle(fontSize: 12, color: Colors.grey),
+                style: const TextStyle(fontSize: 12, color: Colors.grey),
               ),
             ],
           ],
@@ -157,10 +153,8 @@ class RoutineScreen extends ConsumerWidget {
 
   void _showEditDialog(
       BuildContext context, WidgetRef ref, TrainingRoutine? existing) {
-    final nameController =
-        TextEditingController(text: existing?.name ?? '');
-    final noteController =
-        TextEditingController(text: existing?.note ?? '');
+    final nameController = TextEditingController(text: existing?.name ?? '');
+    final noteController = TextEditingController(text: existing?.note ?? '');
     final selectedDays = List<int>.from(existing?.weekdays ?? []);
 
     showDialog(
@@ -168,8 +162,7 @@ class RoutineScreen extends ConsumerWidget {
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) {
           return AlertDialog(
-            title:
-                Text(existing == null ? 'ルーティンを追加' : 'ルーティンを編集'),
+            title: Text(existing == null ? 'ルーティンを追加' : 'ルーティンを編集'),
             content: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -183,15 +176,13 @@ class RoutineScreen extends ConsumerWidget {
                   ),
                   const SizedBox(height: 16),
                   const Text('曜日',
-                      style: TextStyle(
-                          fontSize: 13, color: Colors.grey)),
+                      style: TextStyle(fontSize: 13, color: Colors.grey)),
                   const SizedBox(height: 8),
                   Wrap(
                     spacing: 8,
                     children: List.generate(7, (i) {
                       final day = i + 1; // 1=Mon...7=Sun
-                      final label =
-                          TrainingRoutine.weekdayNames[i];
+                      final label = TrainingRoutine.weekdayNames[i];
                       final selected = selectedDays.contains(day);
                       return FilterChip(
                         label: Text(label),
@@ -212,8 +203,7 @@ class RoutineScreen extends ConsumerWidget {
                   const SizedBox(height: 12),
                   TextField(
                     controller: noteController,
-                    decoration:
-                        const InputDecoration(labelText: 'メモ（任意）'),
+                    decoration: const InputDecoration(labelText: 'メモ（任意）'),
                   ),
                 ],
               ),

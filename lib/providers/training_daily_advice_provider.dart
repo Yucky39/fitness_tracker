@@ -160,10 +160,10 @@ class TrainingDailyAdviceNotifier
   }
 
   /// 指定日のキャッシュを削除して再取得できるようにする
-  void clearAdviceForDate(DateTime date) {
+  Future<void> clearAdviceForDate(DateTime date) async {
     final key = _dateKey(date);
     final updated = Map<String, String>.from(state.adviceByDate)..remove(key);
-    _saveCachedAdvice(updated);
+    await _saveCachedAdvice(updated);
     state = state.copyWith(adviceByDate: updated, clearError: true);
   }
 }

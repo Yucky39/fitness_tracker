@@ -503,8 +503,9 @@ class MealScreen extends ConsumerWidget {
                             reservedSize: 22,
                             getTitlesWidget: (value, _) {
                               final i = value.toInt();
-                              if (i < 0 || i >= last7.length)
+                              if (i < 0 || i >= last7.length) {
                                 return const Text('');
+                              }
                               final isToday = i == last7.length - 1;
                               return Text(
                                 isToday
@@ -963,25 +964,26 @@ class MealScreen extends ConsumerWidget {
                               onPressed: () async {
                                 final ok = await showDialog<bool>(
                                   context: context,
-                                  builder: (_) => AlertDialog(
+                                  builder: (dialogContext) => AlertDialog(
                                     title: const Text('削除の確認'),
                                     content: Text('「${item.name}」を削除しますか？'),
                                     actions: [
                                       TextButton(
-                                          onPressed: () =>
-                                              Navigator.pop(_, false),
+                                          onPressed: () => Navigator.pop(
+                                              dialogContext, false),
                                           child: const Text('キャンセル')),
                                       TextButton(
-                                          onPressed: () =>
-                                              Navigator.pop(_, true),
+                                          onPressed: () => Navigator.pop(
+                                              dialogContext, true),
                                           child: const Text('削除',
                                               style: TextStyle(
                                                   color: Colors.red))),
                                     ],
                                   ),
                                 );
-                                if (ok == true)
+                                if (ok == true) {
                                   notifier.deleteFoodItem(item.id);
+                                }
                               },
                             ),
                           ],
@@ -1170,12 +1172,15 @@ class MealScreen extends ConsumerWidget {
       proteinController.text = entry.protein.toStringAsFixed(1);
       fatController.text = entry.fat.toStringAsFixed(1);
       carbsController.text = entry.carbs.toStringAsFixed(1);
-      if (entry.sugar > 0)
+      if (entry.sugar > 0) {
         sugarController.text = entry.sugar.toStringAsFixed(1);
-      if (entry.fiber > 0)
+      }
+      if (entry.fiber > 0) {
         fiberController.text = entry.fiber.toStringAsFixed(1);
-      if (entry.sodium > 0)
+      }
+      if (entry.sodium > 0) {
         sodiumController.text = entry.sodium.toStringAsFixed(0);
+      }
     }
 
     showDialog(
@@ -2537,16 +2542,18 @@ class _PresetSheet extends ConsumerWidget {
                         onPressed: () async {
                           final confirm = await showDialog<bool>(
                             context: ctx,
-                            builder: (_) => AlertDialog(
+                            builder: (dialogContext) => AlertDialog(
                               title: const Text('削除の確認'),
                               content: Text('「${preset.name}」を削除しますか？'),
                               actions: [
                                 TextButton(
-                                  onPressed: () => Navigator.pop(_, false),
+                                  onPressed: () =>
+                                      Navigator.pop(dialogContext, false),
                                   child: const Text('キャンセル'),
                                 ),
                                 TextButton(
-                                  onPressed: () => Navigator.pop(_, true),
+                                  onPressed: () =>
+                                      Navigator.pop(dialogContext, true),
                                   child: const Text('削除',
                                       style: TextStyle(color: Colors.red)),
                                 ),
@@ -2685,7 +2692,9 @@ class _PhotoAnalysisDialogState extends State<_PhotoAnalysisDialog> {
     });
     try {
       final bytes = _imageBytes ?? await widget.imageFile.readAsBytes();
-      if (_imageBytes == null && mounted) setState(() => _imageBytes = bytes);
+      if (_imageBytes == null && mounted) {
+        setState(() => _imageBytes = bytes);
+      }
 
       final items = await MealImageAnalysisService().analyzeImage(
         imageBytes: bytes,
@@ -2695,11 +2704,12 @@ class _PhotoAnalysisDialogState extends State<_PhotoAnalysisDialog> {
         model: widget.model,
       );
 
-      if (mounted)
+      if (mounted) {
         setState(() {
           _items = items;
           _isLoading = false;
         });
+      }
     } catch (e) {
       if (mounted) {
         setState(() {

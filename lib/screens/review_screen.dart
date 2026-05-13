@@ -114,8 +114,11 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen>
     setState(() => _weekData = _weekData.copyWith(isLoading: true));
     final db = await DatabaseService().database;
 
-    final startStr = DateTime(_weekStart.year, _weekStart.month, _weekStart.day).toIso8601String();
-    final endStr = DateTime(_weekEnd.year, _weekEnd.month, _weekEnd.day, 23, 59, 59).toIso8601String();
+    final startStr = DateTime(_weekStart.year, _weekStart.month, _weekStart.day)
+        .toIso8601String();
+    final endStr =
+        DateTime(_weekEnd.year, _weekEnd.month, _weekEnd.day, 23, 59, 59)
+            .toIso8601String();
 
     final trainingMaps = await db.query(
       'training_logs',
@@ -145,8 +148,12 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen>
     setState(() => _monthData = _monthData.copyWith(isLoading: true));
     final db = await DatabaseService().database;
 
-    final startStr = DateTime(_monthStart.year, _monthStart.month, _monthStart.day).toIso8601String();
-    final endStr = DateTime(_monthEnd.year, _monthEnd.month, _monthEnd.day, 23, 59, 59).toIso8601String();
+    final startStr =
+        DateTime(_monthStart.year, _monthStart.month, _monthStart.day)
+            .toIso8601String();
+    final endStr =
+        DateTime(_monthEnd.year, _monthEnd.month, _monthEnd.day, 23, 59, 59)
+            .toIso8601String();
 
     final trainingMaps = await db.query(
       'training_logs',
@@ -224,7 +231,8 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen>
     if (apiKey.isEmpty) {
       setState(() {
         _weekData = _weekData.copyWith(
-          aiError: '${settings.selectedProvider.label} のAPIキーが設定されていません。⚙️設定から入力してください。',
+          aiError:
+              '${settings.selectedProvider.label} のAPIキーが設定されていません。⚙️設定から入力してください。',
         );
       });
       return;
@@ -283,7 +291,8 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen>
     if (apiKey.isEmpty) {
       setState(() {
         _monthData = _monthData.copyWith(
-          aiError: '${settings.selectedProvider.label} のAPIキーが設定されていません。⚙️設定から入力してください。',
+          aiError:
+              '${settings.selectedProvider.label} のAPIキーが設定されていません。⚙️設定から入力してください。',
         );
       });
       return;
@@ -400,7 +409,8 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen>
               reviewData: _weekData,
               onFetch: _fetchWeeklyReview,
               onRefresh: () {
-                setState(() => _weekData = _weekData.copyWith(clearAiReview: true, clearAiError: true));
+                setState(() => _weekData = _weekData.copyWith(
+                    clearAiReview: true, clearAiError: true));
                 _fetchWeeklyReview();
               },
               periodLabel: '週間',
@@ -416,7 +426,8 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen>
   Widget _buildMonthlyTab() {
     final fmt = DateFormat('yyyy年M月');
     final now = DateTime.now();
-    final isCurrentMonth = _monthStart.year == now.year && _monthStart.month == now.month;
+    final isCurrentMonth =
+        _monthStart.year == now.year && _monthStart.month == now.month;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -452,7 +463,8 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen>
               reviewData: _monthData,
               onFetch: _fetchMonthlyReview,
               onRefresh: () {
-                setState(() => _monthData = _monthData.copyWith(clearAiReview: true, clearAiError: true));
+                setState(() => _monthData = _monthData.copyWith(
+                    clearAiReview: true, clearAiError: true));
                 _fetchMonthlyReview();
               },
               periodLabel: '月間',
@@ -480,9 +492,12 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen>
       final d = l.date.toLocal();
       daySet.add('${d.year}-${d.month}-${d.day}');
     }
-    final strengthLogs = logs.where((l) => l.exerciseType != ExerciseType.cardio).toList();
-    final cardioLogs = logs.where((l) => l.exerciseType == ExerciseType.cardio).toList();
-    final totalKcal = TrainingCalorieCalculator.total(logs, bodyWeightKg: effectiveBw);
+    final strengthLogs =
+        logs.where((l) => l.exerciseType != ExerciseType.cardio).toList();
+    final cardioLogs =
+        logs.where((l) => l.exerciseType == ExerciseType.cardio).toList();
+    final totalKcal =
+        TrainingCalorieCalculator.total(logs, bodyWeightKg: effectiveBw);
     final totalVolume = strengthLogs.fold(0.0, (s, l) => s + l.totalVolume);
     final totalCardioKm = cardioLogs.fold(0.0, (s, l) => s + l.distanceKm);
     final exerciseNames = logs.map((l) => l.exerciseName).toSet();
@@ -499,7 +514,8 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen>
                 const SizedBox(width: 8),
                 Text(
                   'トレーニング（$periodLabel）',
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                  style: const TextStyle(
+                      fontWeight: FontWeight.bold, fontSize: 15),
                 ),
               ],
             ),
@@ -545,7 +561,8 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen>
               ),
               if (showDayBreakdown && daySet.isNotEmpty) ...[
                 const SizedBox(height: 12),
-                const Text('日別内訳:', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                const Text('日別内訳:',
+                    style: TextStyle(fontSize: 12, color: Colors.grey)),
                 const SizedBox(height: 4),
                 ..._buildDayBreakdown(logs),
               ],
@@ -560,10 +577,12 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen>
     final byDay = <String, List<TrainingLog>>{};
     for (final l in logs) {
       final d = l.date.toLocal();
-      final key = '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+      final key =
+          '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
       byDay.putIfAbsent(key, () => []).add(l);
     }
-    final sorted = byDay.entries.toList()..sort((a, b) => a.key.compareTo(b.key));
+    final sorted = byDay.entries.toList()
+      ..sort((a, b) => a.key.compareTo(b.key));
     return sorted.map((entry) {
       final names = entry.value.map((l) => l.exerciseName).toSet().join('・');
       final parts = entry.key.split('-');
@@ -574,7 +593,9 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen>
           children: [
             SizedBox(
               width: 40,
-              child: Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+              child: Text(label,
+                  style: const TextStyle(
+                      fontSize: 12, fontWeight: FontWeight.w600)),
             ),
             Expanded(
               child: Text(
@@ -617,7 +638,8 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen>
                 const SizedBox(width: 8),
                 Text(
                   '食事（$periodLabel）',
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                  style: const TextStyle(
+                      fontWeight: FontWeight.bold, fontSize: 15),
                 ),
               ],
             ),
@@ -637,24 +659,28 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen>
                   _StatChip(
                     icon: Icons.local_fire_department,
                     label: '1日平均',
-                    value: '${(foodItems.fold(0, (s, i) => s + i.calories) / recordedDays).round()} kcal',
+                    value:
+                        '${(foodItems.fold(0, (s, i) => s + i.calories) / recordedDays).round()} kcal',
                   ),
                 ],
               ),
               const SizedBox(height: 8),
               _MacroRow(
                 label: 'タンパク質 平均',
-                value: '${(foodItems.fold(0.0, (s, i) => s + i.protein) / recordedDays).toStringAsFixed(1)} g/日',
+                value:
+                    '${(foodItems.fold(0.0, (s, i) => s + i.protein) / recordedDays).toStringAsFixed(1)} g/日',
                 color: Colors.blue,
               ),
               _MacroRow(
                 label: '脂質 平均',
-                value: '${(foodItems.fold(0.0, (s, i) => s + i.fat) / recordedDays).toStringAsFixed(1)} g/日',
+                value:
+                    '${(foodItems.fold(0.0, (s, i) => s + i.fat) / recordedDays).toStringAsFixed(1)} g/日',
                 color: Colors.orange,
               ),
               _MacroRow(
                 label: '炭水化物 平均',
-                value: '${(foodItems.fold(0.0, (s, i) => s + i.carbs) / recordedDays).toStringAsFixed(1)} g/日',
+                value:
+                    '${(foodItems.fold(0.0, (s, i) => s + i.carbs) / recordedDays).toStringAsFixed(1)} g/日',
                 color: Colors.green,
               ),
             ],
@@ -695,7 +721,9 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen>
     final foodDays = <int>{};
     for (final item in _monthData.foodItems) {
       final d = item.date.toLocal();
-      if (d.year == _monthStart.year && d.month == _monthStart.month) foodDays.add(d.day);
+      if (d.year == _monthStart.year && d.month == _monthStart.month) {
+        foodDays.add(d.day);
+      }
     }
 
     return Card(
@@ -716,7 +744,9 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen>
                   child: Center(
                     child: Text(d,
                         style: const TextStyle(
-                            fontSize: 11, fontWeight: FontWeight.bold, color: Colors.grey)),
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.grey)),
                   ),
                 );
               }).toList(),
@@ -744,9 +774,9 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen>
                   margin: const EdgeInsets.all(2),
                   decoration: BoxDecoration(
                     color: hasTrain
-                        ? Colors.deepOrange.withOpacity(0.85)
+                        ? Colors.deepOrange.withValues(alpha: 0.85)
                         : hasFood
-                            ? Colors.blue.withOpacity(0.15)
+                            ? Colors.blue.withValues(alpha: 0.15)
                             : null,
                     borderRadius: BorderRadius.circular(6),
                     border: isToday
@@ -760,7 +790,8 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen>
                         '$day',
                         style: TextStyle(
                           fontSize: 12,
-                          fontWeight: isToday ? FontWeight.bold : FontWeight.normal,
+                          fontWeight:
+                              isToday ? FontWeight.bold : FontWeight.normal,
                           color: hasTrain ? Colors.white : null,
                         ),
                       ),
@@ -780,13 +811,21 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen>
             const SizedBox(height: 4),
             Row(
               children: [
-                Container(width: 12, height: 12,
-                    decoration: BoxDecoration(color: Colors.deepOrange.withOpacity(0.85), borderRadius: BorderRadius.circular(2))),
+                Container(
+                    width: 12,
+                    height: 12,
+                    decoration: BoxDecoration(
+                        color: Colors.deepOrange.withValues(alpha: 0.85),
+                        borderRadius: BorderRadius.circular(2))),
                 const SizedBox(width: 4),
                 const Text('トレーニングあり', style: TextStyle(fontSize: 11)),
                 const SizedBox(width: 12),
-                Container(width: 12, height: 12,
-                    decoration: BoxDecoration(color: Colors.blue.withOpacity(0.2), borderRadius: BorderRadius.circular(2))),
+                Container(
+                    width: 12,
+                    height: 12,
+                    decoration: BoxDecoration(
+                        color: Colors.blue.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(2))),
                 const SizedBox(width: 4),
                 const Text('食事記録あり', style: TextStyle(fontSize: 11)),
               ],
@@ -811,11 +850,13 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen>
           children: [
             Row(
               children: [
-                const Icon(Icons.auto_awesome, size: 18, color: Colors.deepOrange),
+                const Icon(Icons.auto_awesome,
+                    size: 18, color: Colors.deepOrange),
                 const SizedBox(width: 8),
                 Text(
                   'AI $periodLabel振り返り',
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                  style: const TextStyle(
+                      fontWeight: FontWeight.bold, fontSize: 15),
                 ),
                 const Spacer(),
                 if (reviewData.aiReview != null && !reviewData.aiLoading)
@@ -914,7 +955,8 @@ class _StatChip extends StatelessWidget {
   final String label;
   final String value;
 
-  const _StatChip({required this.icon, required this.label, required this.value});
+  const _StatChip(
+      {required this.icon, required this.label, required this.value});
 
   @override
   Widget build(BuildContext context) {
@@ -934,8 +976,10 @@ class _StatChip extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(value,
-                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-              Text(label, style: const TextStyle(fontSize: 10, color: Colors.grey)),
+                  style: const TextStyle(
+                      fontSize: 13, fontWeight: FontWeight.bold)),
+              Text(label,
+                  style: const TextStyle(fontSize: 10, color: Colors.grey)),
             ],
           ),
         ],
@@ -949,7 +993,8 @@ class _MacroRow extends StatelessWidget {
   final String value;
   final Color color;
 
-  const _MacroRow({required this.label, required this.value, required this.color});
+  const _MacroRow(
+      {required this.label, required this.value, required this.color});
 
   @override
   Widget build(BuildContext context) {

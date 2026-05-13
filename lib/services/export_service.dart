@@ -31,13 +31,15 @@ class ExportService {
     final metricsFile = File('${dir.path}/metrics_$now.csv');
     await metricsFile.writeAsString(_buildMetricsCsv(metrics));
 
-    await Share.shareXFiles(
-      [
-        XFile(foodFile.path),
-        XFile(trainingFile.path),
-        XFile(metricsFile.path),
-      ],
-      subject: 'BeWell データエクスポート $now',
+    await SharePlus.instance.share(
+      ShareParams(
+        files: [
+          XFile(foodFile.path),
+          XFile(trainingFile.path),
+          XFile(metricsFile.path),
+        ],
+        subject: 'BeWell データエクスポート $now',
+      ),
     );
   }
 
@@ -54,8 +56,7 @@ class ExportService {
 
   String _buildTrainingCsv(List<TrainingLog> logs) {
     final sb = StringBuffer();
-    sb.writeln(
-        '日付,種目,重量(kg),回数,セット数,インターバル(秒),RPE(1-10),メモ');
+    sb.writeln('日付,種目,重量(kg),回数,セット数,インターバル(秒),RPE(1-10),メモ');
     for (final log in logs) {
       final date = DateFormat('yyyy/MM/dd HH:mm').format(log.date);
       final rpe = log.rpe?.toString() ?? '';

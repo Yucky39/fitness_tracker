@@ -1,5 +1,5 @@
 import 'dart:convert';
-// ignore: avoid_web_libraries_in_flutter
+// ignore: avoid_web_libraries_in_flutter, deprecated_member_use
 import 'dart:html' as html;
 import 'database_interface.dart';
 
@@ -56,7 +56,7 @@ class WebDatabaseAdapter implements DatabaseAdapter {
     List<dynamic>? whereArgs,
     String? orderBy,
     int? limit,
-  }  ) async {
+  }) async {
     _tables.putIfAbsent(table, () => []);
     var results = List<Map<String, dynamic>>.from(
       _tables[table]!.map((e) => Map<String, dynamic>.from(e)),
@@ -70,7 +70,8 @@ class WebDatabaseAdapter implements DatabaseAdapter {
     // Apply ORDER BY
     if (orderBy != null) {
       final desc = orderBy.contains('DESC');
-      final field = orderBy.replaceAll(' ASC', '').replaceAll(' DESC', '').trim();
+      final field =
+          orderBy.replaceAll(' ASC', '').replaceAll(' DESC', '').trim();
       results.sort((a, b) {
         final aVal = a[field]?.toString() ?? '';
         final bVal = b[field]?.toString() ?? '';
@@ -105,8 +106,8 @@ class WebDatabaseAdapter implements DatabaseAdapter {
         final v0 = whereArgs[0].toString();
         final v1 = whereArgs[1].toString();
         return rows
-            .where((row) =>
-                row[f0]?.toString() == v0 && row[f1]?.toString() == v1)
+            .where(
+                (row) => row[f0]?.toString() == v0 && row[f1]?.toString() == v1)
             .toList();
       }
     }
@@ -115,7 +116,9 @@ class WebDatabaseAdapter implements DatabaseAdapter {
     if (where.contains('=') && !where.contains('BETWEEN')) {
       final field = where.split('=').first.trim();
       final value = whereArgs.first;
-      return rows.where((row) => row[field]?.toString() == value.toString()).toList();
+      return rows
+          .where((row) => row[field]?.toString() == value.toString())
+          .toList();
     }
 
     // Support "field BETWEEN ? AND ?" pattern
@@ -155,7 +158,8 @@ class WebDatabaseAdapter implements DatabaseAdapter {
   }
 
   @override
-  Future<int> delete(String table, {String? where, List<dynamic>? whereArgs}) async {
+  Future<int> delete(String table,
+      {String? where, List<dynamic>? whereArgs}) async {
     _tables.putIfAbsent(table, () => []);
     if (where == null) {
       final count = _tables[table]!.length;

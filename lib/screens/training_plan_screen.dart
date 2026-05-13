@@ -310,7 +310,9 @@ class _TrainingPlanScreenState extends ConsumerState<TrainingPlanScreen> {
                     decoration: BoxDecoration(
                       color: selected
                           ? Theme.of(context).colorScheme.primary
-                          : Theme.of(context).colorScheme.surfaceVariant,
+                          : Theme.of(context)
+                              .colorScheme
+                              .surfaceContainerHighest,
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Column(
@@ -323,7 +325,9 @@ class _TrainingPlanScreenState extends ConsumerState<TrainingPlanScreen> {
                             fontWeight: FontWeight.bold,
                             color: selected
                                 ? Theme.of(context).colorScheme.onPrimary
-                                : Theme.of(context).colorScheme.onSurfaceVariant,
+                                : Theme.of(context)
+                                    .colorScheme
+                                    .onSurfaceVariant,
                           ),
                         ),
                         Text(
@@ -332,7 +336,9 @@ class _TrainingPlanScreenState extends ConsumerState<TrainingPlanScreen> {
                             fontSize: 12,
                             color: selected
                                 ? Theme.of(context).colorScheme.onPrimary
-                                : Theme.of(context).colorScheme.onSurfaceVariant,
+                                : Theme.of(context)
+                                    .colorScheme
+                                    .onSurfaceVariant,
                           ),
                         ),
                       ],
@@ -384,22 +390,24 @@ class _TrainingPlanScreenState extends ConsumerState<TrainingPlanScreen> {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.5),
+        color: Theme.of(context)
+            .colorScheme
+            .surfaceContainerHighest
+            .withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('確認', style: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: Theme.of(context).colorScheme.primary,
-          )),
+          Text('確認',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: Theme.of(context).colorScheme.primary,
+              )),
           const SizedBox(height: 6),
           _SummaryRow(
               label: '目標',
-              value: _goal != null
-                  ? '${_goal!.emoji} ${_goal!.label}'
-                  : '未選択'),
+              value: _goal != null ? '${_goal!.emoji} ${_goal!.label}' : '未選択'),
           _SummaryRow(
               label: _isCut ? 'スタイル' : '部位',
               value: _isCut
@@ -424,8 +432,7 @@ class _TrainingPlanScreenState extends ConsumerState<TrainingPlanScreen> {
           children: [
             const CircularProgressIndicator(),
             const SizedBox(height: 24),
-            const Text('AIがあなた専用のプランを作成しています',
-                style: TextStyle(fontSize: 16)),
+            const Text('AIがあなた専用のプランを作成しています', style: TextStyle(fontSize: 16)),
             const SizedBox(height: 8),
             Text(
               '過去の記録を分析して\n最適な種目・重量・セット数を提案します',
@@ -591,17 +598,14 @@ class _TrainingPlanScreenState extends ConsumerState<TrainingPlanScreen> {
                           context: context,
                           builder: (ctx) => AlertDialog(
                             title: const Text('プランを削除'),
-                            content:
-                                Text('「${plan.name}」を削除しますか？'),
+                            content: Text('「${plan.name}」を削除しますか？'),
                             actions: [
                               TextButton(
-                                onPressed: () =>
-                                    Navigator.pop(ctx, false),
+                                onPressed: () => Navigator.pop(ctx, false),
                                 child: const Text('キャンセル'),
                               ),
                               TextButton(
-                                onPressed: () =>
-                                    Navigator.pop(ctx, true),
+                                onPressed: () => Navigator.pop(ctx, true),
                                 child: Text('削除',
                                     style: TextStyle(
                                         color: Theme.of(context)
@@ -691,7 +695,7 @@ class _StepIndicator extends StatelessWidget {
                   shape: BoxShape.circle,
                   color: done || active
                       ? Theme.of(context).colorScheme.primary
-                      : Theme.of(context).colorScheme.surfaceVariant,
+                      : Theme.of(context).colorScheme.surfaceContainerHighest,
                 ),
                 child: Center(
                   child: done
@@ -720,8 +724,7 @@ class _StepIndicator extends StatelessWidget {
                   color: active
                       ? Theme.of(context).colorScheme.primary
                       : Colors.grey,
-                  fontWeight:
-                      active ? FontWeight.bold : FontWeight.normal,
+                  fontWeight: active ? FontWeight.bold : FontWeight.normal,
                 ),
               ),
             ],
@@ -752,7 +755,7 @@ class _GoalCard extends StatelessWidget {
           decoration: BoxDecoration(
             color: selected
                 ? Theme.of(context).colorScheme.primaryContainer
-                : Theme.of(context).colorScheme.surfaceVariant,
+                : Theme.of(context).colorScheme.surfaceContainerHighest,
             borderRadius: BorderRadius.circular(14),
             border: Border.all(
               color: selected
@@ -806,7 +809,7 @@ class _CutStyleCard extends StatelessWidget {
           decoration: BoxDecoration(
             color: selected
                 ? Theme.of(context).colorScheme.primaryContainer
-                : Theme.of(context).colorScheme.surfaceVariant,
+                : Theme.of(context).colorScheme.surfaceContainerHighest,
             borderRadius: BorderRadius.circular(14),
             border: Border.all(
               color: selected
@@ -826,8 +829,8 @@ class _CutStyleCard extends StatelessWidget {
                             fontSize: 16, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 2),
                     Text(style.description,
-                        style: TextStyle(
-                            fontSize: 12, color: Colors.grey[600])),
+                        style:
+                            TextStyle(fontSize: 12, color: Colors.grey[600])),
                   ],
                 ),
               ),
@@ -862,7 +865,7 @@ class _EquipmentCard extends StatelessWidget {
           decoration: BoxDecoration(
             color: selected
                 ? Theme.of(context).colorScheme.primaryContainer
-                : Theme.of(context).colorScheme.surfaceVariant,
+                : Theme.of(context).colorScheme.surfaceContainerHighest,
             borderRadius: BorderRadius.circular(14),
             border: Border.all(
               color: selected
@@ -884,8 +887,8 @@ class _EquipmentCard extends StatelessWidget {
                             fontSize: 16, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 2),
                     Text(option.description,
-                        style: TextStyle(
-                            fontSize: 12, color: Colors.grey[600])),
+                        style:
+                            TextStyle(fontSize: 12, color: Colors.grey[600])),
                   ],
                 ),
               ),
@@ -906,9 +909,7 @@ class _IntensityCard extends StatelessWidget {
   final VoidCallback onTap;
 
   const _IntensityCard(
-      {required this.intensity,
-      required this.selected,
-      required this.onTap});
+      {required this.intensity, required this.selected, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -922,7 +923,7 @@ class _IntensityCard extends StatelessWidget {
           decoration: BoxDecoration(
             color: selected
                 ? Theme.of(context).colorScheme.primaryContainer
-                : Theme.of(context).colorScheme.surfaceVariant,
+                : Theme.of(context).colorScheme.surfaceContainerHighest,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
               color: selected
@@ -942,8 +943,8 @@ class _IntensityCard extends StatelessWidget {
                             fontSize: 15, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 2),
                     Text(intensity.description,
-                        style: TextStyle(
-                            fontSize: 12, color: Colors.grey[600])),
+                        style:
+                            TextStyle(fontSize: 12, color: Colors.grey[600])),
                   ],
                 ),
               ),
@@ -972,14 +973,13 @@ class _SummaryRow extends StatelessWidget {
           SizedBox(
             width: 40,
             child: Text(label,
-                style: TextStyle(
-                    fontSize: 12, color: Colors.grey[600])),
+                style: TextStyle(fontSize: 12, color: Colors.grey[600])),
           ),
           const SizedBox(width: 8),
           Expanded(
             child: Text(value,
-                style: const TextStyle(
-                    fontSize: 13, fontWeight: FontWeight.w500)),
+                style:
+                    const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
           ),
         ],
       ),
@@ -1085,14 +1085,12 @@ class _PlanDayCardState extends State<_PlanDayCard> {
               '${widget.day.exercises.length} 種目 · '
               '${widget.day.exercises.where((e) => e.completed).length} 完了',
             ),
-            trailing: Icon(
-                _expanded ? Icons.expand_less : Icons.expand_more),
+            trailing: Icon(_expanded ? Icons.expand_less : Icons.expand_more),
             onTap: () => setState(() => _expanded = !_expanded),
           ),
           if (_expanded)
             Padding(
-              padding:
-                  const EdgeInsets.fromLTRB(12, 0, 12, 12),
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
               child: Column(
                 children: widget.day.exercises
                     .asMap()
@@ -1164,8 +1162,7 @@ class _ExerciseRow extends ConsumerWidget {
                         exercise.name,
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
-                          decoration:
-                              done ? TextDecoration.lineThrough : null,
+                          decoration: done ? TextDecoration.lineThrough : null,
                           color: done ? Colors.grey : null,
                         ),
                       ),
@@ -1189,8 +1186,7 @@ class _ExerciseRow extends ConsumerWidget {
                   children: [
                     _StatChip(
                         icon: Icons.repeat,
-                        label:
-                            '${exercise.sets}セット × ${exercise.repRange}回'),
+                        label: '${exercise.sets}セット × ${exercise.repRange}回'),
                     if (exercise.suggestedWeightKg != null)
                       _StatChip(
                           icon: Icons.fitness_center,
@@ -1208,8 +1204,7 @@ class _ExerciseRow extends ConsumerWidget {
                     style: TextStyle(
                       fontSize: 12,
                       color: Colors.grey[600],
-                      decoration:
-                          done ? TextDecoration.lineThrough : null,
+                      decoration: done ? TextDecoration.lineThrough : null,
                     ),
                   ),
                 ],
@@ -1234,8 +1229,7 @@ class _StatChip extends StatelessWidget {
       children: [
         Icon(icon, size: 13, color: Colors.grey[600]),
         const SizedBox(width: 3),
-        Text(label,
-            style: TextStyle(fontSize: 12, color: Colors.grey[700])),
+        Text(label, style: TextStyle(fontSize: 12, color: Colors.grey[700])),
       ],
     );
   }
@@ -1261,8 +1255,8 @@ class _PlanListTileState extends State<_PlanListTile> {
         children: [
           ListTile(
             isThreeLine: plan.totalExerciseCount > 0,
-            leading: Text(plan.goal.emoji,
-                style: const TextStyle(fontSize: 24)),
+            leading:
+                Text(plan.goal.emoji, style: const TextStyle(fontSize: 24)),
             title: Text(plan.name,
                 style: const TextStyle(fontWeight: FontWeight.bold)),
             subtitle: plan.totalExerciseCount > 0
@@ -1277,9 +1271,7 @@ class _PlanListTileState extends State<_PlanListTile> {
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(_expanded
-                    ? Icons.expand_less
-                    : Icons.expand_more),
+                Icon(_expanded ? Icons.expand_less : Icons.expand_more),
               ],
             ),
             onTap: () => setState(() => _expanded = !_expanded),
@@ -1294,8 +1286,7 @@ class _PlanListTileState extends State<_PlanListTile> {
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
                 child: Text(plan.overview!,
-                    style: TextStyle(
-                        fontSize: 13, color: Colors.grey[600])),
+                    style: TextStyle(fontSize: 13, color: Colors.grey[600])),
               ),
             ...plan.days.asMap().entries.map((e) => _PlanDayCard(
                   planId: plan.id,
@@ -1309,14 +1300,10 @@ class _PlanListTileState extends State<_PlanListTile> {
                 children: [
                   TextButton.icon(
                     icon: Icon(Icons.delete_outline,
-                        color:
-                            Theme.of(context).colorScheme.error,
-                        size: 18),
+                        color: Theme.of(context).colorScheme.error, size: 18),
                     label: Text('削除',
                         style: TextStyle(
-                            color: Theme.of(context)
-                                .colorScheme
-                                .error)),
+                            color: Theme.of(context).colorScheme.error)),
                     onPressed: widget.onDelete,
                   ),
                 ],

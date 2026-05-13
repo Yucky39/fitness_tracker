@@ -1,7 +1,6 @@
-/// 1日の食事提案データモデル
-///
-/// AI が生成した提案を保持する。
-/// PFC・カロリーは文部科学省「日本食品標準成分表」の栄養素値を基準とする。
+// 1日の食事提案データモデル。
+// AI が生成した提案を保持する。
+// PFC・カロリーは文部科学省「日本食品標準成分表」の栄養素値を基準とする。
 
 class SuggestedIngredient {
   final String name;
@@ -69,10 +68,9 @@ class SuggestedDish {
                     SuggestedIngredient.fromJson(e as Map<String, dynamic>))
                 .toList() ??
             [],
-        steps: (j['steps'] as List<dynamic>?)
-                ?.map((e) => e.toString())
-                .toList() ??
-            [],
+        steps:
+            (j['steps'] as List<dynamic>?)?.map((e) => e.toString()).toList() ??
+                [],
         calories: (j['calories'] as num?)?.toInt() ?? 0,
         protein: (j['protein'] as num?)?.toDouble() ?? 0.0,
         fat: (j['fat'] as num?)?.toDouble() ?? 0.0,
@@ -185,9 +183,8 @@ class WeeklyMealSuggestion {
                 .toList() ??
             [],
         supplementNote: j['supplement_note'] as String?,
-        generatedAt:
-            DateTime.tryParse(j['generated_at'] as String? ?? '') ??
-                DateTime.now(),
+        generatedAt: DateTime.tryParse(j['generated_at'] as String? ?? '') ??
+            DateTime.now(),
       );
 
   Map<String, dynamic> toJson() => {

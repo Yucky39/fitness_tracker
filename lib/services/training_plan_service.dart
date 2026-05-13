@@ -56,8 +56,7 @@ class TrainingPlanService {
       buffer.writeln('※ 部位痩せは生理学的に不可能であるため、全身の体脂肪を減らしながら'
           '筋量を維持・向上させるプランを作成してください。');
     } else {
-      buffer.writeln(
-          'ターゲット部位: ${targetMuscles.map((m) => m.label).join('・')}');
+      buffer.writeln('ターゲット部位: ${targetMuscles.map((m) => m.label).join('・')}');
     }
     buffer.writeln('週のトレーニング日数: $daysPerWeek 日');
     buffer.writeln('強度レベル: ${intensity.label}（${intensity.description}）');
@@ -91,19 +90,19 @@ class TrainingPlanService {
         final name = entry.key;
         final logs = entry.value;
         if (logs.first.exerciseType == ExerciseType.cardio) {
-          final best = logs.reduce((a, b) =>
-              a.distanceKm > b.distanceKm ? a : b);
+          final best =
+              logs.reduce((a, b) => a.distanceKm > b.distanceKm ? a : b);
           buffer.writeln(
               '・$name: 最長 ${best.distanceKm.toStringAsFixed(1)}km / ${best.durationMinutes}分 (${logs.length}回)');
         } else {
-          final bestWeight = logs.map((l) => l.weight).reduce((a, b) => a > b ? a : b);
+          final bestWeight =
+              logs.map((l) => l.weight).reduce((a, b) => a > b ? a : b);
           final bestOneRm = logs
               .where((l) => l.reps > 0)
               .map((l) => l.weight * (1 + l.reps / 30))
               .fold<double>(0, (max, v) => v > max ? v : max);
           final lastLog = logs.first;
-          buffer.write(
-              '・$name: 最大重量 ${bestWeight}kg');
+          buffer.write('・$name: 最大重量 ${bestWeight}kg');
           if (bestOneRm > 0) {
             buffer.write(' / 推定1RM ${bestOneRm.toStringAsFixed(1)}kg');
           }
@@ -167,8 +166,14 @@ class TrainingPlanService {
     var escaped = false;
     for (var i = 0; i < s.length; i++) {
       final c = s[i];
-      if (escaped) { escaped = false; continue; }
-      if (c == '\\') { escaped = true; continue; }
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+      if (c == '\\') {
+        escaped = true;
+        continue;
+      }
       if (c == '"') inString = !inString;
     }
     if (inString) s += '"';
@@ -180,17 +185,37 @@ class TrainingPlanService {
     var esc2 = false;
     for (var i = 0; i < s.length; i++) {
       final c = s[i];
-      if (esc2) { esc2 = false; continue; }
-      if (c == '\\') { esc2 = true; continue; }
-      if (c == '"') { inStr2 = !inStr2; continue; }
-      if (inStr2) continue;
-      if (c == '{') braces++;
-      else if (c == '}') braces--;
-      else if (c == '[') brackets++;
-      else if (c == ']') brackets--;
+      if (esc2) {
+        esc2 = false;
+        continue;
+      }
+      if (c == '\\') {
+        esc2 = true;
+        continue;
+      }
+      if (c == '"') {
+        inStr2 = !inStr2;
+        continue;
+      }
+      if (inStr2) {
+        continue;
+      }
+      if (c == '{') {
+        braces++;
+      } else if (c == '}') {
+        braces--;
+      } else if (c == '[') {
+        brackets++;
+      } else if (c == ']') {
+        brackets--;
+      }
     }
-    for (var i = 0; i < brackets; i++) s += ']';
-    for (var i = 0; i < braces; i++) s += '}';
+    for (var i = 0; i < brackets; i++) {
+      s += ']';
+    }
+    for (var i = 0; i < braces; i++) {
+      s += '}';
+    }
     return s;
   }
 
@@ -228,11 +253,14 @@ class TrainingPlanService {
     final String raw;
     switch (provider) {
       case AiProviderType.anthropic:
-        raw = await _callAnthropic(systemPrompt, userMessage, apiKey, resolvedModel);
+        raw = await _callAnthropic(
+            systemPrompt, userMessage, apiKey, resolvedModel);
       case AiProviderType.openai:
-        raw = await _callOpenAi(systemPrompt, userMessage, apiKey, resolvedModel);
+        raw =
+            await _callOpenAi(systemPrompt, userMessage, apiKey, resolvedModel);
       case AiProviderType.gemini:
-        raw = await _callGemini(systemPrompt, userMessage, apiKey, resolvedModel);
+        raw =
+            await _callGemini(systemPrompt, userMessage, apiKey, resolvedModel);
     }
 
     final jsonText = _extractJson(raw);
@@ -251,7 +279,8 @@ class TrainingPlanService {
 
     final daysRaw = (data['days'] as List<dynamic>? ?? []);
     final days = daysRaw
-        .map((d) => TrainingPlanDay.fromMap(Map<String, dynamic>.from(d as Map)))
+        .map(
+            (d) => TrainingPlanDay.fromMap(Map<String, dynamic>.from(d as Map)))
         .toList();
 
     return TrainingPlan(
@@ -289,8 +318,8 @@ class TrainingPlanService {
     );
     if (response.statusCode != 200) {
       final body = jsonDecode(utf8.decode(response.bodyBytes));
-      throw Exception(
-          body['error']?['message'] ?? 'Anthropic APIエラー (${response.statusCode})');
+      throw Exception(body['error']?['message'] ??
+          'Anthropic APIエラー (${response.statusCode})');
     }
     final data = jsonDecode(utf8.decode(response.bodyBytes));
     return data['content'][0]['text'] as String;
@@ -315,8 +344,8 @@ class TrainingPlanService {
     );
     if (response.statusCode != 200) {
       final body = jsonDecode(utf8.decode(response.bodyBytes));
-      throw Exception(
-          body['error']?['message'] ?? 'OpenAI APIエラー (${response.statusCode})');
+      throw Exception(body['error']?['message'] ??
+          'OpenAI APIエラー (${response.statusCode})');
     }
     final data = jsonDecode(utf8.decode(response.bodyBytes));
     return data['choices'][0]['message']['content'] as String;
@@ -348,8 +377,8 @@ class TrainingPlanService {
     );
     if (response.statusCode != 200) {
       final body = jsonDecode(utf8.decode(response.bodyBytes));
-      throw Exception(
-          body['error']?['message'] ?? 'Gemini APIエラー (${response.statusCode})');
+      throw Exception(body['error']?['message'] ??
+          'Gemini APIエラー (${response.statusCode})');
     }
     final data = jsonDecode(utf8.decode(response.bodyBytes));
     return data['candidates'][0]['content']['parts'][0]['text'] as String;
