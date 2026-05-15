@@ -10,6 +10,7 @@ import '../providers/settings_provider.dart';
 import '../services/database_service.dart';
 import '../services/review_advice_service.dart';
 import '../services/training_calorie_calculator.dart';
+import '../widgets/source_reference_link.dart';
 
 // ── State classes ──────────────────────────────────────────────────────────
 
@@ -892,9 +893,16 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen>
                 ],
               )
             else if (reviewData.aiReview != null)
-              Text(
-                reviewData.aiReview!,
-                style: const TextStyle(fontSize: 13, height: 1.6),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    reviewData.aiReview!,
+                    style: const TextStyle(fontSize: 13, height: 1.6),
+                  ),
+                  const SizedBox(height: 4),
+                  const SourceReferenceLink(compact: true),
+                ],
               )
             else
               FilledButton.icon(

@@ -24,6 +24,7 @@ import '../widgets/training/training_log_dialog.dart';
 import '../widgets/training/training_one_rm_card.dart';
 import '../widgets/training/training_today_summary.dart';
 import '../widgets/training/training_timer_overlay.dart';
+import '../widgets/source_reference_link.dart';
 import 'active_workout_screen.dart';
 import 'review_screen.dart';
 import 'routine_screen.dart';
@@ -570,8 +571,15 @@ class _DailyAdviceCard extends ConsumerWidget {
                 ],
               )
             else if (adviceText != null)
-              Text(adviceText,
-                  style: const TextStyle(fontSize: 13, height: 1.6))
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(adviceText,
+                      style: const TextStyle(fontSize: 13, height: 1.6)),
+                  const SizedBox(height: 4),
+                  const SourceReferenceLink(compact: true),
+                ],
+              )
             else
               FilledButton.icon(
                 onPressed: () => fetch(),

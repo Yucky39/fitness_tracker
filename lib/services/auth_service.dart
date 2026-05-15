@@ -23,6 +23,9 @@ class AuthService {
     'training_plans',
     'meal_presets',
     'training_routines',
+    'exercise_animations',
+    'shopping_ingredient_aliases',
+    'shopping_ingredient_surface_stats',
   ];
 
   User? get currentUser => _auth.currentUser;

@@ -14,6 +14,7 @@ import '../services/energy_goal_calculator.dart';
 import '../services/export_service.dart';
 import '../services/notification_service.dart';
 import '../widgets/paywall_sheet.dart';
+import '../widgets/source_reference_link.dart';
 
 class ProfileSidebar extends ConsumerWidget {
   final GlobalKey<ScaffoldState> scaffoldKey;
@@ -47,10 +48,9 @@ class ProfileSidebar extends ConsumerWidget {
                 decoration: InputDecoration(
                   labelText: 'パスワード',
                   suffixIcon: IconButton(
-                    icon: Icon(
-                        obscure ? Icons.visibility : Icons.visibility_off),
-                    onPressed: () =>
-                        setDialogState(() => obscure = !obscure),
+                    icon:
+                        Icon(obscure ? Icons.visibility : Icons.visibility_off),
+                    onPressed: () => setDialogState(() => obscure = !obscure),
                   ),
                 ),
               ),
@@ -62,8 +62,7 @@ class ProfileSidebar extends ConsumerWidget {
               child: const Text('キャンセル'),
             ),
             FilledButton(
-              style: FilledButton.styleFrom(
-                  backgroundColor: Colors.red),
+              style: FilledButton.styleFrom(backgroundColor: Colors.red),
               onPressed: () => Navigator.pop(ctx, true),
               child: const Text('削除する'),
             ),
@@ -72,19 +71,32 @@ class ProfileSidebar extends ConsumerWidget {
       ),
     );
 
-    if (confirmed != true) return;
+    if (confirmed != true) {
+      passwordController.dispose();
+      return;
+    }
     final password = passwordController.text;
-    if (!context.mounted) return;
+    if (!context.mounted) {
+      passwordController.dispose();
+      return;
+    }
 
     try {
       await AuthService().reauthenticate(password);
       await AuthService().deleteAccount();
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('アカウントを削除しました')),
+        );
+      }
     } on Exception catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('削除に失敗しました: $e')),
         );
       }
+    } finally {
+      passwordController.dispose();
     }
   }
 
@@ -166,6 +178,7 @@ class ProfileSidebar extends ConsumerWidget {
                     style: TextStyle(
                         fontSize: 11, color: Colors.grey[700], height: 1.35),
                   ),
+                  const SourceReferenceLink(compact: true),
                   const SizedBox(height: 10),
                   const Text('性別',
                       style: TextStyle(fontSize: 12, color: Colors.grey)),
@@ -176,38 +189,33 @@ class ProfileSidebar extends ConsumerWidget {
                       return ChoiceChip(
                         label: Text(s.label),
                         selected: dialogSex == s,
-                        onSelected: (_) =>
-                            setDialogState(() => dialogSex = s),
+                        onSelected: (_) => setDialogState(() => dialogSex = s),
                       );
                     }).toList(),
                   ),
                   const SizedBox(height: 10),
                   TextField(
                     controller: ageController,
-                    decoration:
-                        const InputDecoration(labelText: '年齢（歳）'),
+                    decoration: const InputDecoration(labelText: '年齢（歳）'),
                     keyboardType: TextInputType.number,
                   ),
                   TextField(
                     controller: heightController,
-                    decoration:
-                        const InputDecoration(labelText: '身長 (cm)'),
-                    keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true),
+                    decoration: const InputDecoration(labelText: '身長 (cm)'),
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
                   ),
                   TextField(
                     controller: weightController,
-                    decoration:
-                        const InputDecoration(labelText: '現在の体重 (kg)'),
-                    keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true),
+                    decoration: const InputDecoration(labelText: '現在の体重 (kg)'),
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
                   ),
                   TextField(
                     controller: targetWeightController,
-                    decoration:
-                        const InputDecoration(labelText: '目標体重 (kg)'),
-                    keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true),
+                    decoration: const InputDecoration(labelText: '目標体重 (kg)'),
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
                   ),
                   TextField(
                     controller: weeksController,
@@ -232,8 +240,8 @@ class ProfileSidebar extends ConsumerWidget {
                     items: ActivityLevel.values.map((e) {
                       return DropdownMenuItem(
                         value: e,
-                        child: Text(e.label,
-                            style: const TextStyle(fontSize: 13)),
+                        child:
+                            Text(e.label, style: const TextStyle(fontSize: 13)),
                       );
                     }).toList(),
                     onChanged: (v) {
@@ -249,61 +257,47 @@ class ProfileSidebar extends ConsumerWidget {
                     onPressed: () {
                       if (dialogSex == null) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                              content: Text('性別を選択してください')),
+                          const SnackBar(content: Text('性別を選択してください')),
                         );
                         return;
                       }
                       final age = int.tryParse(ageController.text);
-                      final height =
-                          double.tryParse(heightController.text);
-                      final weight =
-                          double.tryParse(weightController.text);
+                      final height = double.tryParse(heightController.text);
+                      final weight = double.tryParse(weightController.text);
                       final targetW =
                           double.tryParse(targetWeightController.text);
                       final weeks = int.tryParse(weeksController.text);
                       if (age == null || age <= 0 || age > 120) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                              content: Text('有効な年齢を入力してください')),
+                          const SnackBar(content: Text('有効な年齢を入力してください')),
                         );
                         return;
                       }
-                      if (height == null ||
-                          height < 50 ||
-                          height > 250) {
+                      if (height == null || height < 50 || height > 250) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
-                              content: Text(
-                                  '身長は50〜250cmの範囲で入力してください')),
+                              content: Text('身長は50〜250cmの範囲で入力してください')),
                         );
                         return;
                       }
-                      if (weight == null ||
-                          weight < 20 ||
-                          weight > 300) {
+                      if (weight == null || weight < 20 || weight > 300) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
-                              content: Text(
-                                  '現在体重は20〜300kgの範囲で入力してください')),
+                              content: Text('現在体重は20〜300kgの範囲で入力してください')),
                         );
                         return;
                       }
-                      if (targetW == null ||
-                          targetW < 20 ||
-                          targetW > 300) {
+                      if (targetW == null || targetW < 20 || targetW > 300) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
-                              content: Text(
-                                  '目標体重は20〜300kgの範囲で入力してください')),
+                              content: Text('目標体重は20〜300kgの範囲で入力してください')),
                         );
                         return;
                       }
                       if (weeks == null || weeks < 1 || weeks > 520) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
-                              content: Text(
-                                  '達成期間は1〜520週の範囲で入力してください')),
+                              content: Text('達成期間は1〜520週の範囲で入力してください')),
                         );
                         return;
                       }
@@ -316,12 +310,9 @@ class ProfileSidebar extends ConsumerWidget {
                         goalWeeks: weeks,
                         activityLevel: dialogActivity,
                       );
-                      final result =
-                          EnergyGoalCalculator.compute(profile);
-                      calorieController.text =
-                          result.calories.toString();
-                      proteinController.text =
-                          result.proteinG.toString();
+                      final result = EnergyGoalCalculator.compute(profile);
+                      calorieController.text = result.calories.toString();
+                      proteinController.text = result.proteinG.toString();
                       fatController.text = result.fatG.toString();
                       carbsController.text = result.carbsG.toString();
                       setDialogState(() => lastComputed = result);
@@ -370,13 +361,11 @@ class ProfileSidebar extends ConsumerWidget {
                             const SizedBox(height: 8),
                             ...lastComputed!.notes.map(
                               (n) => Padding(
-                                padding:
-                                    const EdgeInsets.only(bottom: 4),
+                                padding: const EdgeInsets.only(bottom: 4),
                                 child: Text(
                                   n,
                                   style: const TextStyle(
-                                      fontSize: 11,
-                                      color: Colors.deepOrange),
+                                      fontSize: 11, color: Colors.deepOrange),
                                 ),
                               ),
                             ),
@@ -391,26 +380,23 @@ class ProfileSidebar extends ConsumerWidget {
                   const SizedBox(height: 8),
                   TextField(
                     controller: calorieController,
-                    decoration: const InputDecoration(
-                        labelText: '目標カロリー (kcal)'),
+                    decoration:
+                        const InputDecoration(labelText: '目標カロリー (kcal)'),
                     keyboardType: TextInputType.number,
                   ),
                   TextField(
                     controller: proteinController,
-                    decoration: const InputDecoration(
-                        labelText: '目標タンパク質 (g)'),
+                    decoration: const InputDecoration(labelText: '目標タンパク質 (g)'),
                     keyboardType: TextInputType.number,
                   ),
                   TextField(
                     controller: fatController,
-                    decoration:
-                        const InputDecoration(labelText: '目標脂質 (g)'),
+                    decoration: const InputDecoration(labelText: '目標脂質 (g)'),
                     keyboardType: TextInputType.number,
                   ),
                   TextField(
                     controller: carbsController,
-                    decoration: const InputDecoration(
-                        labelText: '目標炭水化物 (g)'),
+                    decoration: const InputDecoration(labelText: '目標炭水化物 (g)'),
                     keyboardType: TextInputType.number,
                   ),
                   const SizedBox(height: 8),
@@ -418,8 +404,7 @@ class ProfileSidebar extends ConsumerWidget {
                   TextField(
                     controller: waterGoalController,
                     decoration: const InputDecoration(
-                        labelText: '目標水分摂取量 (ml)',
-                        hintText: '例: 2000'),
+                        labelText: '目標水分摂取量 (ml)', hintText: '例: 2000'),
                     keyboardType: TextInputType.number,
                   ),
                 ],
@@ -436,27 +421,20 @@ class ProfileSidebar extends ConsumerWidget {
                     EnergyProfileState(
                       sex: dialogSex,
                       age: int.tryParse(ageController.text) ?? 0,
-                      heightCm:
-                          double.tryParse(heightController.text) ?? 0,
-                      weightKg:
-                          double.tryParse(weightController.text) ?? 0,
+                      heightCm: double.tryParse(heightController.text) ?? 0,
+                      weightKg: double.tryParse(weightController.text) ?? 0,
                       targetWeightKg:
-                          double.tryParse(targetWeightController.text) ??
-                              0,
-                      goalWeeks:
-                          int.tryParse(weeksController.text) ?? 12,
+                          double.tryParse(targetWeightController.text) ?? 0,
+                      goalWeeks: int.tryParse(weeksController.text) ?? 12,
                       activityLevel: dialogActivity,
                     ),
                   );
                   if (!context.mounted) return;
                   await mealNotifier.updateGoals(
-                    calories:
-                        int.tryParse(calorieController.text) ?? 2000,
-                    protein:
-                        double.tryParse(proteinController.text) ?? 150,
+                    calories: int.tryParse(calorieController.text) ?? 2000,
+                    protein: double.tryParse(proteinController.text) ?? 150,
                     fat: double.tryParse(fatController.text) ?? 60,
-                    carbs:
-                        double.tryParse(carbsController.text) ?? 200,
+                    carbs: double.tryParse(carbsController.text) ?? 200,
                   );
                   final waterGoal =
                       int.tryParse(waterGoalController.text) ?? 2000;
@@ -507,15 +485,12 @@ class ProfileSidebar extends ConsumerWidget {
                   labelText: '${provider.label} APIキー',
                   hintText: provider.apiKeyHint,
                   suffixIcon: IconButton(
-                    icon: Icon(obscure
-                        ? Icons.visibility
-                        : Icons.visibility_off),
-                    onPressed: () =>
-                        setFieldState(() => obscure = !obscure),
+                    icon:
+                        Icon(obscure ? Icons.visibility : Icons.visibility_off),
+                    onPressed: () => setFieldState(() => obscure = !obscure),
                   ),
                 ),
-                onChanged: (v) =>
-                    settingsNotifier.updateApiKey(provider, v),
+                onChanged: (v) => settingsNotifier.updateApiKey(provider, v),
               ),
             );
           }
@@ -530,15 +505,14 @@ class ProfileSidebar extends ConsumerWidget {
                   const Text('AIアドバイス設定',
                       style: TextStyle(fontWeight: FontWeight.bold)),
                   const SizedBox(height: 12),
-                  const Text('使用するAI',
-                      style: TextStyle(fontSize: 13)),
+                  const Text('使用するAI', style: TextStyle(fontSize: 13)),
                   const SizedBox(height: 8),
                   DropdownButtonFormField<AiProviderType>(
                     initialValue: currentProvider,
                     decoration: const InputDecoration(
                       border: OutlineInputBorder(),
-                      contentPadding: EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 8),
+                      contentPadding:
+                          EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     ),
                     items: AiProviderType.values.map((p) {
                       return DropdownMenuItem(
@@ -557,23 +531,21 @@ class ProfileSidebar extends ConsumerWidget {
                     },
                   ),
                   const SizedBox(height: 12),
-                  const Text('使用するモデル',
-                      style: TextStyle(fontSize: 13)),
+                  const Text('使用するモデル', style: TextStyle(fontSize: 13)),
                   const SizedBox(height: 8),
                   DropdownButtonFormField<String>(
-                    key: ValueKey<String>(
-                        'ai_model_${currentProvider.name}'),
+                    key: ValueKey<String>('ai_model_${currentProvider.name}'),
                     initialValue: currentModel,
                     decoration: const InputDecoration(
                       border: OutlineInputBorder(),
-                      contentPadding: EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 8),
+                      contentPadding:
+                          EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     ),
                     items: currentProvider.availableModels.map((m) {
                       return DropdownMenuItem(
                         value: m.id,
-                        child: Text(m.label,
-                            style: const TextStyle(fontSize: 13)),
+                        child:
+                            Text(m.label, style: const TextStyle(fontSize: 13)),
                       );
                     }).toList(),
                     onChanged: (m) {
@@ -583,34 +555,27 @@ class ProfileSidebar extends ConsumerWidget {
                     },
                   ),
                   const SizedBox(height: 16),
-                  const Text('アドバイスのレベル',
-                      style: TextStyle(fontSize: 13)),
+                  const Text('アドバイスのレベル', style: TextStyle(fontSize: 13)),
                   const SizedBox(height: 8),
                   SegmentedButton<String>(
                     segments: const [
-                      ButtonSegment(
-                          value: 'strict', label: Text('厳しめ')),
-                      ButtonSegment(
-                          value: 'normal', label: Text('普通')),
-                      ButtonSegment(
-                          value: 'gentle', label: Text('優しめ')),
+                      ButtonSegment(value: 'strict', label: Text('厳しめ')),
+                      ButtonSegment(value: 'normal', label: Text('普通')),
+                      ButtonSegment(value: 'gentle', label: Text('優しめ')),
                     ],
                     selected: {currentLevel},
                     onSelectionChanged: (selection) {
                       settingsNotifier.updateAdviceLevel(selection.first);
-                      setDialogState(
-                          () => currentLevel = selection.first);
+                      setDialogState(() => currentLevel = selection.first);
                     },
                   ),
                   const SizedBox(height: 4),
                   Text(
                     _adviceLevelDescription(currentLevel),
-                    style: const TextStyle(
-                        fontSize: 11, color: Colors.grey),
+                    style: const TextStyle(fontSize: 11, color: Colors.grey),
                   ),
                   const SizedBox(height: 16),
-                  const Text('APIキー',
-                      style: TextStyle(fontSize: 13)),
+                  const Text('APIキー', style: TextStyle(fontSize: 13)),
                   const SizedBox(height: 8),
                   apiKeyField(AiProviderType.anthropic, anthropicKeyCtrl),
                   const SizedBox(height: 8),
@@ -737,8 +702,7 @@ class ProfileSidebar extends ConsumerWidget {
                   context,
                   ref,
                   label: '食事記録リマインダー',
-                  enabled:
-                      ref.read(settingsProvider).mealReminderEnabled,
+                  enabled: ref.read(settingsProvider).mealReminderEnabled,
                   hour: ref.read(settingsProvider).mealReminderHour,
                   minute: ref.read(settingsProvider).mealReminderMinute,
                   onChanged: (enabled, hour, minute) async {
@@ -758,11 +722,9 @@ class ProfileSidebar extends ConsumerWidget {
                   context,
                   ref,
                   label: 'トレーニングリマインダー',
-                  enabled:
-                      ref.read(settingsProvider).workoutReminderEnabled,
+                  enabled: ref.read(settingsProvider).workoutReminderEnabled,
                   hour: ref.read(settingsProvider).workoutReminderHour,
-                  minute:
-                      ref.read(settingsProvider).workoutReminderMinute,
+                  minute: ref.read(settingsProvider).workoutReminderMinute,
                   onChanged: (enabled, hour, minute) async {
                     await ref
                         .read(settingsProvider.notifier)
@@ -792,9 +754,10 @@ class ProfileSidebar extends ConsumerWidget {
   // ── データ管理 ────────────────────────────────────────────────────────────
 
   void _showDataManagementDialog(BuildContext context, WidgetRef ref) {
+    final parentContext = context;
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: const Text('データ管理'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -809,24 +772,43 @@ class ProfileSidebar extends ConsumerWidget {
               icon: const Icon(Icons.download),
               label: const Text('全データをCSVでエクスポート'),
               onPressed: () async {
-                Navigator.pop(context);
+                Navigator.pop(dialogContext);
                 try {
                   await ExportService().exportAll();
                 } catch (e) {
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                          content: Text('エクスポートに失敗しました: $e')),
+                  if (parentContext.mounted) {
+                    ScaffoldMessenger.of(parentContext).showSnackBar(
+                      SnackBar(content: Text('エクスポートに失敗しました: $e')),
                     );
                   }
                 }
+              },
+            ),
+            const SizedBox(height: 12),
+            const Divider(height: 1),
+            const SizedBox(height: 12),
+            Text(
+              'アカウントを削除すると、デバイス内のローカルデータとクラウド同期データを完全に削除します。',
+              style: TextStyle(fontSize: 13, color: Colors.grey[700]),
+            ),
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              icon: const Icon(Icons.delete_forever, color: Colors.red),
+              label: const Text('アカウントと全データを削除'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: Colors.red,
+                side: const BorderSide(color: Colors.red),
+              ),
+              onPressed: () {
+                Navigator.pop(dialogContext);
+                _deleteAccount(parentContext);
               },
             ),
           ],
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: const Text('閉じる'),
           ),
         ],
@@ -862,11 +844,13 @@ class ProfileSidebar extends ConsumerWidget {
             if (subscription.expiresAt != null)
               _infoRow('次回更新', _formatDate(subscription.expiresAt!)),
             if (subscription.platform != null)
-              _infoRow('ストア', subscription.platform == 'ios' ? 'App Store' : 'Google Play'),
+              _infoRow('ストア',
+                  subscription.platform == 'ios' ? 'App Store' : 'Google Play'),
             const SizedBox(height: 12),
             Text(
               'サブスクリプションの解約・管理は各ストアのアカウント設定から行えます。',
-              style: TextStyle(fontSize: 12, color: Colors.grey[600], height: 1.5),
+              style:
+                  TextStyle(fontSize: 12, color: Colors.grey[600], height: 1.5),
             ),
           ],
         ),
@@ -892,7 +876,8 @@ class ProfileSidebar extends ConsumerWidget {
           ),
           Expanded(
             child: Text(value,
-                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+                style:
+                    const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
           ),
         ],
       ),
@@ -1027,7 +1012,8 @@ class ProfileSidebar extends ConsumerWidget {
                 },
                 child: Container(
                   margin: const EdgeInsets.fromLTRB(12, 8, 12, 4),
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       colors: [
@@ -1052,14 +1038,18 @@ class ProfileSidebar extends ConsumerWidget {
                               style: TextStyle(
                                 fontSize: 13,
                                 fontWeight: FontWeight.bold,
-                                color: Theme.of(context).colorScheme.onPrimaryContainer,
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onPrimaryContainer,
                               ),
                             ),
                             Text(
                               'AI機能が自動で使えるようになります',
                               style: TextStyle(
                                 fontSize: 11,
-                                color: Theme.of(context).colorScheme.onPrimaryContainer,
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onPrimaryContainer,
                               ),
                             ),
                           ],
@@ -1127,8 +1117,8 @@ class ProfileSidebar extends ConsumerWidget {
                             const TextStyle(fontSize: 11, color: Colors.grey),
                       )
                     : null,
-                trailing:
-                    const Icon(Icons.chevron_right, size: 20, color: Colors.grey),
+                trailing: const Icon(Icons.chevron_right,
+                    size: 20, color: Colors.grey),
                 onTap: () {
                   scaffoldKey.currentState?.closeEndDrawer();
                   _showSubscriptionInfoDialog(context, ref);
@@ -1208,8 +1198,7 @@ class ProfileSidebar extends ConsumerWidget {
             // ── アカウント削除 ──
             ListTile(
               leading: const Icon(Icons.delete_forever, color: Colors.red),
-              title: const Text('アカウント削除',
-                  style: TextStyle(color: Colors.red)),
+              title: const Text('アカウント削除', style: TextStyle(color: Colors.red)),
               onTap: () {
                 final ctx = scaffoldKey.currentContext!;
                 scaffoldKey.currentState?.closeEndDrawer();

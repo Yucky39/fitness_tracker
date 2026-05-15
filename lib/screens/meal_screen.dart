@@ -26,6 +26,7 @@ import '../services/food_search_service.dart';
 import '../services/meal_image_analysis_service.dart';
 import '../widgets/nutrient_bar.dart';
 import '../widgets/recipe_preset_editor_sheet.dart';
+import '../widgets/source_reference_link.dart';
 import '../widgets/supplement_entry_dialog.dart';
 
 /// 検索結果1行。行全体の水平ドラッグで食品名を横スクロールする。
@@ -720,6 +721,8 @@ class MealScreen extends ConsumerWidget {
               const SizedBox(height: 4),
               Text(adviceText,
                   style: const TextStyle(fontSize: 14, height: 1.6)),
+              const SizedBox(height: 4),
+              const SourceReferenceLink(compact: true),
             ],
             if (adviceText == null && error == null && !isLoading)
               const Padding(

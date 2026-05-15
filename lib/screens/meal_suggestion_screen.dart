@@ -9,6 +9,7 @@ import '../providers/settings_provider.dart';
 import '../services/ingredient_merge_service.dart';
 import '../services/meal_suggestion_service.dart';
 import '../utils/suggestion_shopping_list.dart';
+import '../widgets/source_reference_link.dart';
 
 /// 1日の食事提案を表示する画面
 class MealSuggestionScreen extends ConsumerWidget {
@@ -45,12 +46,17 @@ class MealSuggestionScreen extends ConsumerWidget {
               suggestion: state.suggestion,
             ),
           ),
+          const SliverToBoxAdapter(
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(16, 4, 16, 0),
+              child: SourceReferenceLink(compact: true),
+            ),
+          ),
 
           // ── 期間セレクタ ──────────────────────────────────────────────────
           SliverToBoxAdapter(
             child: Padding(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               child: SegmentedButton<SuggestionPeriod>(
                 segments: const [
                   ButtonSegment(
@@ -191,14 +197,17 @@ class MealSuggestionScreen extends ConsumerWidget {
 // ── 生成日時バッジ ────────────────────────────────────────────────────────────
 
 class _GeneratedAtBadge extends StatelessWidget {
-  const _GeneratedAtBadge({required this.generatedAt, required this.onRegenerate});
+  const _GeneratedAtBadge(
+      {required this.generatedAt, required this.onRegenerate});
   final DateTime? generatedAt;
   final VoidCallback onRegenerate;
 
   String _format(DateTime dt) {
     final now = DateTime.now();
-    final isToday = dt.year == now.year && dt.month == now.month && dt.day == now.day;
-    final time = '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+    final isToday =
+        dt.year == now.year && dt.month == now.month && dt.day == now.day;
+    final time =
+        '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
     if (isToday) return '本日 $time 生成';
     return '${dt.month}/${dt.day} $time 生成';
   }
@@ -216,7 +225,8 @@ class _GeneratedAtBadge extends StatelessWidget {
           const SizedBox(width: 4),
           Text(
             _format(generatedAt!),
-            style: theme.textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant),
+            style: theme.textTheme.labelSmall
+                ?.copyWith(color: cs.onSurfaceVariant),
           ),
           const Spacer(),
           TextButton.icon(
@@ -444,7 +454,8 @@ class _MealSection extends StatelessWidget {
 
           // 料理リスト
           for (final dish in meal.dishes) ...[
-            _DishCard(dish: dish, initiallyExpanded: dish.ingredients.isNotEmpty),
+            _DishCard(
+                dish: dish, initiallyExpanded: dish.ingredients.isNotEmpty),
             const SizedBox(height: 8),
           ],
         ],
@@ -501,10 +512,10 @@ class _DishCard extends StatelessWidget {
           tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
           childrenPadding:
               const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12)),
-          collapsedShape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          collapsedShape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           title: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -588,8 +599,8 @@ class _IngredientRow extends StatelessWidget {
           ),
           Text(
             '${ing.calories}kcal  P${ing.protein.toStringAsFixed(1)}g',
-            style: theme.textTheme.labelSmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant),
+            style: theme.textTheme.labelSmall
+                ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
           ),
         ],
       ),
@@ -706,8 +717,7 @@ class _DayCard extends StatelessWidget {
         DateTime(generatedAt.year, generatedAt.month, generatedAt.day);
     final actualDate = baseDate.add(Duration(days: day.day - 1));
     final now = DateTime.now();
-    final isToday =
-        actualDate == DateTime(now.year, now.month, now.day);
+    final isToday = actualDate == DateTime(now.year, now.month, now.day);
     final dateLabel = _buildDateLabel(actualDate);
 
     return Padding(
@@ -719,10 +729,10 @@ class _DayCard extends StatelessWidget {
           data: theme.copyWith(dividerColor: Colors.transparent),
           child: ExpansionTile(
             initiallyExpanded: isToday,
-            shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12)),
-            collapsedShape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            collapsedShape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             tilePadding:
                 const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
             title: Row(
@@ -796,13 +806,12 @@ class _DayCard extends StatelessWidget {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(dish.name,
-                                  style: theme.textTheme.bodySmall),
+                              Text(dish.name, style: theme.textTheme.bodySmall),
                               if ((dish.note ?? '').isNotEmpty)
                                 Text(
                                   dish.note!,
-                                  style: theme.textTheme.labelSmall?.copyWith(
-                                      color: cs.onSurfaceVariant),
+                                  style: theme.textTheme.labelSmall
+                                      ?.copyWith(color: cs.onSurfaceVariant),
                                 ),
                             ],
                           ),
@@ -837,6 +846,7 @@ class _EmptyState extends StatelessWidget {
   });
   final bool hasApiKey;
   final SuggestionPeriod period;
+
   /// 今日／明日タブで日次が未生成でも、週間キャッシュがあるとき true
   final bool hasWeeklyPlanCached;
   final VoidCallback onGenerate;
@@ -1065,9 +1075,8 @@ class _ShoppingListBottomSheetBodyState
     final sugg = ref.watch(mealSuggestionProvider);
     final hasWeek = sugg.weeklySuggestion != null;
     final hasDay = sugg.suggestion != null;
-    final items = _loading
-        ? const <AggregatedShoppingItem>[]
-        : _computeItems(sugg, _ctx);
+    final items =
+        _loading ? const <AggregatedShoppingItem>[] : _computeItems(sugg, _ctx);
     final shareText = buildPlainTextShoppingList(
       heading: _heading(sugg.period),
       items: items,
@@ -1089,8 +1098,8 @@ class _ShoppingListBottomSheetBodyState
           padding: const EdgeInsets.symmetric(horizontal: 20),
           child: Text(
             '提案メニューに出てくる食材をまとめました。同じ食材らしい表記は、この端末に保存した使用回数と別名データで1行に寄せます。',
-            style: theme.textTheme.bodySmall
-                ?.copyWith(color: cs.onSurfaceVariant),
+            style:
+                theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
             textAlign: TextAlign.center,
           ),
         ),
