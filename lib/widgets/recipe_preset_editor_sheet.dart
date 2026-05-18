@@ -255,9 +255,9 @@ class _RecipePresetEditorSheetState extends State<RecipePresetEditorSheet> {
     line.name.text = r.name;
     line.quantityUnit = RecipeQuantityUnit.gram;
     line.calories.text = '${r.caloriesPer100g}';
-    line.protein.text = r.proteinPer100g.toStringAsFixed(1);
-    line.fat.text = r.fatPer100g.toStringAsFixed(1);
-    line.carbs.text = r.carbsPer100g.toStringAsFixed(1);
+    line.protein.text = r.proteinPer100g.toStringAsFixed(2);
+    line.fat.text = r.fatPer100g.toStringAsFixed(2);
+    line.carbs.text = r.carbsPer100g.toStringAsFixed(2);
     line.sugar.text = '0';
     line.fiber.text = '0';
     line.sodium.text = '0';
@@ -633,7 +633,7 @@ class _RecipePresetEditorSheetState extends State<RecipePresetEditorSheet> {
                   child: TextField(
                     controller: line.protein,
                     decoration: const InputDecoration(labelText: 'P g', isDense: true),
-                    keyboardType: TextInputType.number,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
                     onChanged: (_) => setState(() {}),
                   ),
                 ),
@@ -642,7 +642,7 @@ class _RecipePresetEditorSheetState extends State<RecipePresetEditorSheet> {
                   child: TextField(
                     controller: line.fat,
                     decoration: const InputDecoration(labelText: 'F g', isDense: true),
-                    keyboardType: TextInputType.number,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
                     onChanged: (_) => setState(() {}),
                   ),
                 ),
@@ -651,7 +651,7 @@ class _RecipePresetEditorSheetState extends State<RecipePresetEditorSheet> {
                   child: TextField(
                     controller: line.carbs,
                     decoration: const InputDecoration(labelText: 'C g', isDense: true),
-                    keyboardType: TextInputType.number,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
                     onChanged: (_) => setState(() {}),
                   ),
                 ),
@@ -664,7 +664,7 @@ class _RecipePresetEditorSheetState extends State<RecipePresetEditorSheet> {
                   child: TextField(
                     controller: line.sugar,
                     decoration: const InputDecoration(labelText: '糖 g', isDense: true),
-                    keyboardType: TextInputType.number,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
                     onChanged: (_) => setState(() {}),
                   ),
                 ),
@@ -673,7 +673,7 @@ class _RecipePresetEditorSheetState extends State<RecipePresetEditorSheet> {
                   child: TextField(
                     controller: line.fiber,
                     decoration: const InputDecoration(labelText: '繊維 g', isDense: true),
-                    keyboardType: TextInputType.number,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
                     onChanged: (_) => setState(() {}),
                   ),
                 ),
@@ -682,7 +682,7 @@ class _RecipePresetEditorSheetState extends State<RecipePresetEditorSheet> {
                   child: TextField(
                     controller: line.sodium,
                     decoration: const InputDecoration(labelText: 'Na mg', isDense: true),
-                    keyboardType: TextInputType.number,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
                     onChanged: (_) => setState(() {}),
                   ),
                 ),
