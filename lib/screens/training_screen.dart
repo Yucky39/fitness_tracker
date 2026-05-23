@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 
 import '../data/exercise_muscle_map.dart';
 import '../models/training_log.dart';
+import '../models/training_session_record.dart';
 import '../providers/active_workout_provider.dart';
 import '../providers/energy_profile_provider.dart';
 import '../providers/muscle_heatmap_provider.dart';
@@ -15,10 +16,13 @@ import '../providers/sleep_provider.dart';
 import '../providers/training_advice_provider.dart';
 import '../providers/training_daily_advice_provider.dart';
 import '../providers/training_provider.dart';
+import '../providers/training_session_provider.dart';
 import '../services/health_service.dart';
 import '../services/training_calorie_calculator.dart';
 import '../widgets/muscle_heatmap_painter.dart';
 import '../widgets/training/exercise_weight_chart_sheet.dart';
+import '../widgets/training/session_record_card.dart';
+import '../widgets/training/session_registration_dialog.dart';
 import '../widgets/training/training_log_card.dart';
 import '../widgets/training/training_log_dialog.dart';
 import '../widgets/training/training_one_rm_card.dart';
@@ -263,6 +267,9 @@ class _TrainingScreenState extends ConsumerState<TrainingScreen> {
   ) {
     final adviceState = ref.watch(trainingAdviceProvider);
     final heatmap = ref.watch(muscleHeatmapProvider);
+    final sessionState = ref.watch(trainingSessionProvider);
+    final sessionsForDate =
+        sessionState.sessionsForDate(state.selectedDate);
 
     return CustomScrollView(
       slivers: [
@@ -397,6 +404,17 @@ class _TrainingScreenState extends ConsumerState<TrainingScreen> {
             childCount: selectedDateLogs.length,
           ),
         ),
+        // ── セッション登録セクション
+        SliverToBoxAdapter(
+          child: _SessionSection(
+            selectedDate: state.selectedDate,
+            dayLogs: selectedDateLogs,
+            sessions: sessionsForDate,
+            allLogs: state.logs,
+            sessionState: sessionState,
+          ),
+        ),
+
         const SliverToBoxAdapter(child: SizedBox(height: 80)),
       ],
     );
@@ -470,6 +488,104 @@ class _DateNavigation extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+// ── セッション登録セクション ─────────────────────────────────────────────────
+
+class _SessionSection extends ConsumerWidget {
+  final DateTime selectedDate;
+  final List<TrainingLog> dayLogs;
+  final List<TrainingSessionRecord> sessions;
+  final List<TrainingLog> allLogs;
+  final TrainingSessionState sessionState;
+
+  const _SessionSection({
+    required this.selectedDate,
+    required this.dayLogs,
+    required this.sessions,
+    required this.allLogs,
+    required this.sessionState,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // ── セクションヘッダー
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 8, 4),
+          child: Row(
+            children: [
+              Icon(
+                Icons.self_improvement,
+                size: 18,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                'セッション記録',
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      color: Theme.of(context).colorScheme.primary,
+                      fontWeight: FontWeight.bold,
+                    ),
+              ),
+              const Spacer(),
+              TextButton.icon(
+                onPressed: dayLogs.isEmpty
+                    ? null
+                    : () => showSessionRegistrationDialog(
+                          context: context,
+                          ref: ref,
+                          dayLogs: dayLogs,
+                          sessionDate: selectedDate,
+                        ),
+                icon: const Icon(Icons.add, size: 16),
+                label: const Text('登録'),
+                style: TextButton.styleFrom(
+                  visualDensity: VisualDensity.compact,
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        // ── セッションカード一覧
+        if (sessions.isEmpty)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+            child: Text(
+              dayLogs.isEmpty
+                  ? 'トレーニングを記録してからセッションを登録できます'
+                  : '「登録」ボタンでセッションをまとめてストレッチを確認できます',
+              style: const TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+          )
+        else
+          ...sessions.map((session) {
+            final sessionLogs = allLogs
+                .where((l) => session.logIds.contains(l.id))
+                .toList();
+            final isLoading =
+                sessionState.fetchingStretchForId == session.id;
+            final error = sessionState.stretchErrorById[session.id];
+
+            return SessionRecordCard(
+              session: session,
+              sessionLogs: sessionLogs,
+              isStretchLoading: isLoading,
+              stretchError: error,
+              onRetryStretch: () => ref
+                  .read(trainingSessionProvider.notifier)
+                  .retryStretch(session, allLogs),
+              onDelete: () => ref
+                  .read(trainingSessionProvider.notifier)
+                  .deleteSession(session.id),
+            );
+          }),
+      ],
     );
   }
 }
