@@ -137,16 +137,15 @@ class TrainingAdviceService {
 
       final history = historyByExercise[log.exerciseName] ?? [];
       if (history.isNotEmpty) {
-        final pastWeights = history.map((l) {
+        final pastWeights = history.sortedByRegistrationTime().map((l) {
           final rpePart = l.rpe != null ? ' RPE${l.rpe}' : '';
+          final when = DateFormat('M/d HH:mm').format(l.date.toLocal());
           if (l.exerciseType == ExerciseType.cardio) {
-            return '${l.distanceKm.toStringAsFixed(1)}km・${l.durationMinutes}分$rpePart'
-                ' (${DateFormat('M/d').format(l.date.toLocal())})';
+            return '${l.distanceKm.toStringAsFixed(1)}km・${l.durationMinutes}分$rpePart ($when)';
           }
-          return '${l.weight}kg×${l.reps}×${l.sets}$rpePart'
-              ' (${DateFormat('M/d').format(l.date.toLocal())})';
+          return '${l.weight}kg×${l.reps}×${l.sets}$rpePart ($when)';
         }).join(' / ');
-        buffer.writeln('  同種目の過去（直近・本記録除く）: $pastWeights');
+        buffer.writeln('  同種目の過去（古い順・本記録除く）: $pastWeights');
       } else {
         buffer.writeln('  同種目の過去記録: なし（初回または比較データなし）');
       }
@@ -177,6 +176,7 @@ class TrainingAdviceService {
   static String _dailySystemPrompt(String level) {
     const base = 'あなたは経験豊富なパーソナルトレーナーです。'
         '提示された1日のトレーニングセッション全体を総合的に評価し、日本語で具体的なアドバイスを提供してください。'
+        '種目一覧は登録時刻の古い順（実際の実施順）で並んでいます。この順序を前提に種目の組み合わせ・順序を評価してください。'
         '種目の組み合わせ・順序・ボリューム・強度バランス（有酸素と筋トレの配分）・総消費カロリーに触れてください。'
         '直近の週間負荷と照らして過負荷・回復不足・オーバートレーニングの兆候があれば指摘し、次のセッションへの具体的な提案を示してください。'
         '睡眠・栄養・水分補給の一般的な留意点も簡潔に含めてください。'
@@ -198,34 +198,40 @@ class TrainingAdviceService {
   }) {
     final buffer = StringBuffer();
     final dateLabel = DateFormat('yyyy/M/d').format(date.toLocal());
+    final orderedLogs = dayLogs.sortedByRegistrationTime();
     buffer.writeln('【$dateLabel のトレーニングセッション全体】');
+    buffer.writeln('（種目は登録時刻の古い順＝実施順で記載）');
     buffer.writeln();
 
-    if (dayLogs.isEmpty) {
+    if (orderedLogs.isEmpty) {
       buffer.writeln('この日のトレーニング記録はありません。');
     } else {
-      final strengthLogs =
-          dayLogs.where((l) => l.exerciseType != ExerciseType.cardio).toList();
-      final cardioLogs =
-          dayLogs.where((l) => l.exerciseType == ExerciseType.cardio).toList();
-      final exerciseNames = dayLogs.map((l) => l.exerciseName).toSet();
+      final strengthLogs = orderedLogs
+          .where((l) => l.exerciseType != ExerciseType.cardio)
+          .toList();
+      final cardioLogs = orderedLogs
+          .where((l) => l.exerciseType == ExerciseType.cardio)
+          .toList();
+      final exerciseNames = orderedLogs.map((l) => l.exerciseName).toSet();
 
       buffer.writeln('■ 実施種目一覧:');
-      for (final log in dayLogs) {
+      for (var i = 0; i < orderedLogs.length; i++) {
+        final log = orderedLogs[i];
+        final when = DateFormat('HH:mm').format(log.date.toLocal());
         if (log.exerciseType == ExerciseType.cardio) {
           final pace = log.paceMinPerKm;
           final paceStr = pace != null
               ? '  ペース: ${pace.floor()}:${((pace - pace.floor()) * 60).round().toString().padLeft(2, '0')}/km'
               : '';
           buffer.writeln(
-            '・${log.exerciseName}（有酸素）: ${log.distanceKm.toStringAsFixed(2)} km / ${log.durationMinutes} 分$paceStr'
+            '${i + 1}. [$when] ${log.exerciseName}（有酸素）: ${log.distanceKm.toStringAsFixed(2)} km / ${log.durationMinutes} 分$paceStr'
             '${log.rpe != null ? " RPE${log.rpe}" : ""}',
           );
         } else {
           final oneRm =
               log.reps > 0 ? log.weight * (1 + log.reps / 30) : log.weight;
           buffer.writeln(
-            '・${log.exerciseName}（${log.exerciseType.label}）: '
+            '${i + 1}. [$when] ${log.exerciseName}（${log.exerciseType.label}）: '
             '${log.weight} kg × ${log.reps} 回 × ${log.sets} セット'
             '（推定1RM: ${oneRm.toStringAsFixed(1)} kg）'
             '${log.rpe != null ? " RPE${log.rpe}" : ""}',
@@ -251,11 +257,11 @@ class TrainingAdviceService {
       }
 
       final rpes =
-          dayLogs.where((l) => l.rpe != null).map((l) => l.rpe!).toList();
+          orderedLogs.where((l) => l.rpe != null).map((l) => l.rpe!).toList();
       if (rpes.isNotEmpty) {
         final avgRpe = rpes.fold(0, (s, v) => s + v) / rpes.length;
         buffer.writeln(
-            '  平均RPE: ${avgRpe.toStringAsFixed(1)}（記録あり ${rpes.length}/${dayLogs.length} 件）');
+            '  平均RPE: ${avgRpe.toStringAsFixed(1)}（記録あり ${rpes.length}/${orderedLogs.length} 件）');
       }
     }
 
@@ -294,7 +300,7 @@ class TrainingAdviceService {
     final systemPrompt = _dailySystemPrompt(adviceLevel);
     final weeklyContext = buildWeeklyLoadContext(allLogs, date);
     final userMessage = _buildDailyUserMessage(
-      dayLogs: dayLogs,
+      dayLogs: dayLogs.sortedByRegistrationTime(),
       date: date,
       bodyWeightKg: bodyWeightKg,
       sleepContext: sleepContext,

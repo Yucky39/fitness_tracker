@@ -13,14 +13,19 @@ class AiProxyService {
     required String systemPrompt,
     required String userMessage,
     int maxTokens = 1024,
+    String? thinkingLevel,
   }) async {
     final callable = _functions.httpsCallable('geminiProxy');
-    final result = await callable.call({
+    final payload = <String, dynamic>{
       'type': 'text',
       'systemPrompt': systemPrompt,
       'userMessage': userMessage,
       'maxTokens': maxTokens,
-    });
+    };
+    if (thinkingLevel != null) {
+      payload['thinkingLevel'] = thinkingLevel;
+    }
+    final result = await callable.call(payload);
     final text = result.data['text'];
     if (text == null || text is! String) {
       throw Exception('AIからの応答が不正です。もう一度試してください。');

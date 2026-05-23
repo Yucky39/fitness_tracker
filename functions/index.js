@@ -7,7 +7,7 @@ const admin = require('firebase-admin');
 admin.initializeApp();
 setGlobalOptions({ region: 'asia-northeast1' });
 
-const MODEL_ID = 'gemini-3-flash-preview';
+const MODEL_ID = 'gemini-3.5-flash';
 
 /** Secret Manager 上の名前と一致させる（firebase functions:secrets:set で登録） */
 const geminiApiKey = defineSecret('GEMINI_API_KEY');
@@ -46,7 +46,16 @@ exports.geminiProxy = onCall(
     const apiKey = geminiApiKey.value();
     if (!apiKey) throw new HttpsError('internal', 'サーバー設定エラーです。管理者にお問い合わせください。');
 
-    const { type, systemPrompt, userMessage, base64Image, mediaType, prompt, maxTokens = 1024 } = request.data;
+    const {
+      type,
+      systemPrompt,
+      userMessage,
+      base64Image,
+      mediaType,
+      prompt,
+      maxTokens = 1024,
+      thinkingLevel,
+    } = request.data;
 
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({ model: MODEL_ID });
@@ -54,10 +63,14 @@ exports.geminiProxy = onCall(
     try {
       if (type === 'text') {
         // テキスト生成（栄養アドバイス・トレーニング評価・プラン生成）
+        const generationConfig = { maxOutputTokens: maxTokens };
+        if (thinkingLevel) {
+          generationConfig.thinkingConfig = { thinkingLevel };
+        }
         const result = await model.generateContent({
           systemInstruction: systemPrompt,
           contents: [{ role: 'user', parts: [{ text: userMessage }] }],
-          generationConfig: { maxOutputTokens: maxTokens },
+          generationConfig,
         });
         return { text: result.response.text() };
 

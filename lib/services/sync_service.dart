@@ -160,7 +160,7 @@ class SyncService {
           'openAiModel':
               prefs.getString('openAiModel') ?? 'gpt-4o-mini',
           'geminiModel':
-              prefs.getString('geminiModel') ?? 'gemini-3-flash-preview',
+              prefs.getString('geminiModel') ?? 'gemini-3.5-flash',
           'mealReminderEnabled':
               prefs.getBool('mealReminderEnabled') ?? false,
           'mealReminderHour': prefs.getInt('mealReminderHour') ?? 12,
@@ -249,7 +249,7 @@ class SyncService {
       await prefs.setString('openAiModel',
           settings['openAiModel'] as String? ?? 'gpt-4o-mini');
       await prefs.setString('geminiModel',
-          settings['geminiModel'] as String? ?? 'gemini-3-flash-preview');
+          settings['geminiModel'] as String? ?? 'gemini-3.5-flash');
       await prefs.setBool('mealReminderEnabled',
           settings['mealReminderEnabled'] as bool? ?? false);
       await prefs.setInt('mealReminderHour',

@@ -38,13 +38,14 @@ enum AiProviderType {
         ];
       case AiProviderType.gemini:
         return [
+          (id: 'gemini-3.5-flash', label: 'Gemini 3.5 Flash（最新・高速）'),
           (id: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash（高速）'),
           (id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash（高速）'),
           (id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro（高性能）'),
-          (id: 'gemini-3-flash-preview', label: 'Gemini 3 Flash プレビュー（最新・高速）'),
+          (id: 'gemini-3-flash-preview', label: 'Gemini 3 Flash プレビュー'),
           (
             id: 'gemini-3.1-pro-preview',
-            label: 'Gemini 3.1 Pro プレビュー（最新・最高性能）'
+            label: 'Gemini 3.1 Pro プレビュー（最高性能）'
           ),
         ];
     }
@@ -57,7 +58,7 @@ enum AiProviderType {
       case AiProviderType.openai:
         return 'gpt-4o-mini';
       case AiProviderType.gemini:
-        return 'gemini-3-flash-preview';
+        return 'gemini-3.5-flash';
     }
   }
 
@@ -68,7 +69,7 @@ enum AiProviderType {
       case AiProviderType.openai:
         return 'GPT-5.4 mini';
       case AiProviderType.gemini:
-        return 'Gemini 3 Flash';
+        return 'Gemini 3.5 Flash';
     }
   }
 
@@ -144,7 +145,7 @@ class SettingsState {
     this.geminiApiKey = '',
     this.selectedAnthropicModel = 'claude-haiku-4-5-20251001',
     this.selectedOpenAiModel = 'gpt-4o-mini',
-    this.selectedGeminiModel = 'gemini-3-flash-preview',
+    this.selectedGeminiModel = 'gemini-3.5-flash',
     this.mealReminderEnabled = false,
     this.mealReminderHour = 12,
     this.mealReminderMinute = 0,

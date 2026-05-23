@@ -1,56 +1,54 @@
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
+import 'package:intl/intl.dart';
 
 import '../models/training_log.dart';
 import '../providers/settings_provider.dart';
 import 'ai_proxy_service.dart';
 
 class StretchRecommendationService {
-  static const _maxTokens = 1500;
+  /// Gemini 3 は thinking トークンも maxOutputTokens に含まれるため余裕を持たせる。
+  static const _maxTokens = 4096;
+
+  /// ストレッチ提案は深い推論不要。thinking 分を抑えて本文にトークンを回す。
+  static const _geminiThinkingLevel = 'minimal';
 
   static const _systemPrompt =
       'あなたは経験豊富なパーソナルトレーナーであり、スポーツ科学に基づいたストレッチング指導の専門家です。'
       '提示されたトレーニングセッションの種目リストから、主に使用された筋群を特定し、'
       '効果的なクールダウンストレッチを日本語で提案してください。\n\n'
       '【回答フォーマット】\n'
-      '- 3〜6種類のストレッチを箇条書きで提示\n'
-      '- 各ストレッチに「対象筋群」「方法」「保持時間・回数」を簡潔に記載\n'
-      '- 静的ストレッチを中心に、種目に応じて動的ストレッチや呼吸法も適宜追加\n'
+      '- 使用筋群に対応する3〜5種類のストレッチを、フラットな箇条書き（ネストなし）で提示\n'
+      '- 各項目は次の形式で1ブロックにまとめる:\n'
+      '  **名称** — 対象筋群: … / 方法: …（1文） / 保持: …\n'
+      '- 静的ストレッチを中心に、種目に応じて動的ストレッチも適宜追加\n'
       '- 医療診断ではなく一般的なエクササイズガイドラインとして提供\n'
-      '- 全体が300〜500文字程度に収まるよう簡潔にまとめる';
+      '- すべての項目を最後まで書き切る（途中で省略しない）';
 
   static String _buildUserMessage(List<TrainingLog> logs) {
     final buffer = StringBuffer();
     buffer.writeln('【本日のトレーニングセッション】');
+    buffer.writeln('（種目は登録時刻の古い順＝実施順）');
     buffer.writeln();
 
-    final strengthLogs =
-        logs.where((l) => l.exerciseType != ExerciseType.cardio).toList();
-    final cardioLogs =
-        logs.where((l) => l.exerciseType == ExerciseType.cardio).toList();
-
-    if (strengthLogs.isNotEmpty) {
-      buffer.writeln('■ 筋トレ種目:');
-      for (final log in strengthLogs) {
+    for (var i = 0; i < logs.length; i++) {
+      final log = logs[i];
+      final when = DateFormat('HH:mm').format(log.date.toLocal());
+      if (log.exerciseType == ExerciseType.cardio) {
         buffer.writeln(
-          '・${log.exerciseName}（${log.exerciseType.label}）'
+          '${i + 1}. [$when] ${log.exerciseName}: '
+          '${log.distanceKm.toStringAsFixed(1)}km / ${log.durationMinutes}分',
+        );
+      } else {
+        buffer.writeln(
+          '${i + 1}. [$when] ${log.exerciseName}（${log.exerciseType.label}）'
           ' ${log.weight}kg × ${log.reps}回 × ${log.sets}セット',
         );
       }
-      buffer.writeln();
     }
 
-    if (cardioLogs.isNotEmpty) {
-      buffer.writeln('■ 有酸素種目:');
-      for (final log in cardioLogs) {
-        buffer.writeln(
-          '・${log.exerciseName}: ${log.distanceKm.toStringAsFixed(1)}km / ${log.durationMinutes}分',
-        );
-      }
-      buffer.writeln();
-    }
-
+    buffer.writeln();
     buffer.writeln(
       'この種目構成を踏まえ、使用した筋群に対するクールダウンストレッチを提案してください。',
     );
@@ -68,13 +66,14 @@ class StretchRecommendationService {
       throw Exception('セッションの記録がありません。');
     }
 
-    final userMessage = _buildUserMessage(sessionLogs);
+    final userMessage = _buildUserMessage(sessionLogs.sortedByRegistrationTime());
 
     if (useSystemAi) {
       return AiProxyService.callText(
         systemPrompt: _systemPrompt,
         userMessage: userMessage,
         maxTokens: _maxTokens,
+        thinkingLevel: _geminiThinkingLevel,
       );
     }
 
@@ -161,7 +160,10 @@ class StretchRecommendationService {
             ],
           },
         ],
-        'generationConfig': {'maxOutputTokens': _maxTokens},
+        'generationConfig': {
+          'maxOutputTokens': _maxTokens,
+          'thinkingConfig': {'thinkingLevel': _geminiThinkingLevel},
+        },
       }),
     );
     if (response.statusCode != 200) {

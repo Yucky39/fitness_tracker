@@ -57,15 +57,18 @@ class TrainingAdviceNotifier extends StateNotifier<TrainingAdviceState> {
     try {
       final history = allLogs
           .where((l) => l.id != log.id && l.exerciseName == log.exerciseName)
-          .take(5)
-          .toList();
+          .toList()
+          .sortedByRegistrationTime();
+      final recentHistory = history.length <= 5
+          ? history
+          : history.sublist(history.length - 5);
 
       final weeklyLoadContext =
           TrainingAdviceService.buildWeeklyLoadContext(allLogs, log.date);
 
       final text = await TrainingAdviceService().getAdvice(
         focusLogs: [log],
-        historyByExercise: {log.exerciseName: history},
+        historyByExercise: {log.exerciseName: recentHistory},
         adviceLevel: adviceLevel,
         useSystemAi: isSubscribed,
         apiKey: effectiveApiKey,

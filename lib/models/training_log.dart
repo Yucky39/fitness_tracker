@@ -151,6 +151,13 @@ class TrainingLog {
   }
 }
 
+extension TrainingLogListX on List<TrainingLog> {
+  /// 登録時刻（[TrainingLog.date]）の昇順（古い→新しい）で並べ替えたコピー。
+  List<TrainingLog> sortedByRegistrationTime() {
+    return [...this]..sort((a, b) => a.date.compareTo(b.date));
+  }
+}
+
 /// よく使われる種目と器具種別のプリセット
 class ExercisePresets {
   static const Map<String, List<String>> byCategory = {
