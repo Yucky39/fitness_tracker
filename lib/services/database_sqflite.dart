@@ -14,7 +14,7 @@ class SqfliteDatabaseAdapter implements DatabaseAdapter {
 
     _database = await openDatabase(
       path,
-      version: 19,
+      version: 20,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -160,6 +160,20 @@ class SqfliteDatabaseAdapter implements DatabaseAdapter {
         )
       ''');
     }
+    if (oldVersion < 20) {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS training_session_records(
+          id TEXT PRIMARY KEY,
+          name TEXT,
+          started_at TEXT NOT NULL,
+          finished_at TEXT,
+          log_ids TEXT NOT NULL,
+          exercise_names TEXT NOT NULL,
+          stretch_recommendation TEXT,
+          note TEXT
+        )
+      ''');
+    }
   }
 
   Future<void> _onCreate(Database db, int version) async {
@@ -297,6 +311,19 @@ class SqfliteDatabaseAdapter implements DatabaseAdapter {
         seen_count INTEGER NOT NULL DEFAULT 0,
         last_seen TEXT NOT NULL,
         PRIMARY KEY (user_id, surface)
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE training_session_records(
+        id TEXT PRIMARY KEY,
+        name TEXT,
+        started_at TEXT NOT NULL,
+        finished_at TEXT,
+        log_ids TEXT NOT NULL,
+        exercise_names TEXT NOT NULL,
+        stretch_recommendation TEXT,
+        note TEXT
       )
     ''');
   }
