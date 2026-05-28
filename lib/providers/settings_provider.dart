@@ -133,6 +133,17 @@ class SettingsState {
   final bool workoutReminderEnabled;
   final int workoutReminderHour;
   final int workoutReminderMinute;
+  final bool waterReminderEnabled;
+
+  /// リマインダーの間隔（分）例: 60 = 1時間ごと
+  final int waterReminderIntervalMinutes;
+
+  /// リマインダーを送る時間帯の開始時刻（時）
+  final int waterReminderStartHour;
+
+  /// リマインダーを送る時間帯の終了時刻（時）
+  final int waterReminderEndHour;
+
   final bool trainingAdviceEnabled;
   final bool communityFoodContributeEnabled;
   final bool mealSuggestionEnabled;
@@ -152,6 +163,10 @@ class SettingsState {
     this.workoutReminderEnabled = false,
     this.workoutReminderHour = 18,
     this.workoutReminderMinute = 0,
+    this.waterReminderEnabled = false,
+    this.waterReminderIntervalMinutes = 60,
+    this.waterReminderStartHour = 8,
+    this.waterReminderEndHour = 21,
     this.trainingAdviceEnabled = true,
     this.communityFoodContributeEnabled = true,
     this.mealSuggestionEnabled = false,
@@ -226,6 +241,10 @@ class SettingsState {
     bool? workoutReminderEnabled,
     int? workoutReminderHour,
     int? workoutReminderMinute,
+    bool? waterReminderEnabled,
+    int? waterReminderIntervalMinutes,
+    int? waterReminderStartHour,
+    int? waterReminderEndHour,
     bool? trainingAdviceEnabled,
     bool? communityFoodContributeEnabled,
     bool? mealSuggestionEnabled,
@@ -248,6 +267,14 @@ class SettingsState {
         workoutReminderHour: workoutReminderHour ?? this.workoutReminderHour,
         workoutReminderMinute:
             workoutReminderMinute ?? this.workoutReminderMinute,
+        waterReminderEnabled:
+            waterReminderEnabled ?? this.waterReminderEnabled,
+        waterReminderIntervalMinutes:
+            waterReminderIntervalMinutes ?? this.waterReminderIntervalMinutes,
+        waterReminderStartHour:
+            waterReminderStartHour ?? this.waterReminderStartHour,
+        waterReminderEndHour:
+            waterReminderEndHour ?? this.waterReminderEndHour,
         trainingAdviceEnabled:
             trainingAdviceEnabled ?? this.trainingAdviceEnabled,
         communityFoodContributeEnabled: communityFoodContributeEnabled ??
@@ -312,6 +339,11 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
       workoutReminderEnabled: prefs.getBool('workoutReminderEnabled') ?? false,
       workoutReminderHour: prefs.getInt('workoutReminderHour') ?? 18,
       workoutReminderMinute: prefs.getInt('workoutReminderMinute') ?? 0,
+      waterReminderEnabled: prefs.getBool('waterReminderEnabled') ?? false,
+      waterReminderIntervalMinutes:
+          prefs.getInt('waterReminderIntervalMinutes') ?? 60,
+      waterReminderStartHour: prefs.getInt('waterReminderStartHour') ?? 8,
+      waterReminderEndHour: prefs.getInt('waterReminderEndHour') ?? 21,
       trainingAdviceEnabled: prefs.getBool('trainingAdviceEnabled') ?? true,
       communityFoodContributeEnabled:
           prefs.getBool('communityFoodContributeEnabled') ?? true,
@@ -389,6 +421,10 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
     bool? workoutEnabled,
     int? workoutHour,
     int? workoutMinute,
+    bool? waterEnabled,
+    int? waterIntervalMinutes,
+    int? waterStartHour,
+    int? waterEndHour,
   }) async {
     final prefs = await SharedPreferences.getInstance();
     if (mealEnabled != null) {
@@ -407,6 +443,18 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
     if (workoutMinute != null) {
       await prefs.setInt('workoutReminderMinute', workoutMinute);
     }
+    if (waterEnabled != null) {
+      await prefs.setBool('waterReminderEnabled', waterEnabled);
+    }
+    if (waterIntervalMinutes != null) {
+      await prefs.setInt('waterReminderIntervalMinutes', waterIntervalMinutes);
+    }
+    if (waterStartHour != null) {
+      await prefs.setInt('waterReminderStartHour', waterStartHour);
+    }
+    if (waterEndHour != null) {
+      await prefs.setInt('waterReminderEndHour', waterEndHour);
+    }
     state = state.copyWith(
       mealReminderEnabled: mealEnabled,
       mealReminderHour: mealHour,
@@ -414,6 +462,10 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
       workoutReminderEnabled: workoutEnabled,
       workoutReminderHour: workoutHour,
       workoutReminderMinute: workoutMinute,
+      waterReminderEnabled: waterEnabled,
+      waterReminderIntervalMinutes: waterIntervalMinutes,
+      waterReminderStartHour: waterStartHour,
+      waterReminderEndHour: waterEndHour,
     );
 
     SyncService().syncFields({
@@ -425,6 +477,12 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
       if (workoutHour != null) 'settings.workoutReminderHour': workoutHour,
       if (workoutMinute != null)
         'settings.workoutReminderMinute': workoutMinute,
+      if (waterEnabled != null) 'settings.waterReminderEnabled': waterEnabled,
+      if (waterIntervalMinutes != null)
+        'settings.waterReminderIntervalMinutes': waterIntervalMinutes,
+      if (waterStartHour != null)
+        'settings.waterReminderStartHour': waterStartHour,
+      if (waterEndHour != null) 'settings.waterReminderEndHour': waterEndHour,
     });
   }
 

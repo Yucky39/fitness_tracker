@@ -92,5 +92,28 @@ class NotificationService {
         minute: prefs.getInt('workoutReminderMinute') ?? 0,
       );
     }
+
+    if (prefs.getBool('waterReminderEnabled') ?? false) {
+      final intervalMinutes =
+          prefs.getInt('waterReminderIntervalMinutes') ?? 60;
+      final startHour = prefs.getInt('waterReminderStartHour') ?? 8;
+      final endHour = prefs.getInt('waterReminderEndHour') ?? 21;
+
+      // 時間帯内の各スロットに通知をスケジュール（ID: 100〜）
+      var id = 100;
+      var currentMinutes = startHour * 60;
+      final endMinutes = endHour * 60;
+      while (currentMinutes <= endMinutes && id < 200) {
+        await scheduleDailyReminder(
+          id: id,
+          title: '水分補給のリマインダー',
+          body: '水を飲みましょう！こまめな水分補給が大切です💧',
+          hour: currentMinutes ~/ 60,
+          minute: currentMinutes % 60,
+        );
+        currentMinutes += intervalMinutes;
+        id++;
+      }
+    }
   }
 }
