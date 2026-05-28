@@ -693,51 +693,64 @@ class ProfileSidebar extends ConsumerWidget {
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) {
+          final settings = ref.read(settingsProvider);
           return AlertDialog(
             title: const Text('リマインダー通知'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _buildReminderRow(
-                  context,
-                  ref,
-                  label: '食事記録リマインダー',
-                  enabled: ref.read(settingsProvider).mealReminderEnabled,
-                  hour: ref.read(settingsProvider).mealReminderHour,
-                  minute: ref.read(settingsProvider).mealReminderMinute,
-                  onChanged: (enabled, hour, minute) async {
-                    await ref
-                        .read(settingsProvider.notifier)
-                        .updateNotificationSettings(
-                          mealEnabled: enabled,
-                          mealHour: hour,
-                          mealMinute: minute,
-                        );
-                    await NotificationService().rescheduleFromSettings();
-                    setDialogState(() {});
-                  },
-                ),
-                const SizedBox(height: 8),
-                _buildReminderRow(
-                  context,
-                  ref,
-                  label: 'トレーニングリマインダー',
-                  enabled: ref.read(settingsProvider).workoutReminderEnabled,
-                  hour: ref.read(settingsProvider).workoutReminderHour,
-                  minute: ref.read(settingsProvider).workoutReminderMinute,
-                  onChanged: (enabled, hour, minute) async {
-                    await ref
-                        .read(settingsProvider.notifier)
-                        .updateNotificationSettings(
-                          workoutEnabled: enabled,
-                          workoutHour: hour,
-                          workoutMinute: minute,
-                        );
-                    await NotificationService().rescheduleFromSettings();
-                    setDialogState(() {});
-                  },
-                ),
-              ],
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildReminderRow(
+                    context,
+                    ref,
+                    label: '食事記録リマインダー',
+                    enabled: settings.mealReminderEnabled,
+                    hour: settings.mealReminderHour,
+                    minute: settings.mealReminderMinute,
+                    onChanged: (enabled, hour, minute) async {
+                      await ref
+                          .read(settingsProvider.notifier)
+                          .updateNotificationSettings(
+                            mealEnabled: enabled,
+                            mealHour: hour,
+                            mealMinute: minute,
+                          );
+                      await NotificationService().rescheduleFromSettings();
+                      setDialogState(() {});
+                    },
+                  ),
+                  const SizedBox(height: 8),
+                  _buildReminderRow(
+                    context,
+                    ref,
+                    label: 'トレーニングリマインダー',
+                    enabled: settings.workoutReminderEnabled,
+                    hour: settings.workoutReminderHour,
+                    minute: settings.workoutReminderMinute,
+                    onChanged: (enabled, hour, minute) async {
+                      await ref
+                          .read(settingsProvider.notifier)
+                          .updateNotificationSettings(
+                            workoutEnabled: enabled,
+                            workoutHour: hour,
+                            workoutMinute: minute,
+                          );
+                      await NotificationService().rescheduleFromSettings();
+                      setDialogState(() {});
+                    },
+                  ),
+                  const SizedBox(height: 8),
+                  const Divider(),
+                  const SizedBox(height: 4),
+                  _buildWaterReminderSection(
+                    context,
+                    ref,
+                    setDialogState,
+                    settings,
+                  ),
+                ],
+              ),
             ),
             actions: [
               TextButton(
@@ -748,6 +761,135 @@ class ProfileSidebar extends ConsumerWidget {
           );
         },
       ),
+    );
+  }
+
+  Widget _buildWaterReminderSection(
+    BuildContext context,
+    WidgetRef ref,
+    StateSetter setDialogState,
+    SettingsState settings,
+  ) {
+    Future<void> save({
+      bool? enabled,
+      int? intervalMinutes,
+      int? startHour,
+      int? endHour,
+    }) async {
+      await ref.read(settingsProvider.notifier).updateNotificationSettings(
+            waterEnabled: enabled,
+            waterIntervalMinutes: intervalMinutes,
+            waterStartHour: startHour,
+            waterEndHour: endHour,
+          );
+      await NotificationService().rescheduleFromSettings();
+      setDialogState(() {});
+    }
+
+    const intervalOptions = [30, 60, 90, 120, 180];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // トグル行
+        Row(
+          children: [
+            Switch(
+              value: settings.waterReminderEnabled,
+              onChanged: (v) => save(enabled: v),
+            ),
+            const Expanded(
+              child: Text('水分補給リマインダー', style: TextStyle(fontSize: 13)),
+            ),
+          ],
+        ),
+
+        // 詳細設定（有効時のみ）
+        if (settings.waterReminderEnabled) ...[
+          const SizedBox(height: 8),
+
+          // 間隔
+          Row(
+            children: [
+              const SizedBox(width: 8),
+              const Text('間隔', style: TextStyle(fontSize: 12, color: Colors.grey)),
+              const SizedBox(width: 12),
+              DropdownButton<int>(
+                value: settings.waterReminderIntervalMinutes,
+                isDense: true,
+                items: intervalOptions
+                    .map(
+                      (m) => DropdownMenuItem(
+                        value: m,
+                        child: Text(
+                          m < 60 ? '$m分' : '${m ~/ 60}時間',
+                          style: const TextStyle(fontSize: 13),
+                        ),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (v) {
+                  if (v != null) save(intervalMinutes: v);
+                },
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+
+          // 時間帯
+          Row(
+            children: [
+              const SizedBox(width: 8),
+              const Text('時間帯', style: TextStyle(fontSize: 12, color: Colors.grey)),
+              const SizedBox(width: 8),
+              TextButton(
+                style: TextButton.styleFrom(
+                    visualDensity: VisualDensity.compact, padding: EdgeInsets.zero),
+                onPressed: () async {
+                  final t = await showTimePicker(
+                    context: context,
+                    initialTime:
+                        TimeOfDay(hour: settings.waterReminderStartHour, minute: 0),
+                    helpText: '開始時刻',
+                  );
+                  if (t != null) save(startHour: t.hour);
+                },
+                child: Text(
+                  '${settings.waterReminderStartHour.toString().padLeft(2, '0')}:00',
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                ),
+              ),
+              const Text('〜', style: TextStyle(fontSize: 13)),
+              TextButton(
+                style: TextButton.styleFrom(
+                    visualDensity: VisualDensity.compact, padding: EdgeInsets.zero),
+                onPressed: () async {
+                  final t = await showTimePicker(
+                    context: context,
+                    initialTime:
+                        TimeOfDay(hour: settings.waterReminderEndHour, minute: 0),
+                    helpText: '終了時刻',
+                  );
+                  if (t != null) save(endHour: t.hour);
+                },
+                child: Text(
+                  '${settings.waterReminderEndHour.toString().padLeft(2, '0')}:00',
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                ),
+              ),
+            ],
+          ),
+
+          Padding(
+            padding: const EdgeInsets.only(left: 8, bottom: 4),
+            child: Text(
+              '${settings.waterReminderStartHour}:00〜${settings.waterReminderEndHour}:00の間、'
+              '${settings.waterReminderIntervalMinutes < 60 ? '${settings.waterReminderIntervalMinutes}分' : '${settings.waterReminderIntervalMinutes ~/ 60}時間'}ごとに通知',
+              style: const TextStyle(fontSize: 11, color: Colors.grey),
+            ),
+          ),
+        ],
+      ],
     );
   }
 
