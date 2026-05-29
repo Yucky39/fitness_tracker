@@ -1,9 +1,34 @@
+/// 体型写真の撮影方向
+enum PhotoDirection {
+  front('front', '正面'),
+  side('side', '側面'),
+  back('back', '背面');
+
+  const PhotoDirection(this.key, this.label);
+  final String key;
+  final String label;
+
+  static PhotoDirection fromKey(String? key) => PhotoDirection.values.firstWhere(
+        (d) => d.key == key,
+        orElse: () => PhotoDirection.front,
+      );
+}
+
 class BodyMetrics {
   final String id;
   final double weight;
   final double waist;
   final double bodyFatPercentage;
-  final String? imagePath;
+
+  /// 正面写真のローカルパス
+  final String? imageFrontPath;
+
+  /// 側面写真のローカルパス
+  final String? imageSidePath;
+
+  /// 背面写真のローカルパス
+  final String? imageBackPath;
+
   final DateTime date;
 
   BodyMetrics({
@@ -11,9 +36,31 @@ class BodyMetrics {
     required this.weight,
     required this.waist,
     required this.bodyFatPercentage,
-    this.imagePath,
+    this.imageFrontPath,
+    this.imageSidePath,
+    this.imageBackPath,
     required this.date,
   });
+
+  /// 向きに対応するパスを返す
+  String? pathForDirection(PhotoDirection direction) {
+    switch (direction) {
+      case PhotoDirection.front:
+        return imageFrontPath;
+      case PhotoDirection.side:
+        return imageSidePath;
+      case PhotoDirection.back:
+        return imageBackPath;
+    }
+  }
+
+  /// いずれかの向きに写真があるか
+  bool get hasAnyPhoto =>
+      imageFrontPath != null || imageSidePath != null || imageBackPath != null;
+
+  /// サムネイル表示用に最初に見つかったパスを返す（正面→側面→背面の優先順）
+  String? get firstPhotoPath =>
+      imageFrontPath ?? imageSidePath ?? imageBackPath;
 
   /// 除脂肪体重 (kg)
   double get leanBodyMass => weight * (1 - bodyFatPercentage / 100);
@@ -42,8 +89,12 @@ class BodyMetrics {
     double? weight,
     double? waist,
     double? bodyFatPercentage,
-    String? imagePath,
-    bool clearImage = false,
+    String? imageFrontPath,
+    bool clearFront = false,
+    String? imageSidePath,
+    bool clearSide = false,
+    String? imageBackPath,
+    bool clearBack = false,
     DateTime? date,
   }) =>
       BodyMetrics(
@@ -51,7 +102,12 @@ class BodyMetrics {
         weight: weight ?? this.weight,
         waist: waist ?? this.waist,
         bodyFatPercentage: bodyFatPercentage ?? this.bodyFatPercentage,
-        imagePath: clearImage ? null : (imagePath ?? this.imagePath),
+        imageFrontPath:
+            clearFront ? null : (imageFrontPath ?? this.imageFrontPath),
+        imageSidePath:
+            clearSide ? null : (imageSidePath ?? this.imageSidePath),
+        imageBackPath:
+            clearBack ? null : (imageBackPath ?? this.imageBackPath),
         date: date ?? this.date,
       );
 
@@ -61,18 +117,25 @@ class BodyMetrics {
       'weight': weight,
       'waist': waist,
       'bodyFatPercentage': bodyFatPercentage,
-      'imagePath': imagePath,
+      'image_front_path': imageFrontPath,
+      'image_side_path': imageSidePath,
+      'image_back_path': imageBackPath,
       'date': date.toIso8601String(),
     };
   }
 
   factory BodyMetrics.fromMap(Map<String, dynamic> map) {
+    // 旧スキーマの `imagePath` は正面写真として移行する
+    final legacyPath = map['imagePath'] as String?;
     return BodyMetrics(
       id: map['id'] as String,
       weight: (map['weight'] as num).toDouble(),
       waist: (map['waist'] as num).toDouble(),
       bodyFatPercentage: (map['bodyFatPercentage'] as num).toDouble(),
-      imagePath: map['imagePath'] as String?,
+      imageFrontPath:
+          (map['image_front_path'] as String?) ?? legacyPath,
+      imageSidePath: map['image_side_path'] as String?,
+      imageBackPath: map['image_back_path'] as String?,
       date: DateTime.parse(map['date'] as String),
     );
   }
