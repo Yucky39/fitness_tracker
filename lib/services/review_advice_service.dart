@@ -8,7 +8,8 @@ import 'training_calorie_calculator.dart';
 
 /// 週間・月間の振り返りレポートを生成するサービス。
 class ReviewAdviceService {
-  static const _maxTokens = 2048;
+  static const _weeklyMaxTokens = 4096;
+  static const _monthlyMaxTokens = 6000;
 
   // ── System prompts ──────────────────────────────────────────────────────────
 
@@ -298,11 +299,14 @@ class ReviewAdviceService {
     final resolvedModel = model ?? provider.defaultModel;
     switch (provider) {
       case AiProviderType.anthropic:
-        return _callAnthropic(systemPrompt, userMessage, apiKey, resolvedModel);
+        return _callAnthropic(
+            systemPrompt, userMessage, apiKey, resolvedModel, _weeklyMaxTokens);
       case AiProviderType.openai:
-        return _callOpenAi(systemPrompt, userMessage, apiKey, resolvedModel);
+        return _callOpenAi(
+            systemPrompt, userMessage, apiKey, resolvedModel, _weeklyMaxTokens);
       case AiProviderType.gemini:
-        return _callGemini(systemPrompt, userMessage, apiKey, resolvedModel);
+        return _callGemini(
+            systemPrompt, userMessage, apiKey, resolvedModel, _weeklyMaxTokens);
     }
   }
 
@@ -336,18 +340,21 @@ class ReviewAdviceService {
     final resolvedModel = model ?? provider.defaultModel;
     switch (provider) {
       case AiProviderType.anthropic:
-        return _callAnthropic(systemPrompt, userMessage, apiKey, resolvedModel);
+        return _callAnthropic(systemPrompt, userMessage, apiKey, resolvedModel,
+            _monthlyMaxTokens);
       case AiProviderType.openai:
-        return _callOpenAi(systemPrompt, userMessage, apiKey, resolvedModel);
+        return _callOpenAi(systemPrompt, userMessage, apiKey, resolvedModel,
+            _monthlyMaxTokens);
       case AiProviderType.gemini:
-        return _callGemini(systemPrompt, userMessage, apiKey, resolvedModel);
+        return _callGemini(systemPrompt, userMessage, apiKey, resolvedModel,
+            _monthlyMaxTokens);
     }
   }
 
   // ── Providers ──────────────────────────────────────────────────────────────
 
   Future<String> _callAnthropic(
-      String system, String user, String apiKey, String model) async {
+      String system, String user, String apiKey, String model, int maxTokens) async {
     final response = await http.post(
       Uri.parse('https://api.anthropic.com/v1/messages'),
       headers: {
@@ -357,7 +364,7 @@ class ReviewAdviceService {
       },
       body: jsonEncode({
         'model': model,
-        'max_tokens': _maxTokens,
+        'max_tokens': maxTokens,
         'system': system,
         'messages': [
           {'role': 'user', 'content': user},
@@ -374,7 +381,7 @@ class ReviewAdviceService {
   }
 
   Future<String> _callOpenAi(
-      String system, String user, String apiKey, String model) async {
+      String system, String user, String apiKey, String model, int maxTokens) async {
     final response = await http.post(
       Uri.parse('https://api.openai.com/v1/chat/completions'),
       headers: {
@@ -383,7 +390,7 @@ class ReviewAdviceService {
       },
       body: jsonEncode({
         'model': model,
-        'max_tokens': _maxTokens,
+        'max_tokens': maxTokens,
         'messages': [
           {'role': 'system', 'content': system},
           {'role': 'user', 'content': user},
@@ -400,7 +407,7 @@ class ReviewAdviceService {
   }
 
   Future<String> _callGemini(
-      String system, String user, String apiKey, String model) async {
+      String system, String user, String apiKey, String model, int maxTokens) async {
     final uri = Uri.parse(
       'https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=$apiKey',
     );
@@ -420,7 +427,7 @@ class ReviewAdviceService {
             ],
           },
         ],
-        'generationConfig': {'maxOutputTokens': _maxTokens},
+        'generationConfig': {'maxOutputTokens': maxTokens},
       }),
     );
     if (response.statusCode != 200) {
