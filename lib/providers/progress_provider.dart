@@ -116,7 +116,9 @@ class ProgressNotifier extends StateNotifier<ProgressState> {
     required double weight,
     required double waist,
     required double bodyFatPercentage,
-    String? imagePath,
+    String? imageFrontPath,
+    String? imageSidePath,
+    String? imageBackPath,
   }) async {
     final adapter = await DatabaseService().database;
     final newMetrics = BodyMetrics(
@@ -124,7 +126,9 @@ class ProgressNotifier extends StateNotifier<ProgressState> {
       weight: weight,
       waist: waist,
       bodyFatPercentage: bodyFatPercentage,
-      imagePath: imagePath,
+      imageFrontPath: imageFrontPath,
+      imageSidePath: imageSidePath,
+      imageBackPath: imageBackPath,
       date: DateTime.now(),
     );
     await adapter.insert('body_metrics', newMetrics.toMap());

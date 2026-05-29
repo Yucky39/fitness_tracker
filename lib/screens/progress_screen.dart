@@ -103,15 +103,14 @@ class ProgressScreen extends ConsumerWidget {
             (context, index) {
               final reversed = state.metrics.reversed.toList();
               final item = reversed[index];
-              final otherWithPhotos = reversed
-                  .where((m) => m.imagePath != null && m.id != item.id)
-                  .toList();
+              final pastMetrics =
+                  reversed.where((m) => m.id != item.id).toList();
 
               return _MetricsCard(
                 item: item,
                 heightCm: epState.heightCm,
                 targetWeightKg: epState.targetWeightKg,
-                otherMetricsWithPhotos: otherWithPhotos,
+                pastMetrics: pastMetrics,
                 onEdit: () => _showMetricsDialog(
                   context: context,
                   ref: ref,
@@ -166,15 +165,108 @@ class ProgressScreen extends ConsumerWidget {
         text: isEdit && existing.bodyFatPercentage > 0
             ? existing.bodyFatPercentage.toString()
             : '');
-    String? selectedImagePath = existing?.imagePath;
+
+    // 向きごとのパス
+    String? frontPath = existing?.imageFrontPath;
+    String? sidePath = existing?.imageSidePath;
+    String? backPath = existing?.imageBackPath;
 
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setState) {
-          // Derive live BMI preview
           final w = double.tryParse(weightCtrl.text) ?? 0;
           final bmiVal = heightCm > 0 ? BodyMetrics.bmi(w, heightCm) : 0.0;
+
+          // 向きごとのピッカーUI
+          Widget photoRow(
+            String label,
+            String? path,
+            void Function(String?) onChanged,
+          ) {
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(label,
+                      style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.grey)),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      // サムネイル or プレースホルダー
+                      GestureDetector(
+                        onTap: path != null
+                            ? () => onChanged(null) // タップで削除
+                            : null,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(6),
+                          child: path != null && !kIsWeb
+                              ? Stack(
+                                  children: [
+                                    Image.file(File(path),
+                                        width: 60,
+                                        height: 72,
+                                        fit: BoxFit.cover),
+                                    const Positioned(
+                                      top: 2,
+                                      right: 2,
+                                      child: Icon(Icons.cancel,
+                                          size: 16, color: Colors.white),
+                                    ),
+                                  ],
+                                )
+                              : Container(
+                                  width: 60,
+                                  height: 72,
+                                  color: Colors.grey.shade100,
+                                  child: const Icon(Icons.add_photo_alternate,
+                                      color: Colors.grey),
+                                ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      if (!kIsWeb)
+                        Expanded(
+                          child: Column(
+                            children: [
+                              OutlinedButton.icon(
+                                icon:
+                                    const Icon(Icons.camera_alt, size: 16),
+                                label: const Text('カメラ'),
+                                style: OutlinedButton.styleFrom(
+                                    visualDensity: VisualDensity.compact),
+                                onPressed: () async {
+                                  final p = await _pickImage(
+                                      ctx, ImageSource.camera);
+                                  if (p != null) setState(() => onChanged(p));
+                                },
+                              ),
+                              const SizedBox(height: 4),
+                              OutlinedButton.icon(
+                                icon: const Icon(Icons.photo_library,
+                                    size: 16),
+                                label: const Text('ギャラリー'),
+                                style: OutlinedButton.styleFrom(
+                                    visualDensity: VisualDensity.compact),
+                                onPressed: () async {
+                                  final p = await _pickImage(
+                                      ctx, ImageSource.gallery);
+                                  if (p != null) setState(() => onChanged(p));
+                                },
+                              ),
+                            ],
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
+              ),
+            );
+          }
 
           return AlertDialog(
             title: Text(isEdit ? '記録を編集' : '進捗を記録'),
@@ -210,76 +302,27 @@ class ProgressScreen extends ConsumerWidget {
                   ),
                   TextField(
                     controller: fatCtrl,
-                    decoration: const InputDecoration(labelText: '体脂肪率 (%)'),
+                    decoration:
+                        const InputDecoration(labelText: '体脂肪率 (%)'),
                     keyboardType:
                         const TextInputType.numberWithOptions(decimal: true),
                   ),
                   const SizedBox(height: 16),
-
-                  // Photo
-                  if (selectedImagePath != null && !kIsWeb)
-                    Stack(
-                      children: [
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: Image.file(File(selectedImagePath!),
-                              height: 100,
-                              width: double.infinity,
-                              fit: BoxFit.cover),
-                        ),
-                        Positioned(
-                          top: 4,
-                          right: 4,
-                          child: GestureDetector(
-                            onTap: () =>
-                                setState(() => selectedImagePath = null),
-                            child: Container(
-                              decoration: BoxDecoration(
-                                color: Colors.black54,
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: const Icon(Icons.close,
-                                  color: Colors.white, size: 18),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  if (!kIsWeb) ...[
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            icon: const Icon(Icons.camera_alt, size: 18),
-                            label: const Text('カメラ'),
-                            onPressed: () async {
-                              final path = await _pickImage(
-                                  context, ImageSource.camera);
-                              if (path != null) {
-                                setState(() => selectedImagePath = path);
-                              }
-                            },
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            icon:
-                                const Icon(Icons.photo_library, size: 18),
-                            label: const Text('ギャラリー'),
-                            onPressed: () async {
-                              final path = await _pickImage(
-                                  context, ImageSource.gallery);
-                              if (path != null) {
-                                setState(() => selectedImagePath = path);
-                              }
-                            },
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
+                  const Text('体型写真（任意）',
+                      style: TextStyle(
+                          fontSize: 13, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 4),
+                  const Text(
+                    '各向きは省略できます。同じ向きの写真が揃ったときにオーバーレイ比較が使えます。',
+                    style: TextStyle(fontSize: 11, color: Colors.grey),
+                  ),
+                  const SizedBox(height: 12),
+                  photoRow('正面', frontPath,
+                      (p) => frontPath = p),
+                  photoRow('側面', sidePath,
+                      (p) => sidePath = p),
+                  photoRow('背面', backPath,
+                      (p) => backPath = p),
                 ],
               ),
             ),
@@ -294,12 +337,17 @@ class ProgressScreen extends ConsumerWidget {
                   if (isEdit) {
                     notifier.updateMetrics(existing.copyWith(
                       weight: w,
-                      waist: double.tryParse(waistCtrl.text) ?? existing.waist,
+                      waist:
+                          double.tryParse(waistCtrl.text) ?? existing.waist,
                       bodyFatPercentage:
                           double.tryParse(fatCtrl.text) ??
                               existing.bodyFatPercentage,
-                      imagePath: selectedImagePath,
-                      clearImage: selectedImagePath == null,
+                      imageFrontPath: frontPath,
+                      clearFront: frontPath == null,
+                      imageSidePath: sidePath,
+                      clearSide: sidePath == null,
+                      imageBackPath: backPath,
+                      clearBack: backPath == null,
                     ));
                   } else {
                     notifier.addMetrics(
@@ -307,7 +355,9 @@ class ProgressScreen extends ConsumerWidget {
                       waist: double.tryParse(waistCtrl.text) ?? 0,
                       bodyFatPercentage:
                           double.tryParse(fatCtrl.text) ?? 0,
-                      imagePath: selectedImagePath,
+                      imageFrontPath: frontPath,
+                      imageSidePath: sidePath,
+                      imageBackPath: backPath,
                     );
                   }
                   Navigator.pop(ctx);
@@ -827,7 +877,7 @@ class _MetricsCard extends StatelessWidget {
   final BodyMetrics item;
   final double heightCm;
   final double targetWeightKg;
-  final List<BodyMetrics> otherMetricsWithPhotos;
+  final List<BodyMetrics> pastMetrics;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
 
@@ -835,7 +885,7 @@ class _MetricsCard extends StatelessWidget {
     required this.item,
     required this.heightCm,
     required this.targetWeightKg,
-    required this.otherMetricsWithPhotos,
+    required this.pastMetrics,
     required this.onEdit,
     required this.onDelete,
   });
@@ -856,14 +906,14 @@ class _MetricsCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Photo thumbnail
-              if (item.imagePath != null && !kIsWeb)
+              if (item.hasAnyPhoto && !kIsWeb)
                 GestureDetector(
                   onTap: () => Navigator.push(
                     context,
                     MaterialPageRoute(
                       builder: (_) => PhotoCompareScreen(
-                        currentImagePath: item.imagePath!,
-                        otherMetrics: otherMetricsWithPhotos,
+                        current: item,
+                        pastMetrics: pastMetrics,
                       ),
                     ),
                   ),
@@ -872,7 +922,7 @@ class _MetricsCard extends StatelessWidget {
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(8),
                       child: Image.file(
-                        File(item.imagePath!),
+                        File(item.firstPhotoPath!),
                         width: 56,
                         height: 56,
                         fit: BoxFit.cover,
