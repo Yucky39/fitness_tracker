@@ -173,22 +173,20 @@ class _PhotoCompareScreenState extends State<PhotoCompareScreen>
                       height: double.infinity,
                     ),
 
-                    // 現在写真（右側にクリップ）
+                    // 現在写真（右側にクリップ）- Align+widthFactorは画像を縮小するためCustomClipperを使用
                     ClipRect(
-                      child: Align(
-                        alignment: Alignment.centerRight,
-                        widthFactor: 1 - _splitFraction,
-                        child: Opacity(
-                          opacity: _opacity,
-                          child: Image.file(
-                            File(_currentPath!),
-                            fit: BoxFit.contain,
-                            width: double.infinity,
-                            height: double.infinity,
-                          ),
+                      clipper: _RightSplitClipper(splitX),
+                      child: Opacity(
+                        opacity: _opacity,
+                        child: Image.file(
+                          File(_currentPath!),
+                          fit: BoxFit.contain,
+                          width: double.infinity,
+                          height: double.infinity,
                         ),
                       ),
                     ),
+
 
                     // 分割ライン
                     Positioned(
@@ -442,4 +440,16 @@ class _PhotoCompareScreenState extends State<PhotoCompareScreen>
       ),
     );
   }
+}
+
+// splitX の右側だけを通すクリッパー
+class _RightSplitClipper extends CustomClipper<Rect> {
+  final double splitX;
+  const _RightSplitClipper(this.splitX);
+
+  @override
+  Rect getClip(Size size) => Rect.fromLTRB(splitX, 0, size.width, size.height);
+
+  @override
+  bool shouldReclip(_RightSplitClipper old) => old.splitX != splitX;
 }
