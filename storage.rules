@@ -1,0 +1,10 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Android APK 配布用。認証済みユーザーのみ読み取り可。書き込みは Admin SDK / CLI のみ。
+    match /releases/android/{fileName} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+  }
+}

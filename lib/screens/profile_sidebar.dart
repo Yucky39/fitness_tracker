@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'dart:io' show Platform;
 
 import '../models/energy_profile.dart';
 import '../providers/energy_profile_provider.dart';
@@ -14,6 +15,7 @@ import '../services/energy_goal_calculator.dart';
 import '../services/export_service.dart';
 import '../services/notification_service.dart';
 import '../widgets/paywall_sheet.dart';
+import '../widgets/app_update_dialog.dart';
 import '../widgets/source_reference_link.dart';
 
 class ProfileSidebar extends ConsumerWidget {
@@ -688,12 +690,15 @@ class ProfileSidebar extends ConsumerWidget {
 
   // ── リマインダー通知 ──────────────────────────────────────────────────────
 
-  void _showReminderDialog(BuildContext context, WidgetRef ref) {
+  void _showReminderDialog(BuildContext context, WidgetRef _) {
     showDialog(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) {
-          final settings = ref.read(settingsProvider);
+      // ダイアログを開くと Drawer（ProfileSidebar）はアンマウントされ、その
+      // WidgetRef は無効になる。そのため Consumer でダイアログ自身の要素に
+      // 紐づく有効な ref を取得して使用する（ref.watch により自動再描画）。
+      builder: (context) => Consumer(
+        builder: (context, ref, child) {
+          final settings = ref.watch(settingsProvider);
           return AlertDialog(
             title: const Text('リマインダー通知'),
             content: SingleChildScrollView(
@@ -717,7 +722,6 @@ class ProfileSidebar extends ConsumerWidget {
                             mealMinute: minute,
                           );
                       await NotificationService().rescheduleFromSettings();
-                      setDialogState(() {});
                     },
                   ),
                   const SizedBox(height: 8),
@@ -737,7 +741,6 @@ class ProfileSidebar extends ConsumerWidget {
                             workoutMinute: minute,
                           );
                       await NotificationService().rescheduleFromSettings();
-                      setDialogState(() {});
                     },
                   ),
                   const SizedBox(height: 8),
@@ -746,7 +749,6 @@ class ProfileSidebar extends ConsumerWidget {
                   _buildWaterReminderSection(
                     context,
                     ref,
-                    setDialogState,
                     settings,
                   ),
                 ],
@@ -767,7 +769,6 @@ class ProfileSidebar extends ConsumerWidget {
   Widget _buildWaterReminderSection(
     BuildContext context,
     WidgetRef ref,
-    StateSetter setDialogState,
     SettingsState settings,
   ) {
     Future<void> save({
@@ -783,7 +784,6 @@ class ProfileSidebar extends ConsumerWidget {
             waterEndHour: endHour,
           );
       await NotificationService().rescheduleFromSettings();
-      setDialogState(() {});
     }
 
     const intervalOptions = [30, 60, 90, 120, 180];
@@ -1292,6 +1292,19 @@ class ProfileSidebar extends ConsumerWidget {
                 _showDataManagementDialog(ctx, ref);
               },
             ),
+
+            if (Platform.isAndroid)
+              ListTile(
+                leading: const Icon(Icons.system_update_alt_outlined),
+                title: const Text('アプリ更新'),
+                trailing: const Icon(Icons.chevron_right,
+                    size: 20, color: Colors.grey),
+                onTap: () {
+                  final ctx = scaffoldKey.currentContext!;
+                  scaffoldKey.currentState?.closeEndDrawer();
+                  showAppUpdateDialog(ctx);
+                },
+              ),
 
             const Spacer(),
             const Divider(height: 1),

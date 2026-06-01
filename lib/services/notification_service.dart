@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/timezone.dart' as tz;
@@ -69,51 +70,77 @@ class NotificationService {
   Future<void> cancelAll() => _plugin.cancelAll();
   Future<void> cancel(int id) => _plugin.cancel(id: id);
 
+  /// 端末側のスケジューリングが失敗しても、設定の保存や UI 反映を妨げないよう
+  /// 例外はここで握りつぶしてログのみ出力する。
+  Future<void> _trySchedule({
+    required int id,
+    required String title,
+    required String body,
+    required int hour,
+    required int minute,
+  }) async {
+    try {
+      await scheduleDailyReminder(
+        id: id,
+        title: title,
+        body: body,
+        hour: hour,
+        minute: minute,
+      );
+    } catch (e, st) {
+      debugPrint('リマインダーのスケジュールに失敗しました (id=$id): $e\n$st');
+    }
+  }
+
   Future<void> rescheduleFromSettings() async {
-    final prefs = await SharedPreferences.getInstance();
-    await cancelAll();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await cancelAll();
 
-    if (prefs.getBool('mealReminderEnabled') ?? false) {
-      await scheduleDailyReminder(
-        id: 1,
-        title: '食事記録のリマインダー',
-        body: '今日の食事を記録しましょう！',
-        hour: prefs.getInt('mealReminderHour') ?? 12,
-        minute: prefs.getInt('mealReminderMinute') ?? 0,
-      );
-    }
-
-    if (prefs.getBool('workoutReminderEnabled') ?? false) {
-      await scheduleDailyReminder(
-        id: 2,
-        title: 'トレーニングのリマインダー',
-        body: '今日のトレーニングを忘れずに！',
-        hour: prefs.getInt('workoutReminderHour') ?? 18,
-        minute: prefs.getInt('workoutReminderMinute') ?? 0,
-      );
-    }
-
-    if (prefs.getBool('waterReminderEnabled') ?? false) {
-      final intervalMinutes =
-          prefs.getInt('waterReminderIntervalMinutes') ?? 60;
-      final startHour = prefs.getInt('waterReminderStartHour') ?? 8;
-      final endHour = prefs.getInt('waterReminderEndHour') ?? 21;
-
-      // 時間帯内の各スロットに通知をスケジュール（ID: 100〜）
-      var id = 100;
-      var currentMinutes = startHour * 60;
-      final endMinutes = endHour * 60;
-      while (currentMinutes <= endMinutes && id < 200) {
-        await scheduleDailyReminder(
-          id: id,
-          title: '水分補給のリマインダー',
-          body: '水を飲みましょう！こまめな水分補給が大切です💧',
-          hour: currentMinutes ~/ 60,
-          minute: currentMinutes % 60,
+      if (prefs.getBool('mealReminderEnabled') ?? false) {
+        await _trySchedule(
+          id: 1,
+          title: '食事記録のリマインダー',
+          body: '今日の食事を記録しましょう！',
+          hour: prefs.getInt('mealReminderHour') ?? 12,
+          minute: prefs.getInt('mealReminderMinute') ?? 0,
         );
-        currentMinutes += intervalMinutes;
-        id++;
       }
+
+      if (prefs.getBool('workoutReminderEnabled') ?? false) {
+        await _trySchedule(
+          id: 2,
+          title: 'トレーニングのリマインダー',
+          body: '今日のトレーニングを忘れずに！',
+          hour: prefs.getInt('workoutReminderHour') ?? 18,
+          minute: prefs.getInt('workoutReminderMinute') ?? 0,
+        );
+      }
+
+      if (prefs.getBool('waterReminderEnabled') ?? false) {
+        final intervalMinutes =
+            prefs.getInt('waterReminderIntervalMinutes') ?? 60;
+        final startHour = prefs.getInt('waterReminderStartHour') ?? 8;
+        final endHour = prefs.getInt('waterReminderEndHour') ?? 21;
+
+        // 時間帯内の各スロットに通知をスケジュール（ID: 100〜）
+        var id = 100;
+        var currentMinutes = startHour * 60;
+        final endMinutes = endHour * 60;
+        while (currentMinutes <= endMinutes && id < 200) {
+          await _trySchedule(
+            id: id,
+            title: '水分補給のリマインダー',
+            body: '水を飲みましょう！こまめな水分補給が大切です💧',
+            hour: currentMinutes ~/ 60,
+            minute: currentMinutes % 60,
+          );
+          currentMinutes += intervalMinutes;
+          id++;
+        }
+      }
+    } catch (e, st) {
+      debugPrint('リマインダーの再スケジュールに失敗しました: $e\n$st');
     }
   }
 }
