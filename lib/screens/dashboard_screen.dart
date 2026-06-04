@@ -24,6 +24,7 @@ import '../services/health_service.dart';
 import '../services/training_calorie_calculator.dart';
 import '../widgets/micro_tap.dart';
 import 'routine_screen.dart';
+import 'trainer_chat_screen.dart';
 
 class DashboardScreen extends ConsumerWidget {
   const DashboardScreen({super.key});
@@ -131,6 +132,8 @@ class DashboardScreen extends ConsumerWidget {
                     onTraining: () => goTab(_tabTraining),
                     onProgress: () => goTab(_tabProgress),
                   ),
+                  const SizedBox(height: 12),
+                  _buildTrainerChatCard(context, scheme),
                   const SizedBox(height: 20),
                   _buildRoutineReminderCard(
                     context,
@@ -910,6 +913,76 @@ class DashboardScreen extends ConsumerWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildTrainerChatCard(BuildContext context, ColorScheme scheme) {
+    void open() {
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => const TrainerChatScreen(),
+        ),
+      );
+    }
+
+    return Material(
+      color: scheme.primaryContainer,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: MicroTap(
+        onTap: open,
+        scale: 0.97,
+        child: InkWell(
+          onTap: open,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: scheme.primary.withValues(alpha: 0.18),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Icon(Icons.auto_awesome_rounded,
+                      color: scheme.primary, size: 22),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'AIトレーナーに相談',
+                        style:
+                            Theme.of(context).textTheme.titleSmall?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                  color: scheme.onPrimaryContainer,
+                                ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'トレーニング・食事・日々のルーティンをチャットで相談',
+                        style: TextStyle(
+                          fontSize: 12,
+                          height: 1.3,
+                          color: scheme.onPrimaryContainer
+                              .withValues(alpha: 0.8),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(Icons.chevron_right_rounded,
+                    color: scheme.onPrimaryContainer.withValues(alpha: 0.7)),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

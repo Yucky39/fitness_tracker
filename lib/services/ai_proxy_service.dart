@@ -33,6 +33,34 @@ class AiProxyService {
     return text;
   }
 
+  // ── 会話（マルチターン） ─────────────────────────────────────────────────
+
+  /// AIトレーナーチャット用。会話履歴を保ったまま生成する。
+  /// [messages] は古い順に並んだ `{role: 'user'|'model', text}` の配列。
+  static Future<String> callChat({
+    required String systemPrompt,
+    required List<Map<String, String>> messages,
+    int maxTokens = 800,
+  }) async {
+    final callable = _functions.httpsCallable(
+      'geminiProxy',
+      options: HttpsCallableOptions(
+        timeout: const Duration(seconds: 60),
+      ),
+    );
+    final result = await callable.call({
+      'type': 'chat',
+      'systemPrompt': systemPrompt,
+      'messages': messages,
+      'maxTokens': maxTokens,
+    });
+    final text = result.data['text'];
+    if (text == null || text is! String) {
+      throw Exception('AIからの応答が不正です。もう一度試してください。');
+    }
+    return text;
+  }
+
   // ── 画像解析 ─────────────────────────────────────────────────────────────
 
   static Future<String> callVision({

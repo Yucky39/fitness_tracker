@@ -50,6 +50,7 @@ exports.geminiProxy = onCall(
       type,
       systemPrompt,
       userMessage,
+      messages,
       base64Image,
       mediaType,
       prompt,
@@ -72,6 +73,24 @@ exports.geminiProxy = onCall(
           contents: [{ role: 'user', parts: [{ text: userMessage }] }],
           generationConfig,
         });
+        return { text: result.response.text() };
+
+      } else if (type === 'chat') {
+        // 会話型（マルチターン）。AIトレーナーチャット用。
+        // messages は [{ role: 'user' | 'model', text }] の配列で、古い順に並ぶ。
+        if (!Array.isArray(messages) || messages.length === 0) {
+          throw new HttpsError('invalid-argument', 'メッセージが空です。');
+        }
+        const contents = messages.map((m) => ({
+          role: m.role === 'model' ? 'model' : 'user',
+          parts: [{ text: typeof m.text === 'string' ? m.text : '' }],
+        }));
+        const result = await model.generateContent({
+          systemInstruction: systemPrompt,
+          contents,
+          generationConfig: { maxOutputTokens: maxTokens },
+        });
+        // フェーズ3（使用量計測）で usageMetadata を加算記帳できるよう、参照点をここに置く。
         return { text: result.response.text() };
 
       } else if (type === 'vision') {
