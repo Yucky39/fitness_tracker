@@ -44,3 +44,14 @@ class SubscriptionProducts {
 
   static const all = [monthlyId, annualId];
 }
+
+/// AI追加クレジット（消費型IAP）の商品ID。
+/// 当月のAI利用枠が上限に達したとき、追加で購入して使い続けるためのパック。
+class AiCreditProducts {
+  static const credit500 = 'ai_credit_500';
+  static const credit1000 = 'ai_credit_1000';
+
+  static const all = [credit500, credit1000];
+
+  static bool isCredit(String productId) => all.contains(productId);
+}

@@ -24,6 +24,7 @@ import '../services/barcode_lookup_service.dart';
 import '../services/community_food_service.dart';
 import '../services/food_search_service.dart';
 import '../services/meal_image_analysis_service.dart';
+import '../widgets/ai_limit_banner.dart';
 import '../widgets/nutrient_bar.dart';
 import '../widgets/recipe_preset_editor_sheet.dart';
 import '../widgets/source_reference_link.dart';
@@ -710,11 +711,7 @@ class MealScreen extends ConsumerWidget {
                     fontSize: 12, color: Colors.teal, height: 1.35),
               ),
             ),
-            if (error != null) ...[
-              const SizedBox(height: 8),
-              Text(error,
-                  style: const TextStyle(color: Colors.red, fontSize: 13)),
-            ],
+            AiLimitBanner(error: error),
             if (adviceText != null) ...[
               const SizedBox(height: 8),
               const Divider(),

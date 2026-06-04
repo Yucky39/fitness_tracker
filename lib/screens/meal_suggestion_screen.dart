@@ -6,9 +6,11 @@ import '../models/meal_suggestion.dart';
 import '../providers/meal_provider.dart';
 import '../providers/meal_suggestion_provider.dart';
 import '../providers/settings_provider.dart';
+import '../services/ai_exceptions.dart';
 import '../services/ingredient_merge_service.dart';
 import '../services/meal_suggestion_service.dart';
 import '../utils/suggestion_shopping_list.dart';
+import '../widgets/ai_credit_sheet.dart';
 import '../widgets/source_reference_link.dart';
 
 /// 1日の食事提案を表示する画面
@@ -141,11 +143,18 @@ class MealSuggestionScreen extends ConsumerWidget {
                         style: TextStyle(color: colorScheme.error),
                       ),
                       const SizedBox(height: 20),
-                      FilledButton.icon(
-                        icon: const Icon(Icons.refresh),
-                        label: const Text('再試行'),
-                        onPressed: () => notifier.generate(),
-                      ),
+                      if (AiUsageLimitException.isLimit(state.error))
+                        FilledButton.icon(
+                          icon: const Icon(Icons.bolt_rounded),
+                          label: const Text('追加パックを見る'),
+                          onPressed: () => AiCreditSheet.show(context),
+                        )
+                      else
+                        FilledButton.icon(
+                          icon: const Icon(Icons.refresh),
+                          label: const Text('再試行'),
+                          onPressed: () => notifier.generate(),
+                        ),
                     ],
                   ),
                 ),

@@ -46,7 +46,11 @@ class SubscriptionService {
 
       if (purchase.status == PurchaseStatus.purchased ||
           purchase.status == PurchaseStatus.restored) {
-        await _activateOnServer(purchase);
+        if (AiCreditProducts.isCredit(purchase.productID)) {
+          await _addCreditOnServer(purchase);
+        } else {
+          await _activateOnServer(purchase);
+        }
       }
 
       if (purchase.pendingCompletePurchase) {
@@ -75,8 +79,32 @@ class SubscriptionService {
     }
   }
 
+  Future<void> _addCreditOnServer(PurchaseDetails purchase) async {
+    try {
+      final callable = FirebaseFunctions.instanceFor(region: 'asia-northeast1')
+          .httpsCallable('addAiCredit');
+      await callable.call({
+        'productId': purchase.productID,
+        'purchaseToken': purchase.verificationData.serverVerificationData,
+        'platform': Platform.isIOS ? 'ios' : 'android',
+      });
+    } catch (_) {
+      // サーバ反映に失敗してもクラッシュさせない。リストアで再試行できる。
+    }
+  }
+
   /// 商品情報を取得する（空になった理由は [SubscriptionProductQueryResult] を参照）
   Future<SubscriptionProductQueryResult> queryStoreProducts() async {
+    return _queryProducts(SubscriptionProducts.all.toSet());
+  }
+
+  /// AI追加クレジット（消費型）の商品情報を取得する
+  Future<SubscriptionProductQueryResult> queryCreditProducts() async {
+    return _queryProducts(AiCreditProducts.all.toSet());
+  }
+
+  Future<SubscriptionProductQueryResult> _queryProducts(
+      Set<String> ids) async {
     final available = await _iap.isAvailable();
     if (!available) {
       return const SubscriptionProductQueryResult(
@@ -85,9 +113,7 @@ class SubscriptionService {
       );
     }
 
-    final response = await _iap.queryProductDetails(
-      SubscriptionProducts.all.toSet(),
-    );
+    final response = await _iap.queryProductDetails(ids);
     return SubscriptionProductQueryResult(
       products: response.productDetails,
       notFoundProductIds: response.notFoundIDs,
@@ -99,6 +125,12 @@ class SubscriptionService {
   Future<void> purchase(ProductDetails product) async {
     final purchaseParam = PurchaseParam(productDetails: product);
     await _iap.buyNonConsumable(purchaseParam: purchaseParam);
+  }
+
+  /// AI追加クレジット（消費型）を購入する
+  Future<void> purchaseCredit(ProductDetails product) async {
+    final purchaseParam = PurchaseParam(productDetails: product);
+    await _iap.buyConsumable(purchaseParam: purchaseParam);
   }
 
   /// 過去の購入をリストアする
