@@ -1,11 +1,40 @@
 import 'dart:convert';
 import 'package:cloud_functions/cloud_functions.dart';
 
+import 'ai_exceptions.dart';
+
 /// サブスク加入済みユーザー向けのAI呼び出しプロキシ。
 /// Gemini APIキーはCloud Functions側で管理し、クライアントに露出させない。
 class AiProxyService {
   static final _functions =
       FirebaseFunctions.instanceFor(region: 'asia-northeast1');
+
+  /// 共通の呼び出し。`geminiProxy` の `resource-exhausted`（利用枠の上限）を
+  /// [AiUsageLimitException] に変換し、全AI機能で統一的に扱えるようにする。
+  static Future<String> _invoke(
+    Map<String, dynamic> payload, {
+    Duration? timeout,
+  }) async {
+    final callable = _functions.httpsCallable(
+      'geminiProxy',
+      options: timeout != null
+          ? HttpsCallableOptions(timeout: timeout)
+          : null,
+    );
+    try {
+      final result = await callable.call(payload);
+      final text = result.data['text'];
+      if (text == null || text is! String) {
+        throw Exception('AIからの応答が不正です。もう一度試してください。');
+      }
+      return text;
+    } on FirebaseFunctionsException catch (e) {
+      if (e.code == 'resource-exhausted') {
+        throw const AiUsageLimitException();
+      }
+      throw Exception(e.message ?? 'AI処理中にエラーが発生しました。もう一度試してください。');
+    }
+  }
 
   // ── テキスト生成 ─────────────────────────────────────────────────────────
 
@@ -14,8 +43,7 @@ class AiProxyService {
     required String userMessage,
     int maxTokens = 1024,
     String? thinkingLevel,
-  }) async {
-    final callable = _functions.httpsCallable('geminiProxy');
+  }) {
     final payload = <String, dynamic>{
       'type': 'text',
       'systemPrompt': systemPrompt,
@@ -25,12 +53,7 @@ class AiProxyService {
     if (thinkingLevel != null) {
       payload['thinkingLevel'] = thinkingLevel;
     }
-    final result = await callable.call(payload);
-    final text = result.data['text'];
-    if (text == null || text is! String) {
-      throw Exception('AIからの応答が不正です。もう一度試してください。');
-    }
-    return text;
+    return _invoke(payload);
   }
 
   // ── 会話（マルチターン） ─────────────────────────────────────────────────
@@ -41,24 +64,16 @@ class AiProxyService {
     required String systemPrompt,
     required List<Map<String, String>> messages,
     int maxTokens = 800,
-  }) async {
-    final callable = _functions.httpsCallable(
-      'geminiProxy',
-      options: HttpsCallableOptions(
-        timeout: const Duration(seconds: 60),
-      ),
+  }) {
+    return _invoke(
+      {
+        'type': 'chat',
+        'systemPrompt': systemPrompt,
+        'messages': messages,
+        'maxTokens': maxTokens,
+      },
+      timeout: const Duration(seconds: 60),
     );
-    final result = await callable.call({
-      'type': 'chat',
-      'systemPrompt': systemPrompt,
-      'messages': messages,
-      'maxTokens': maxTokens,
-    });
-    final text = result.data['text'];
-    if (text == null || text is! String) {
-      throw Exception('AIからの応答が不正です。もう一度試してください。');
-    }
-    return text;
   }
 
   // ── 画像解析 ─────────────────────────────────────────────────────────────
@@ -68,25 +83,17 @@ class AiProxyService {
     required String mediaType,
     required String prompt,
     int maxTokens = 2048,
-  }) async {
+  }) {
     final base64Image = base64Encode(imageBytes);
-    final callable = _functions.httpsCallable(
-      'geminiProxy',
-      options: HttpsCallableOptions(
-        timeout: const Duration(seconds: 60),
-      ),
+    return _invoke(
+      {
+        'type': 'vision',
+        'base64Image': base64Image,
+        'mediaType': mediaType,
+        'prompt': prompt,
+        'maxTokens': maxTokens,
+      },
+      timeout: const Duration(seconds: 60),
     );
-    final result = await callable.call({
-      'type': 'vision',
-      'base64Image': base64Image,
-      'mediaType': mediaType,
-      'prompt': prompt,
-      'maxTokens': maxTokens,
-    });
-    final text = result.data['text'];
-    if (text == null || text is! String) {
-      throw Exception('AIからの応答が不正です。もう一度試してください。');
-    }
-    return text;
   }
 }

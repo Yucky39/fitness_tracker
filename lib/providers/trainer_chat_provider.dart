@@ -1,11 +1,11 @@
 import 'dart:convert';
 
-import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod/legacy.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/chat_message.dart';
+import '../services/ai_exceptions.dart';
 import '../services/trainer_chat_service.dart';
 import 'energy_profile_provider.dart';
 import 'meal_provider.dart';
@@ -135,20 +135,13 @@ class TrainerChatNotifier extends StateNotifier<TrainerChatState> {
       }
       state = state.copyWith(messages: next, isLoading: false);
       await _persist();
-    } on FirebaseFunctionsException catch (e) {
+    } on AiUsageLimitException catch (e) {
       // 当月の利用枠を使い切った場合は追加課金の導線を出す。
-      if (e.code == 'resource-exhausted') {
-        state = state.copyWith(
-          isLoading: false,
-          limitReached: true,
-          error: '今月のAI利用枠の上限に達しました。追加パックで続けられます。',
-        );
-      } else {
-        state = state.copyWith(
-          isLoading: false,
-          error: e.message ?? 'AI処理中にエラーが発生しました。',
-        );
-      }
+      state = state.copyWith(
+        isLoading: false,
+        limitReached: true,
+        error: e.message,
+      );
     } catch (e) {
       state = state.copyWith(
         isLoading: false,

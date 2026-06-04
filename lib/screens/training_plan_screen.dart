@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/training_plan.dart';
 import '../providers/training_plan_provider.dart';
+import '../widgets/ai_limit_banner.dart';
 
 class TrainingPlanScreen extends ConsumerStatefulWidget {
   const TrainingPlanScreen({super.key});
@@ -131,14 +132,7 @@ class _TrainingPlanScreenState extends ConsumerState<TrainingPlanScreen> {
           if (planState.error != null)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-              child: Text(
-                planState.error!,
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.error,
-                  fontSize: 13,
-                ),
-                textAlign: TextAlign.center,
-              ),
+              child: AiLimitBanner(error: planState.error),
             ),
           _buildBottomBar(context),
         ],

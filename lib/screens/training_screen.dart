@@ -19,6 +19,8 @@ import '../providers/training_provider.dart';
 import '../providers/training_session_provider.dart';
 import '../services/health_service.dart';
 import '../services/training_calorie_calculator.dart';
+import '../services/ai_exceptions.dart';
+import '../widgets/ai_limit_banner.dart';
 import '../widgets/muscle_heatmap_painter.dart';
 import '../widgets/training/exercise_weight_chart_sheet.dart';
 import '../widgets/training/session_record_card.dart';
@@ -673,17 +675,22 @@ class _DailyAdviceCard extends ConsumerWidget {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(error,
-                      style: const TextStyle(color: Colors.red, fontSize: 13)),
-                  const SizedBox(height: 6),
-                  OutlinedButton.icon(
-                    onPressed: () => fetch(),
-                    icon: const Icon(Icons.refresh, size: 14),
-                    label: const Text('再試行'),
-                    style: OutlinedButton.styleFrom(
-                      visualDensity: VisualDensity.compact,
+                  if (AiUsageLimitException.isLimit(error)) ...[
+                    AiLimitBanner(error: error),
+                  ] else ...[
+                    Text(error,
+                        style:
+                            const TextStyle(color: Colors.red, fontSize: 13)),
+                    const SizedBox(height: 6),
+                    OutlinedButton.icon(
+                      onPressed: () => fetch(),
+                      icon: const Icon(Icons.refresh, size: 14),
+                      label: const Text('再試行'),
+                      style: OutlinedButton.styleFrom(
+                        visualDensity: VisualDensity.compact,
+                      ),
                     ),
-                  ),
+                  ],
                 ],
               )
             else if (adviceText != null)

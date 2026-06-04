@@ -196,10 +196,16 @@ class ChatMessage {
 - **Firestore ルール**: `users/{uid}/ai_usage/{月}` はクライアント読み取りのみ・書き込みは Admin SDK のみ。`ai_credit_purchases` は Callable 専用。
 - **UX**: チャット画面に利用80%超で利用枠メーターを表示。上限到達（`resource-exhausted`）で「追加パック」導線（`AiCreditSheet`）を提示。
 
-#### フェーズ3の運用前TODO（本番化に必要）
-- **レシート検証**: `addAiCredit` は現状 `purchaseToken` の記録のみ。本番ではApp Store / Google Play のサーバ検証を追加する（`activateSubscription` も同様）。
-- **ストア商品登録**: App Store Connect / Google Play Console に消費型 `ai_credit_500` / `ai_credit_1000` を登録。
-- **既存AI機能のメーター反映**: text/vision も計測対象になったため、栄養アドバイス等の画面でも上限到達時のハンドリング（エラーメッセージ）を確認する。
+### 6.6 本番化対応（実装済み）
+
+- **レシート検証**: `functions/receipt_validation.js` を追加し、`activateSubscription` / `addAiCredit` で Apple（verifyReceipt）/ Google（Play Developer API）のサーバ検証を実施。`RECEIPT_VALIDATION_STRICT` で段階導入可能（移行期は未設定プラットフォームを許可、本番は fail-closed）。
+- **既存AI機能の上限ハンドリング**: `AiProxyService` が `resource-exhausted` を `AiUsageLimitException`（`lib/services/ai_exceptions.dart`）に変換。全AI機能で分かりやすいメッセージが出る。共通ウィジェット `AiLimitBanner` と各画面（栄養アドバイス・食事提案・トレプラン・トレ日次アドバイス）に**追加パック導線**を配置。
+- **ストア商品登録の手順書**: [AI追加パックとレシート検証_設定ガイド.md](./AI追加パックとレシート検証_設定ガイド.md) に、消費型IAP登録・シークレット設定・strictロールアウト・デプロイ手順をまとめた。
+
+#### 残る運用作業（コンソール操作・要シークレット）
+- App Store Connect / Google Play Console での `ai_credit_500` / `ai_credit_1000` 登録（手順書参照）。
+- `APPLE_SHARED_SECRET` / `GOOGLE_PLAY_SERVICE_ACCOUNT` / `ANDROID_PACKAGE_NAME` のシークレット設定。
+- テスト購入で検証確認後、`RECEIPT_VALIDATION_STRICT=true` へ切り替え。
 
 ## 7. 安全性（ガードレール）
 

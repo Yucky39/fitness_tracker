@@ -3,6 +3,7 @@ const { setGlobalOptions } = require('firebase-functions/v2');
 const { defineSecret } = require('firebase-functions/params');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const admin = require('firebase-admin');
+const { verifyPurchase, receiptSecrets } = require('./receipt_validation');
 
 admin.initializeApp();
 setGlobalOptions({ region: 'asia-northeast1' });
@@ -192,13 +193,23 @@ exports.geminiProxy = onCall(
 // ── activateSubscription: 購入完了後にサブスクをFirestoreへ書き込む ──────────────
 
 exports.activateSubscription = onCall(
-  { timeoutSeconds: 30 },
+  { timeoutSeconds: 30, secrets: receiptSecrets },
   async (request) => {
     if (!request.auth) throw new HttpsError('unauthenticated', 'ログインが必要です。');
 
     const { productId, purchaseToken, platform } = request.data;
     if (!productId || !purchaseToken || !platform) {
       throw new HttpsError('invalid-argument', '必要なパラメータが不足しています。');
+    }
+
+    // ストアのレシート（購入トークン）をサーバ検証する。
+    try {
+      await verifyPurchase({
+        platform, productId, purchaseToken, kind: 'subscription',
+      });
+    } catch (err) {
+      console.error('subscription receipt validation failed:', err);
+      throw new HttpsError('permission-denied', '購入の検証に失敗しました。');
     }
 
     // 有効期限の計算
@@ -230,7 +241,7 @@ exports.activateSubscription = onCall(
 // ── addAiCredit: 追加パック（消費型IAP）購入で当月のAI利用枠を増やす ──────────────
 
 exports.addAiCredit = onCall(
-  { timeoutSeconds: 30 },
+  { timeoutSeconds: 30, secrets: receiptSecrets },
   async (request) => {
     if (!request.auth) throw new HttpsError('unauthenticated', 'ログインが必要です。');
 
@@ -242,6 +253,16 @@ exports.addAiCredit = onCall(
     const creditYen = CREDIT_YEN_BY_PRODUCT[productId];
     if (!creditYen) {
       throw new HttpsError('invalid-argument', '不明な商品IDです。');
+    }
+
+    // 消費型IAP（プロダクト）の購入をサーバ検証する。
+    try {
+      await verifyPurchase({
+        platform, productId, purchaseToken, kind: 'product',
+      });
+    } catch (err) {
+      console.error('credit receipt validation failed:', err);
+      throw new HttpsError('permission-denied', '購入の検証に失敗しました。');
     }
 
     const uid = request.auth.uid;
