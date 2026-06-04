@@ -12,11 +12,11 @@
 
 ## 2. スコープとフェーズ
 
-| フェーズ | 内容 | 本ドキュメントでの扱い |
+| フェーズ | 内容 | 状態 |
 |---|---|---|
 | **1. 設計** | 本ドキュメント | ✅ 完了 |
-| **2. MVP（課金=サブスク前提）** | チャット本体・マルチターン・要約文脈注入・安全ガードレール・返答長キャップ。サブスク有効ユーザーのみ利用可 | 本ドキュメント §5 |
-| **3. 計測・追加課金** | トークン使用量の計測・月次上限・上限到達時の追加課金（消費型IAP）導線 | 本ドキュメント §6 |
+| **2. MVP（課金=サブスク前提）** | チャット本体・マルチターン・要約文脈注入・安全ガードレール・返答長キャップ。サブスク有効ユーザーのみ利用可（§5） | ✅ 実装済み |
+| **3. 計測・追加課金** | トークン使用量の計測・月次上限・上限到達時の追加課金（消費型IAP）導線（§6） | ✅ 実装済み |
 
 MVP（フェーズ2）では「サブスク有効なら使い放題（ただしレート制限あり）」とし、厳密な従量計測と追加課金はフェーズ3で載せる。**ただし計測を後付けしやすいよう、MVP時点で全AI呼び出しを `geminiProxy` の単一チョークポイントに通す設計**にしておく。
 
@@ -183,6 +183,23 @@ class ChatMessage {
 - 追加課金しない人 → コスト上限が読める（下振れ保護）
 - 追加課金する人 → 売上が増える（上振れ取り込み）
 - §4.4 の「乱用2,700円」問題が構造的に消え、ヘビーユーザーがリスクから収益源に変わる。
+
+### 6.5 実装メモ（フェーズ3）
+
+- **計測**: `functions/index.js` の `geminiProxy` で、生成前に `assertWithinBudget()`（超過時 `resource-exhausted`）、生成後に `accrueUsage()` が `usageMetadata` を円換算して `users/{uid}/ai_usage/{YYYY-MM}` に加算。**全AI機能（text/chat/vision）が同じ経路を通るため一括計測される。**
+- **単価・予算定数**（`functions/index.js` 冒頭。運用に応じて更新）:
+  - `USD_TO_JPY = 150`、`INPUT 1.65 / OUTPUT 9.90 USD/1M`
+  - `MONTHLY_INCLUDED_BUDGET_YEN = 1500`（サブスクに含む月次枠。他インフラ費を切り出すなら下げる）
+  - `CREDIT_YEN_BY_PRODUCT`: `ai_credit_500 → 300円`、`ai_credit_1000 → 650円`（手数料15%を見込み付与額 < 手取り）
+- **クライアント定数**: `AiUsage.monthlyIncludedYen = 1500`（サーバ定数と一致させること。メーター％算出用）。
+- **追加課金**: 消費型IAP（`AiCreditProducts`）→ `SubscriptionService.purchaseCredit()` → 購入ストリームで `addAiCredit` を呼び、`purchaseToken` をキーに二重付与防止のうえ `extraCreditYen` を加算。
+- **Firestore ルール**: `users/{uid}/ai_usage/{月}` はクライアント読み取りのみ・書き込みは Admin SDK のみ。`ai_credit_purchases` は Callable 専用。
+- **UX**: チャット画面に利用80%超で利用枠メーターを表示。上限到達（`resource-exhausted`）で「追加パック」導線（`AiCreditSheet`）を提示。
+
+#### フェーズ3の運用前TODO（本番化に必要）
+- **レシート検証**: `addAiCredit` は現状 `purchaseToken` の記録のみ。本番ではApp Store / Google Play のサーバ検証を追加する（`activateSubscription` も同様）。
+- **ストア商品登録**: App Store Connect / Google Play Console に消費型 `ai_credit_500` / `ai_credit_1000` を登録。
+- **既存AI機能のメーター反映**: text/vision も計測対象になったため、栄養アドバイス等の画面でも上限到達時のハンドリング（エラーメッセージ）を確認する。
 
 ## 7. 安全性（ガードレール）
 

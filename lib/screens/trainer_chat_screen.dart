@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../models/ai_usage.dart';
 import '../models/chat_message.dart';
+import '../providers/ai_usage_provider.dart';
 import '../providers/subscription_provider.dart';
 import '../providers/trainer_chat_provider.dart';
+import '../widgets/ai_credit_sheet.dart';
 import '../widgets/paywall_sheet.dart';
 
 /// AIトレーナーに、トレーニング・食事・日常のルーティンなどを自由に相談できるチャット画面。
@@ -144,8 +147,10 @@ class _TrainerChatScreenState extends ConsumerState<TrainerChatScreen> {
     ColorScheme scheme,
     TrainerChatState chat,
   ) {
+    final usage = ref.watch(aiUsageProvider);
     return Column(
       children: [
+        _buildUsageMeter(context, scheme, usage),
         Expanded(
           child: chat.messages.isEmpty
               ? _buildEmptyState(context, scheme)
@@ -161,10 +166,68 @@ class _TrainerChatScreenState extends ConsumerState<TrainerChatScreen> {
                   },
                 ),
         ),
-        if (chat.error != null) _buildError(context, scheme, chat.error!),
+        if (chat.error != null) _buildError(context, scheme, chat),
         _buildDisclaimer(scheme),
         _buildInputBar(context, scheme, chat),
       ],
+    );
+  }
+
+  /// 当月のAI利用枠メーター。残りが少ないときだけ表示してノイズを抑える。
+  Widget _buildUsageMeter(
+    BuildContext context,
+    ColorScheme scheme,
+    AiUsage usage,
+  ) {
+    // 利用が80%未満なら非表示（普段は意識させない）。
+    if (usage.usedRatio < 0.8) return const SizedBox.shrink();
+    final pct = (usage.usedRatio * 100).round();
+    final atLimit = usage.isLimitReached;
+    return Container(
+      color: atLimit ? scheme.errorContainer : scheme.surfaceContainerLow,
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                atLimit ? '今月のAI利用枠を使い切りました' : '今月のAI利用 $pct%',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: atLimit
+                      ? scheme.onErrorContainer
+                      : scheme.onSurfaceVariant,
+                ),
+              ),
+              if (atLimit)
+                GestureDetector(
+                  onTap: () => AiCreditSheet.show(context),
+                  child: Text(
+                    '追加パック',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: scheme.primary,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: usage.usedRatio,
+              minHeight: 6,
+              backgroundColor: scheme.surfaceContainerHighest,
+              color: atLimit ? scheme.error : scheme.primary,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -258,7 +321,11 @@ class _TrainerChatScreenState extends ConsumerState<TrainerChatScreen> {
     );
   }
 
-  Widget _buildError(BuildContext context, ColorScheme scheme, String error) {
+  Widget _buildError(
+    BuildContext context,
+    ColorScheme scheme,
+    TrainerChatState chat,
+  ) {
     return Container(
       width: double.infinity,
       color: scheme.errorContainer,
@@ -267,14 +334,21 @@ class _TrainerChatScreenState extends ConsumerState<TrainerChatScreen> {
         children: [
           Expanded(
             child: Text(
-              error,
+              chat.error ?? '',
               style: TextStyle(color: scheme.onErrorContainer, fontSize: 13),
             ),
           ),
-          TextButton(
-            onPressed: () => ref.read(trainerChatProvider.notifier).retryLast(),
-            child: const Text('再試行'),
-          ),
+          if (chat.limitReached)
+            FilledButton(
+              onPressed: () => AiCreditSheet.show(context),
+              child: const Text('追加パック'),
+            )
+          else
+            TextButton(
+              onPressed: () =>
+                  ref.read(trainerChatProvider.notifier).retryLast(),
+              child: const Text('再試行'),
+            ),
         ],
       ),
     );

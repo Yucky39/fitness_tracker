@@ -12,10 +12,17 @@ service cloud.firestore {
         allow write: if false;
       }
 
-      // food_items, training_logs など（subscription 以外）
+      // AI使用量（月次の計測値）も Admin SDK のみが書き換え可能。クライアントは読み取りのみ（メーター表示用）。
+      match /ai_usage/{docId} {
+        allow read: if request.auth != null && request.auth.uid == userId;
+        allow write: if false;
+      }
+
+      // food_items, training_logs など（subscription / ai_usage 以外）
       match /{subcollection}/{docId} {
         allow read, write: if request.auth != null && request.auth.uid == userId
-          && subcollection != 'subscription';
+          && subcollection != 'subscription'
+          && subcollection != 'ai_usage';
       }
     }
 
@@ -33,6 +40,11 @@ service cloud.firestore {
 
     // プロモ台帳は Callable（Admin）のみ。クライアントからの直接読書きは禁止。
     match /promo_codes/{code} {
+      allow read, write: if false;
+    }
+
+    // AI追加クレジットの購入台帳（二重付与防止）は Callable（Admin）のみ。
+    match /ai_credit_purchases/{token} {
       allow read, write: if false;
     }
 

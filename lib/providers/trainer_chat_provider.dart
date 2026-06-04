@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod/legacy.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -16,10 +17,15 @@ class TrainerChatState {
   final bool isLoading;
   final String? error;
 
+  /// 当月のAI利用枠の上限に達したため送信がブロックされた状態。
+  /// true のとき、画面は追加パック購入の導線を表示する。
+  final bool limitReached;
+
   const TrainerChatState({
     this.messages = const [],
     this.isLoading = false,
     this.error,
+    this.limitReached = false,
   });
 
   TrainerChatState copyWith({
@@ -27,11 +33,13 @@ class TrainerChatState {
     bool? isLoading,
     String? error,
     bool clearError = false,
+    bool? limitReached,
   }) =>
       TrainerChatState(
         messages: messages ?? this.messages,
         isLoading: isLoading ?? this.isLoading,
         error: clearError ? null : error ?? this.error,
+        limitReached: limitReached ?? this.limitReached,
       );
 }
 
@@ -102,6 +110,7 @@ class TrainerChatNotifier extends StateNotifier<TrainerChatState> {
       messages: history,
       isLoading: true,
       clearError: true,
+      limitReached: false,
     );
     await _persist();
 
@@ -126,6 +135,20 @@ class TrainerChatNotifier extends StateNotifier<TrainerChatState> {
       }
       state = state.copyWith(messages: next, isLoading: false);
       await _persist();
+    } on FirebaseFunctionsException catch (e) {
+      // 当月の利用枠を使い切った場合は追加課金の導線を出す。
+      if (e.code == 'resource-exhausted') {
+        state = state.copyWith(
+          isLoading: false,
+          limitReached: true,
+          error: '今月のAI利用枠の上限に達しました。追加パックで続けられます。',
+        );
+      } else {
+        state = state.copyWith(
+          isLoading: false,
+          error: e.message ?? 'AI処理中にエラーが発生しました。',
+        );
+      }
     } catch (e) {
       state = state.copyWith(
         isLoading: false,
