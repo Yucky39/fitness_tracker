@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../../data/exercise_motion_guides.dart';
 import '../../data/exercise_muscle_map.dart';
 import '../../models/community_exercise_definition.dart';
 import '../../models/training_log.dart';
@@ -9,8 +10,11 @@ import '../../providers/community_exercise_provider.dart';
 import '../../providers/training_provider.dart';
 import '../../services/auth_service.dart';
 import '../../services/community_exercise_service.dart';
+import '../../services/exercise_animation_service.dart';
 import '../../services/training_calorie_calculator.dart';
 import '../../utils/exercise_inference.dart';
+import 'exercise_motion_demo_sheet.dart';
+import 'stick_figure_animation_widget.dart';
 
 /// トレーニング記録の追加・編集ダイアログを表示する。
 ///
@@ -331,6 +335,18 @@ void showTrainingLogDialog({
                         );
                       },
                     ),
+                    if (exerciseName.trim().isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      _ExerciseMotionInlinePreview(
+                        exerciseName: exerciseName,
+                        exerciseType: exerciseType,
+                        onDetailTap: () => showExerciseMotionDemoSheet(
+                          context,
+                          exerciseName: exerciseName,
+                          exerciseType: exerciseType,
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 10),
                     const Text('器具・種別',
                         style: TextStyle(fontSize: 12, color: Colors.grey)),
@@ -838,5 +854,171 @@ class _CaloriePreviewChip extends StatelessWidget {
     final min = minPerKm.floor();
     final sec = ((minPerKm - min) * 60).round();
     return '$min:${sec.toString().padLeft(2, '0')}/km';
+  }
+}
+
+// ── 種目動作インラインプレビュー ────────────────────────────────────────────────
+
+/// 種目名と器具種別の間に表示する2フレーム静止イラスト＋解説テキスト。
+class _ExerciseMotionInlinePreview extends StatelessWidget {
+  final String exerciseName;
+  final ExerciseType exerciseType;
+  final VoidCallback onDetailTap;
+
+  const _ExerciseMotionInlinePreview({
+    required this.exerciseName,
+    required this.exerciseType,
+    required this.onDetailTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final frames = ExerciseAnimationService.getPreviewFrames(
+        exerciseName, exerciseType);
+    final guide = lookupExerciseMotionGuide(exerciseName, exerciseType);
+    final scheme = Theme.of(context).colorScheme;
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerHighest.withValues(alpha: 0.28),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: scheme.outline.withValues(alpha: 0.18),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // ヘッダー行
+          Row(
+            children: [
+              Icon(Icons.directions_run_rounded,
+                  size: 14, color: scheme.primary),
+              const SizedBox(width: 4),
+              Text(
+                '種目動作',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: scheme.primary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const Spacer(),
+              GestureDetector(
+                onTap: onDetailTap,
+                child: Row(
+                  children: [
+                    Text(
+                      'アニメーションを見る',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: scheme.primary,
+                      ),
+                    ),
+                    Icon(Icons.chevron_right_rounded,
+                        size: 14, color: scheme.primary),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          // 2フレームイラスト
+          Row(
+            children: [
+              Expanded(
+                child: _PoseFrame(
+                  label: '① 開始姿勢',
+                  joints: frames.start,
+                  scheme: scheme,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _PoseFrame(
+                  label: '② 動作ピーク',
+                  joints: frames.peak,
+                  scheme: scheme,
+                ),
+              ),
+            ],
+          ),
+          // 解説テキスト（最初のポイント）
+          if (guide.tips.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.check_circle_outline_rounded,
+                    size: 14, color: scheme.primary),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: Text(
+                    guide.tips.first,
+                    style: const TextStyle(fontSize: 11, height: 1.4),
+                  ),
+                ),
+              ],
+            ),
+            if (guide.tips.length > 1) ...[
+              const SizedBox(height: 4),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.check_circle_outline_rounded,
+                      size: 14, color: scheme.primary),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      guide.tips[1],
+                      style: const TextStyle(fontSize: 11, height: 1.4),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _PoseFrame extends StatelessWidget {
+  final String label;
+  final Map<String, List<double>> joints;
+  final ColorScheme scheme;
+
+  const _PoseFrame({
+    required this.label,
+    required this.joints,
+    required this.scheme,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Container(
+          height: 108,
+          decoration: BoxDecoration(
+            color: scheme.surfaceContainerHighest.withValues(alpha: 0.45),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: StaticExercisePoseWidget(joints: joints),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 10,
+            color: scheme.onSurfaceVariant,
+            fontWeight: FontWeight.w500,
+          ),
+          textAlign: TextAlign.center,
+        ),
+      ],
+    );
   }
 }

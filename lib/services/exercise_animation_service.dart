@@ -50,6 +50,30 @@ class ExerciseAnimationService {
 
   // ── 公開 API ───────────────────────────────────────────────────────────────
 
+  /// 種目名からスタートフレームとピークフレームの関節座標を同期的に返す。
+  /// APIキー不要・キャッシュ不要でダイアログ内プレビュー用に使用する。
+  static ({
+    Map<String, List<double>> start,
+    Map<String, List<double>> peak,
+  }) getPreviewFrames(String exerciseName, ExerciseType exerciseType) {
+    final key = normalizeKey(exerciseName);
+    final data = _fallbackAnimation(key, exerciseName) ??
+        ExerciseAnimationData(
+          exerciseKey: key,
+          durationMs: 2000,
+          keyframes: [
+            ExerciseAnimationKeyframe(t: 0.0, joints: _standingJoints()),
+            ExerciseAnimationKeyframe(t: 0.5, joints: _gentleBendJoints()),
+            ExerciseAnimationKeyframe(t: 1.0, joints: _standingJoints()),
+          ],
+        );
+    final start = data.keyframes.first.joints;
+    final peak = data.keyframes.length >= 2
+        ? data.keyframes[data.keyframes.length ~/ 2].joints
+        : start;
+    return (start: start, peak: peak);
+  }
+
   /// キャッシュがあれば返し、なければ AI で生成してキャッシュする。
   /// API キーが空の場合は `null` を返す（呼び出し元がフォールバック表示）。
   Future<ExerciseAnimationData?> getAnimation({
