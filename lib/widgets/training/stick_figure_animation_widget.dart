@@ -2,6 +2,32 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../models/exercise_animation.dart';
 
+/// 1フレームの静止ポーズを描画するウィジェット（ダイアログ内プレビュー用）。
+class StaticExercisePoseWidget extends StatelessWidget {
+  final Map<String, List<double>> joints;
+  final double rotY;
+
+  const StaticExercisePoseWidget({
+    super.key,
+    required this.joints,
+    this.rotY = 0.0,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return CustomPaint(
+      painter: _Body3DPainter(
+        joints: joints,
+        rotY: rotY,
+        isFemale: false,
+        color: scheme.primary,
+      ),
+      child: const SizedBox.expand(),
+    );
+  }
+}
+
 /// 横スワイプで360度回転・性別切り替え対応の3D人体アニメーションウィジェット。
 class StickFigureAnimationWidget extends StatefulWidget {
   final ExerciseAnimationData data;
