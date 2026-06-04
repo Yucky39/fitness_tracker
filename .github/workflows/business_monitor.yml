@@ -1,0 +1,41 @@
+name: AI ビジネス監視レポート
+
+on:
+  schedule:
+    # 毎週月曜 AM 9:00 JST (UTC 00:00)
+    - cron: "0 0 * * 1"
+  workflow_dispatch:
+    inputs:
+      lookback_days:
+        description: "分析対象の日数 (デフォルト: 7)"
+        required: false
+        default: "7"
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install anthropic requests
+
+      - name: Run business analysis
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          LOOKBACK_DAYS: ${{ github.event.inputs.lookback_days || '7' }}
+        run: python .github/scripts/analyze_business.py
