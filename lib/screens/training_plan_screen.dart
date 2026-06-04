@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/training_plan.dart';
 import '../providers/training_plan_provider.dart';
+import '../services/ai_exceptions.dart';
+import '../widgets/ai_error_text.dart';
 import '../widgets/ai_limit_banner.dart';
+import '../widgets/paywall_sheet.dart';
 
 class TrainingPlanScreen extends ConsumerStatefulWidget {
   const TrainingPlanScreen({super.key});
@@ -132,7 +135,11 @@ class _TrainingPlanScreenState extends ConsumerState<TrainingPlanScreen> {
           if (planState.error != null)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-              child: AiLimitBanner(error: planState.error),
+              child: Center(
+                child: AiUsageLimitException.isLimit(planState.error)
+                    ? AiLimitBanner(error: planState.error)
+                    : AiErrorText(planState.error!, center: true),
+              ),
             ),
           _buildBottomBar(context),
         ],
@@ -587,6 +594,29 @@ class _TrainingPlanScreenState extends ConsumerState<TrainingPlanScreen> {
                     final plan = state.plans[index];
                     return _PlanListTile(
                       plan: plan,
+                      onAdjust: () async {
+                        final messenger = ScaffoldMessenger.of(context);
+                        messenger.showSnackBar(
+                          const SnackBar(
+                            content: Text('今週の実績をもとに調整版を作成しています…'),
+                          ),
+                        );
+                        final adjusted = await ref
+                            .read(trainingPlanProvider.notifier)
+                            .adjustPlan(plan.id);
+                        if (!context.mounted) return;
+                        final err = ref.read(trainingPlanProvider).error;
+                        messenger.hideCurrentSnackBar();
+                        if (adjusted != null) {
+                          messenger.showSnackBar(
+                            SnackBar(content: Text('「${adjusted.name}」を作成しました')),
+                          );
+                        } else if (err == '__paywall__') {
+                          await PaywallSheet.show(context);
+                        } else if (err != null) {
+                          messenger.showSnackBar(SnackBar(content: Text(err)));
+                        }
+                      },
                       onDelete: () async {
                         final confirm = await showDialog<bool>(
                           context: context,
@@ -1232,7 +1262,12 @@ class _StatChip extends StatelessWidget {
 class _PlanListTile extends StatefulWidget {
   final TrainingPlan plan;
   final VoidCallback onDelete;
-  const _PlanListTile({required this.plan, required this.onDelete});
+  final VoidCallback onAdjust;
+  const _PlanListTile({
+    required this.plan,
+    required this.onDelete,
+    required this.onAdjust,
+  });
 
   @override
   State<_PlanListTile> createState() => _PlanListTileState();
@@ -1290,8 +1325,13 @@ class _PlanListTileState extends State<_PlanListTile> {
             Padding(
               padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.end,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
+                  TextButton.icon(
+                    icon: const Icon(Icons.auto_fix_high, size: 18),
+                    label: const Text('今週の実績で調整'),
+                    onPressed: widget.onAdjust,
+                  ),
                   TextButton.icon(
                     icon: Icon(Icons.delete_outline,
                         color: Theme.of(context).colorScheme.error, size: 18),

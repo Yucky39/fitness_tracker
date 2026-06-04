@@ -1,9 +1,14 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:flutter/foundation.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'auth_service.dart';
 import 'database_service.dart';
+import 'sync_tables.dart';
 
 /// Handles bidirectional sync between local SQLite/SharedPreferences and Firestore.
 ///
@@ -19,18 +24,24 @@ class SyncService {
 
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  // Tables synced per-record to Firestore subcollections
-  static const _tables = [
-    'food_items',
-    'training_logs',
-    'body_metrics',
-    'water_logs',
-    'sleep_logs',
-    'achievements',
-    'training_plans',
-    'meal_presets',
-    'training_routines',
-  ];
+  // Tables synced per-record to Firestore subcollections (single source of truth)
+  static const _tables = SyncTables.synced;
+
+  // クラウド専用フィールド（ローカルDBには書き戻さない）。
+  static const _kUpdatedAt = 'updatedAt'; // LWW 用の更新時刻（ms）
+  static const _kDeleted = 'deleted'; // tombstone（削除マーカー）
+
+  // オフライン中に失敗した書き込み/削除を保持する再送キュー。
+  static const _queueKey = 'sync_pending_queue';
+  bool _flushing = false;
+
+  // body_metrics の写真: ローカルパス列 → クラウドに保存する Storage パス列。
+  // ローカルパスは端末固有なのでクラウドには保存せず、Storage パスのみ保存する。
+  static const _photoFields = {
+    'image_front_path': 'image_front_remote',
+    'image_side_path': 'image_side_remote',
+    'image_back_path': 'image_back_remote',
+  };
 
   String? get _userId => AuthService().userId;
 
@@ -46,15 +57,24 @@ class SyncService {
   Future<void> uploadAllData() async {
     if (_userId == null) return;
     final adapter = await DatabaseService().database;
+    final now = DateTime.now().millisecondsSinceEpoch;
 
     for (final table in _tables) {
       final rows = await adapter.query(table);
       if (rows.isEmpty) continue;
 
+      // body_metrics は写真を Storage へアップロードしてから同期する。
+      if (table == 'body_metrics') {
+        for (final row in rows) {
+          await syncBodyMetrics(row);
+        }
+        continue;
+      }
+
       final batch = _firestore.batch();
       for (final row in rows) {
         final docRef = _collection(table).doc(row['id'] as String);
-        batch.set(docRef, row);
+        batch.set(docRef, {...row, _kUpdatedAt: now});
       }
       await batch.commit();
     }
@@ -63,22 +83,47 @@ class SyncService {
   }
 
   /// Download Firestore data and merge into local DB + SharedPreferences.
+  ///
+  /// 双方向マージ:
+  /// - tombstone（deleted=true）はローカルからも削除し、ゾンビ復活を防ぐ。
+  /// - 既存IDは update、未知IDは insert（upsert）。編集がローカルへ反映される。
+  /// - ログインはクラウドを正とする同期点（cloud-wins）。
   Future<void> downloadAndMergeData() async {
     if (_userId == null) return;
+
+    // 先に未送信キューを送り切ってからクラウドを取り込む。
+    await flushPendingQueue();
+
     final adapter = await DatabaseService().database;
 
     for (final table in _tables) {
       final snapshot = await _collection(table).get();
       if (snapshot.docs.isEmpty) continue;
 
-      final localRows = await adapter.query(table);
-      final localIds = localRows.map((r) => r['id'] as String).toSet();
-
       for (final doc in snapshot.docs) {
-        if (!localIds.contains(doc.id)) {
-          final row = Map<String, dynamic>.from(doc.data() as Map);
-          row['id'] ??= doc.id;
-          await adapter.insert(table, row);
+        final raw = Map<String, dynamic>.from(doc.data() as Map);
+
+        // tombstone はローカル削除。
+        if (raw[_kDeleted] == true) {
+          await adapter.delete(table, where: 'id = ?', whereArgs: [doc.id]);
+          continue;
+        }
+
+        // クラウド専用フィールドを除去してからローカルへ書く。
+        raw.remove(_kUpdatedAt);
+        raw.remove(_kDeleted);
+        raw['id'] ??= doc.id;
+
+        // body_metrics は Storage パスを端末ローカルへダウンロードして
+        // image_*_path に書き戻す（UI は Image.file を使うため）。
+        if (table == 'body_metrics') {
+          await _applyBodyPhotos(raw);
+        }
+
+        try {
+          await _upsertLocal(adapter, table, raw);
+        } catch (_) {
+          // 制約違反などで1件失敗しても全体は止めない。
         }
       }
     }
@@ -86,19 +131,226 @@ class SyncService {
     await downloadAndApplyUserProfile();
   }
 
-  /// Sync a single record to Firestore (fire-and-forget).
-  void syncRecord(String table, Map<String, dynamic> data) {
-    if (_userId == null) return;
-    _collection(table)
-        .doc(data['id'] as String)
-        .set(data)
-        .catchError((_) {});
+  Future<void> _upsertLocal(
+    dynamic adapter,
+    String table,
+    Map<String, dynamic> row,
+  ) async {
+    final id = row['id'];
+    final existing =
+        await adapter.query(table, where: 'id = ?', whereArgs: [id], limit: 1);
+    if (existing.isNotEmpty) {
+      await adapter.update(table, row, where: 'id = ?', whereArgs: [id]);
+    } else {
+      await adapter.insert(table, row);
+    }
   }
 
-  /// Delete a record from Firestore (fire-and-forget).
+  /// Sync a single record to Firestore. 失敗時は再送キューへ退避する。
+  void syncRecord(String table, Map<String, dynamic> data) {
+    if (_userId == null) return;
+    final id = data['id'] as String;
+    final payload = {
+      ...data,
+      _kUpdatedAt: DateTime.now().millisecondsSinceEpoch,
+    };
+    _setRemote(table, id, payload);
+  }
+
+  /// Delete a record from Firestore via tombstone（他端末へ削除を伝播）。
   void deleteRecord(String table, String id) {
     if (_userId == null) return;
-    _collection(table).doc(id).delete().catchError((_) {});
+    _deleteRemote(table, id);
+  }
+
+  // ── 体型写真（Firebase Storage）────────────────────────────────────────────
+
+  String _photoStoragePath(String id, String dir) =>
+      'users/$_userId/body_photos/${id}_$dir.jpg';
+
+  String _dirOf(String pathKey) => pathKey.contains('front')
+      ? 'front'
+      : pathKey.contains('side')
+          ? 'side'
+          : 'back';
+
+  /// body_metrics を同期する。写真は Storage へアップロードし、
+  /// クラウドには Storage パスのみ保存する（端末固有のローカルパスは保存しない）。
+  Future<void> syncBodyMetrics(Map<String, dynamic> data) async {
+    if (_userId == null) return;
+    final payload = Map<String, dynamic>.from(data);
+    final id = data['id'] as String;
+
+    for (final entry in _photoFields.entries) {
+      final pathKey = entry.key;
+      final remoteKey = entry.value;
+      // 端末固有のローカルパスはクラウドへ保存しない。
+      payload.remove(pathKey);
+
+      final localPath = data[pathKey] as String?;
+      if (kIsWeb || localPath == null || localPath.isEmpty) continue;
+      // 既にリモートURL/パスが入っている場合はそのまま使う。
+      if (localPath.startsWith('http') || localPath.startsWith('users/')) {
+        payload[remoteKey] = localPath;
+        continue;
+      }
+      try {
+        final file = File(localPath);
+        if (!await file.exists()) continue;
+        final storagePath = _photoStoragePath(id, _dirOf(pathKey));
+        await FirebaseStorage.instance.ref(storagePath).putFile(file);
+        payload[remoteKey] = storagePath;
+      } catch (_) {
+        // アップロード失敗時は写真なしで本文だけ同期する。
+      }
+    }
+
+    syncRecord('body_metrics', payload);
+  }
+
+  /// body_metrics を削除する。Storage 上の写真も併せて削除する。
+  Future<void> deleteBodyMetrics(String id) async {
+    if (_userId == null) return;
+    if (!kIsWeb) {
+      for (final pathKey in _photoFields.keys) {
+        try {
+          await FirebaseStorage.instance
+              .ref(_photoStoragePath(id, _dirOf(pathKey)))
+              .delete();
+        } catch (_) {
+          // 元々写真が無い場合などは無視。
+        }
+      }
+    }
+    deleteRecord('body_metrics', id);
+  }
+
+  /// ダウンロードした body_metrics の Storage パスを端末ローカルへ取得し、
+  /// image_*_path に書き戻す。クラウド専用の *_remote 列は除去する。
+  Future<void> _applyBodyPhotos(Map<String, dynamic> raw) async {
+    final id = raw['id'] as String?;
+    for (final entry in _photoFields.entries) {
+      final pathKey = entry.key;
+      final remoteKey = entry.value;
+      final remote = raw.remove(remoteKey) as String?;
+      if (kIsWeb || id == null || remote == null || remote.isEmpty) continue;
+      final localPath = await _downloadBodyPhoto(remote, id, _dirOf(pathKey));
+      if (localPath != null) raw[pathKey] = localPath;
+    }
+  }
+
+  Future<String?> _downloadBodyPhoto(
+      String storagePath, String id, String dir) async {
+    try {
+      final docs = await getApplicationDocumentsDirectory();
+      final destDir = Directory('${docs.path}/body_photos');
+      if (!await destDir.exists()) await destDir.create(recursive: true);
+      final dest = File('${destDir.path}/${id}_$dir.jpg');
+      // 既に取得済みなら再ダウンロードしない。
+      if (await dest.exists()) return dest.path;
+
+      final ref = storagePath.startsWith('http')
+          ? FirebaseStorage.instance.refFromURL(storagePath)
+          : FirebaseStorage.instance.ref(storagePath);
+      await ref.writeToFile(dest);
+      return dest.path;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _setRemote(
+      String table, String id, Map<String, dynamic> payload) async {
+    if (_userId == null) return;
+    try {
+      await _collection(table).doc(id).set(payload);
+      flushPendingQueue();
+    } catch (_) {
+      await _enqueue({'op': 'set', 'table': table, 'id': id, 'data': payload});
+    }
+  }
+
+  Future<void> _deleteRemote(String table, String id) async {
+    if (_userId == null) return;
+    final tombstone = {
+      _kDeleted: true,
+      _kUpdatedAt: DateTime.now().millisecondsSinceEpoch,
+    };
+    try {
+      await _collection(table).doc(id).set(tombstone, SetOptions(merge: true));
+      flushPendingQueue();
+    } catch (_) {
+      await _enqueue({
+        'op': 'delete',
+        'table': table,
+        'id': id,
+        'data': tombstone,
+      });
+    }
+  }
+
+  // ── オフライン再送キュー ───────────────────────────────────────────────────
+
+  List<Map<String, dynamic>> _readQueue(SharedPreferences prefs) {
+    final raw = prefs.getString(_queueKey);
+    if (raw == null) return [];
+    try {
+      return (jsonDecode(raw) as List)
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  Future<void> _enqueue(Map<String, dynamic> op) async {
+    final prefs = await SharedPreferences.getInstance();
+    final list = _readQueue(prefs);
+    op['uid'] = _userId;
+    list.add(op);
+    // 暴走防止に上限を設ける。
+    if (list.length > 2000) {
+      list.removeRange(0, list.length - 2000);
+    }
+    await prefs.setString(_queueKey, jsonEncode(list));
+  }
+
+  /// 未送信の書き込み/削除を再送する。オンライン復帰時・起動時・ログイン時に呼ぶ。
+  Future<void> flushPendingQueue() async {
+    if (_userId == null || _flushing) return;
+    _flushing = true;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final list = _readQueue(prefs);
+      if (list.isEmpty) return;
+
+      final remaining = <Map<String, dynamic>>[];
+      for (final op in list) {
+        // 別ユーザーの残骸は破棄する。
+        if (op['uid'] != _userId) continue;
+        try {
+          await _applyOp(op);
+        } catch (_) {
+          remaining.add(op); // 失敗分は次回へ持ち越す。
+        }
+      }
+      await prefs.setString(_queueKey, jsonEncode(remaining));
+    } finally {
+      _flushing = false;
+    }
+  }
+
+  Future<void> _applyOp(Map<String, dynamic> op) async {
+    final table = op['table'] as String;
+    final id = op['id'] as String;
+    final data = op['data'] is Map
+        ? Map<String, dynamic>.from(op['data'] as Map)
+        : <String, dynamic>{};
+    if (op['op'] == 'set') {
+      await _collection(table).doc(id).set(data);
+    } else if (op['op'] == 'delete') {
+      await _collection(table).doc(id).set(data, SetOptions(merge: true));
+    }
   }
 
   // ── User Profile (SharedPreferences) Sync ────────────────────────────────

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -14,8 +16,10 @@ import 'screens/auth_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/onboarding_screen.dart';
 import 'screens/splash_screen.dart';
+import 'services/auth_service.dart';
 import 'services/notification_service.dart';
 import 'services/subscription_service.dart';
+import 'services/sync_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -40,11 +44,41 @@ class _BootstrapAppState extends State<_BootstrapApp> {
   var _ready = false;
   late final DateTime _splashStartedAt;
 
+  // 課金反映の成否を画面下部のスナックバーで知らせるためのキー。
+  final _messengerKey = GlobalKey<ScaffoldMessengerState>();
+  StreamSubscription<SubscriptionActivationEvent>? _activationSub;
+
   @override
   void initState() {
     super.initState();
     _splashStartedAt = DateTime.now();
     WidgetsBinding.instance.addPostFrameCallback((_) => _bootstrap());
+  }
+
+  @override
+  void dispose() {
+    _activationSub?.cancel();
+    super.dispose();
+  }
+
+  void _listenActivationEvents() {
+    _activationSub?.cancel();
+    _activationSub = SubscriptionService().activationEvents.listen((event) {
+      if (!mounted) return;
+      final messenger = _messengerKey.currentState;
+      if (messenger == null) return;
+      final isError =
+          event.status == SubscriptionActivationStatus.failed;
+      messenger
+        ..clearSnackBars()
+        ..showSnackBar(SnackBar(
+          content: Text(event.message),
+          duration: Duration(seconds: isError ? 8 : 4),
+          backgroundColor: isError
+              ? Theme.of(context).colorScheme.errorContainer
+              : null,
+        ));
+    });
   }
 
   /// GIF のデコードと本体初期化を並行し、スプラッシュ開始から最低 [_minSplashDuration] は表示する。
@@ -81,6 +115,14 @@ class _BootstrapAppState extends State<_BootstrapApp> {
 
     await NotificationService().initialize();
     SubscriptionService().initialize();
+    _listenActivationEvents();
+
+    // ログイン済み（セッション復元含む）になったら未送信の同期キューを再送する。
+    AuthService().authStateChanges.listen((user) {
+      if (user != null) {
+        SyncService().flushPendingQueue();
+      }
+    });
   }
 
   @override
@@ -88,6 +130,7 @@ class _BootstrapAppState extends State<_BootstrapApp> {
     return MaterialApp(
       title: 'BeWell',
       debugShowCheckedModeBanner: false,
+      scaffoldMessengerKey: _messengerKey,
       theme: _appLightTheme(),
       darkTheme: _appDarkTheme(),
       themeMode: ThemeMode.system,

@@ -4,6 +4,8 @@ import 'package:intl/intl.dart';
 import '../models/food_item.dart';
 import '../models/training_log.dart';
 import '../providers/settings_provider.dart';
+import 'ai_proxy_purpose.dart';
+import 'ai_proxy_service.dart';
 import 'training_calorie_calculator.dart';
 
 /// 週間・月間の振り返りレポートを生成するサービス。
@@ -283,6 +285,7 @@ class ReviewAdviceService {
     required String apiKey,
     required AiProviderType provider,
     String? model,
+    bool useSystemAi = false,
   }) {
     final systemPrompt = _weeklySystemPrompt(adviceLevel);
     final userMessage = _buildWeeklyUserMessage(
@@ -296,6 +299,14 @@ class ReviewAdviceService {
       carbsGoal: carbsGoal,
       bodyWeightKg: bodyWeightKg,
     );
+    if (useSystemAi) {
+      return AiProxyService.callText(
+        systemPrompt: systemPrompt,
+        userMessage: userMessage,
+        maxTokens: _weeklyMaxTokens,
+        purpose: AiProxyPurpose.review,
+      );
+    }
     final resolvedModel = model ?? provider.defaultModel;
     switch (provider) {
       case AiProviderType.anthropic:
@@ -324,6 +335,7 @@ class ReviewAdviceService {
     required String apiKey,
     required AiProviderType provider,
     String? model,
+    bool useSystemAi = false,
   }) {
     final systemPrompt = _monthlySystemPrompt(adviceLevel);
     final userMessage = _buildMonthlyUserMessage(
@@ -337,6 +349,14 @@ class ReviewAdviceService {
       carbsGoal: carbsGoal,
       bodyWeightKg: bodyWeightKg,
     );
+    if (useSystemAi) {
+      return AiProxyService.callText(
+        systemPrompt: systemPrompt,
+        userMessage: userMessage,
+        maxTokens: _monthlyMaxTokens,
+        purpose: AiProxyPurpose.review,
+      );
+    }
     final resolvedModel = model ?? provider.defaultModel;
     switch (provider) {
       case AiProviderType.anthropic:

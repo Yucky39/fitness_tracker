@@ -1,8 +1,10 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'database_service.dart';
+import 'sync_tables.dart';
 
 class AuthService {
   static final AuthService _instance = AuthService._internal();
@@ -12,21 +14,6 @@ class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   static const _secureStorage = FlutterSecureStorage();
-
-  static const _tables = [
-    'food_items',
-    'training_logs',
-    'body_metrics',
-    'water_logs',
-    'sleep_logs',
-    'achievements',
-    'training_plans',
-    'meal_presets',
-    'training_routines',
-    'exercise_animations',
-    'shopping_ingredient_aliases',
-    'shopping_ingredient_surface_stats',
-  ];
 
   User? get currentUser => _auth.currentUser;
   String? get userId => _auth.currentUser?.uid;
@@ -79,9 +66,20 @@ class AuthService {
     if (user == null) throw Exception('ユーザーが見つかりません');
     final uid = user.uid;
 
-    // Delete Firestore subcollections
+    // subscription サブコレクションはセキュリティルール上クライアントから削除できない
+    // （Admin SDK 専用）。先にサーバー側でユーザーデータを完全削除する。
+    // 失敗してもアカウント自体の削除は続行する（孤児ドキュメントは Auth 削除トリガで回収）。
+    try {
+      final callable = FirebaseFunctions.instanceFor(region: 'asia-northeast1')
+          .httpsCallable('purgeUserData');
+      await callable.call();
+    } catch (_) {
+      // サーバー側削除に失敗した場合でも、以下でクライアント可能な範囲を削除する。
+    }
+
+    // Delete Firestore subcollections (client-writable tables only)
     final userDoc = _firestore.collection('users').doc(uid);
-    for (final table in _tables) {
+    for (final table in SyncTables.synced) {
       final snapshot = await userDoc.collection(table).get();
       final batch = _firestore.batch();
       for (final doc in snapshot.docs) {
@@ -91,9 +89,9 @@ class AuthService {
     }
     await userDoc.delete();
 
-    // Clear local DB
+    // Clear local DB (all local tables, including local-only caches)
     final adapter = await DatabaseService().database;
-    for (final table in _tables) {
+    for (final table in SyncTables.all) {
       await adapter.delete(table);
     }
 

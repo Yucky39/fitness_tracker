@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod/legacy.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/food_item.dart';
+import '../providers/ai_access.dart';
 import '../providers/settings_provider.dart';
 import '../providers/subscription_provider.dart';
 import '../services/nutrition_advice_service.dart';
@@ -98,7 +99,9 @@ class AdviceNotifier extends StateNotifier<AdviceState> {
     final effectiveProvider = provider ?? settings.selectedProvider;
     final modelStr = model ?? settings.currentModel;
 
-    if (!isSubscribed && effectiveApiKey.isEmpty) {
+    final access =
+        resolveAiAccess(isSubscribed: isSubscribed, apiKey: effectiveApiKey);
+    if (!access.allowed) {
       state = const AdviceState(error: '__paywall__');
       return;
     }
@@ -127,7 +130,7 @@ class AdviceNotifier extends StateNotifier<AdviceState> {
         fiberGoal: fiberGoal,
         sodiumGoal: sodiumGoal,
         adviceLevel: adviceLevel,
-        useSystemAi: isSubscribed,
+        useSystemAi: access.useSystemAi,
         apiKey: effectiveApiKey,
         provider: effectiveProvider,
         model: resolvedModel,

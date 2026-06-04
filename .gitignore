@@ -1,3 +1,6 @@
+# Firebase Functions local env (may contain review allowlist)
+functions/.env
+
 # Miscellaneous
 *.class
 *.log

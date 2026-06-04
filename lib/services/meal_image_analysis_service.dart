@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../providers/settings_provider.dart';
+import '../services/ai_proxy_purpose.dart';
 import '../services/ai_proxy_service.dart';
 
 class AnalyzedFoodItem {
@@ -117,6 +118,7 @@ class MealImageAnalysisService {
         mediaType: mediaType,
         prompt: _prompt,
         maxTokens: _maxTokens,
+        purpose: AiProxyPurpose.vision,
       );
     } else {
       final resolvedModel = model ?? provider.defaultModel;

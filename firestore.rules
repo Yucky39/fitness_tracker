@@ -12,7 +12,7 @@ service cloud.firestore {
         allow write: if false;
       }
 
-      // AI使用量（月次の計測値）も Admin SDK のみが書き換え可能。クライアントは読み取りのみ（メーター表示用）。
+      // AI使用量（月次の計測値）も Admin SDK のみが書き換え可能。クライアントは読み取りのみ。
       match /ai_usage/{docId} {
         allow read: if request.auth != null && request.auth.uid == userId;
         allow write: if false;

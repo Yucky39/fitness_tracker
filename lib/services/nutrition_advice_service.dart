@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/food_item.dart';
 import '../providers/settings_provider.dart';
+import '../services/ai_proxy_purpose.dart';
 import '../services/ai_proxy_service.dart';
 
 class NutritionAdviceService {
@@ -107,6 +108,7 @@ $fiberLine$sodiumLine
         systemPrompt: systemPrompt,
         userMessage: userMessage,
         maxTokens: _maxTokens,
+        purpose: AiProxyPurpose.nutrition,
       );
     }
 

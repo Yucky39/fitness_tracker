@@ -19,7 +19,7 @@ class SourceReferenceLink extends StatelessWidget {
           visualDensity: compact ? VisualDensity.compact : null,
         ),
         icon: const Icon(Icons.menu_book_outlined, size: 16),
-        label: const Text('情報源・参考資料を見る'),
+        label: const Text('Sources / 情報源・参考資料'),
         onPressed: () {
           Navigator.of(context).push(
             MaterialPageRoute<void>(builder: (_) => const FaqScreen()),

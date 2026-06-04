@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../utils/open_url.dart';
+
 class FaqScreen extends StatelessWidget {
   const FaqScreen({super.key});
 
@@ -22,7 +24,8 @@ class FaqScreen extends StatelessWidget {
     ),
     _FaqItem(
       question: 'AIアドバイス機能を使うには何が必要ですか？',
-      answer: 'Anthropic・OpenAI・Googleいずれかの有効なAPIキーが必要です。'
+      answer: 'プレミアムプラン加入者はAPIキー不要でAI機能を利用できます。'
+          '未加入の場合は、Anthropic・OpenAI・Googleいずれかの有効なAPIキーが必要です。'
           'サイドバーの「AIキー・トレーニングアドバイス設定」から入力してください。',
     ),
     _FaqItem(
@@ -67,11 +70,25 @@ class FaqScreen extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('よくある質問・免責事項')),
+      appBar: AppBar(
+        title: const Text('FAQ / Disclaimer'),
+        bottom: const PreferredSize(
+          preferredSize: Size.fromHeight(28),
+          child: Padding(
+            padding: EdgeInsets.only(left: 16, right: 16, bottom: 10),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'よくある質問・免責事項',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+              ),
+            ),
+          ),
+        ),
+      ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          // 免責事項バナー
           Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
@@ -97,6 +114,34 @@ class FaqScreen extends StatelessWidget {
               ],
             ),
           ),
+          const SizedBox(height: 20),
+          Text(
+            'Sources and references',
+            style: Theme.of(context)
+                .textTheme
+                .titleMedium
+                ?.copyWith(fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            '情報源・参考資料',
+            style: TextStyle(
+              fontSize: 12,
+              color: colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '本アプリ内のカロリー推定、身体活動、栄養、健康管理に関する一般情報は、'
+            '以下の公開資料を参考にしています。各項目をタップするとブラウザで開きます。',
+            style: TextStyle(
+              fontSize: 13,
+              height: 1.55,
+              color: colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 10),
+          ..._sources.map((source) => _SourceTile(source: source)),
           const SizedBox(height: 24),
           Text(
             'よくある質問',
@@ -107,26 +152,6 @@ class FaqScreen extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           ..._faqs.map((item) => _FaqTile(item: item)),
-          const SizedBox(height: 24),
-          Text(
-            '情報源・参考資料',
-            style: Theme.of(context)
-                .textTheme
-                .titleMedium
-                ?.copyWith(fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            '本アプリ内のカロリー推定、身体活動、栄養、健康管理に関する一般情報は、'
-            '以下の公開資料を参考にしています。',
-            style: TextStyle(
-              fontSize: 13,
-              height: 1.55,
-              color: colorScheme.onSurfaceVariant,
-            ),
-          ),
-          const SizedBox(height: 8),
-          ..._sources.map((source) => _SourceTile(source: source)),
         ],
       ),
     );
@@ -182,24 +207,42 @@ class _SourceTile extends StatelessWidget {
     return Card(
       elevation: 0,
       margin: const EdgeInsets.only(bottom: 8),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              source.title,
-              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-            ),
-            const SizedBox(height: 4),
-            SelectableText(
-              source.url,
-              style: TextStyle(
-                fontSize: 12,
-                color: colorScheme.primary,
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => openExternalUrl(context, source.url),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      source.title,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      source.url,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: colorScheme.primary,
+                        decoration: TextDecoration.underline,
+                        decorationColor: colorScheme.primary,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ],
+              const SizedBox(width: 8),
+              Icon(Icons.open_in_new, size: 18, color: colorScheme.primary),
+            ],
+          ),
         ),
       ),
     );

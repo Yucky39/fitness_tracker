@@ -1,41 +1,52 @@
-const { onCall, HttpsError } = require('firebase-functions/v2/https');
+const { onCall, onRequest, HttpsError } = require('firebase-functions/v2/https');
 const { setGlobalOptions } = require('firebase-functions/v2');
-const { defineSecret } = require('firebase-functions/params');
+const { defineSecret, defineString } = require('firebase-functions/params');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const admin = require('firebase-admin');
-const { verifyPurchase, receiptSecrets } = require('./receipt_validation');
+const {
+  verifyPurchase,
+  receiptSecrets,
+  appleSharedSecret,
+  googlePlayServiceAccount,
+  androidPackageName,
+} = require('./receipt_validation');
 
 admin.initializeApp();
 setGlobalOptions({ region: 'asia-northeast1' });
 
+const { parseAppleNotificationV2 } = require('./appstore');
+const { verifyGoogleSubscription, parseGoogleRtdn } = require('./googleplay');
+const {
+  recordPurchaseLink,
+  findUidByPurchaseKey,
+  writeSubscriptionStatus,
+  purgeUserData: purgeUser,
+} = require('./subscriptions');
+
 const MODEL_ID = 'gemini-3.5-flash';
 
-/** Secret Manager 上の名前と一致させる（firebase functions:secrets:set で登録） */
 const geminiApiKey = defineSecret('GEMINI_API_KEY');
 
+/**
+ * App Store 審査用デモアカウント（カンマ区切りメール）。
+ * 例: APP_REVIEW_EMAILS=review@example.com
+ */
+const appReviewEmails = defineString('APP_REVIEW_EMAILS', { default: '' });
+
 // ── AI使用量の計測・予算 ─────────────────────────────────────────────────────
-// gemini-3.5-flash（asia-northeast1 / non-global）の単価を円換算して記帳する。
-// 為替・単価は変数。サービス運用に合わせてここを更新する。
 const USD_TO_JPY = 150;
-const INPUT_USD_PER_TOKEN = 1.65 / 1e6; // $1.65 / 1M tokens
-const OUTPUT_USD_PER_TOKEN = 9.9 / 1e6; // $9.90 / 1M tokens
+const INPUT_USD_PER_TOKEN = 1.65 / 1e6;
+const OUTPUT_USD_PER_TOKEN = 9.9 / 1e6;
 const INPUT_YEN_PER_TOKEN = INPUT_USD_PER_TOKEN * USD_TO_JPY;
 const OUTPUT_YEN_PER_TOKEN = OUTPUT_USD_PER_TOKEN * USD_TO_JPY;
 
-/**
- * 1ユーザー・1ヶ月あたりにサブスクへ含める（無料で使える）AI利用枠（円）。
- * これを超えると追加課金（消費型IAP）の導線が表示される。
- * サブスク手取りから他インフラ費を差し引いて調整する。
- */
 const MONTHLY_INCLUDED_BUDGET_YEN = 1500;
 
-/** 追加クレジット商品ID → 付与する利用枠（円）。手数料を見込み付与額 < 手取りにする。 */
 const CREDIT_YEN_BY_PRODUCT = {
   ai_credit_500: 300,
   ai_credit_1000: 650,
 };
 
-/** JST基準の `YYYY-MM`。月次の使用量ドキュメントキーに使う。 */
 function currentMonthKey() {
   const jst = new Date(Date.now() + 9 * 60 * 60 * 1000);
   const y = jst.getUTCFullYear();
@@ -49,7 +60,6 @@ function usageDocRef(uid, monthKey) {
     .collection('ai_usage').doc(monthKey);
 }
 
-/** 当月の利用が予算（含む枠 + 追加クレジット）内かを検証。超過なら resource-exhausted。 */
 async function assertWithinBudget(uid) {
   const snap = await usageDocRef(uid, currentMonthKey()).get();
   const data = snap.exists ? snap.data() : {};
@@ -60,7 +70,6 @@ async function assertWithinBudget(uid) {
   }
 }
 
-/** 実トークン数（usageMetadata）から円換算し、当月使用量へ加算記帳する（ベストエフォート）。 */
 async function accrueUsage(uid, result) {
   try {
     const meta = result?.response?.usageMetadata || {};
@@ -76,23 +85,49 @@ async function accrueUsage(uid, result) {
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     }, { merge: true });
   } catch (err) {
-    // 記帳失敗は本処理を妨げない（次回以降で再計上される）。
     console.error('accrueUsage error:', err);
   }
 }
 
-// ── 共通: サブスク状態の検証 ─────────────────────────────────────────────────
+// ── サブスク検証（審査用バイパス含む） ───────────────────────────────────────
 
-async function assertSubscribed(uid) {
+function parseReviewEmailAllowlist() {
+  return appReviewEmails
+    .value()
+    .split(',')
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+async function isAppReviewAccount(uid) {
+  const allowlist = parseReviewEmailAllowlist();
+  if (allowlist.length === 0) return false;
+  try {
+    const user = await admin.auth().getUser(uid);
+    const email = user.email?.trim().toLowerCase();
+    return Boolean(email && allowlist.includes(email));
+  } catch (_) {
+    return false;
+  }
+}
+
+async function assertSubscribed(uid, authToken) {
+  if (authToken?.appReview === true) return;
+  if (await isAppReviewAccount(uid)) return;
+
   const snap = await admin.firestore()
     .collection('users').doc(uid)
     .collection('subscription').doc('status')
     .get();
 
-  if (!snap.exists) throw new HttpsError('permission-denied', 'サブスクリプションが必要です。');
+  if (!snap.exists) {
+    throw new HttpsError('permission-denied', 'サブスクリプションが必要です。');
+  }
 
   const data = snap.data();
-  if (!data.active) throw new HttpsError('permission-denied', 'サブスクリプションが有効ではありません。');
+  if (!data.active) {
+    throw new HttpsError('permission-denied', 'サブスクリプションが有効ではありません。');
+  }
 
   const expiresAt = data.expiresAt?.toDate?.() ?? null;
   if (expiresAt && expiresAt < new Date()) {
@@ -100,7 +135,7 @@ async function assertSubscribed(uid) {
   }
 }
 
-// ── geminiProxy: AI生成プロキシ ───────────────────────────────────────────────
+// ── geminiProxy ───────────────────────────────────────────────────────────────
 
 exports.geminiProxy = onCall(
   {
@@ -110,12 +145,13 @@ exports.geminiProxy = onCall(
   },
   async (request) => {
     if (!request.auth) throw new HttpsError('unauthenticated', 'ログインが必要です。');
-    await assertSubscribed(request.auth.uid);
-    // 当月の利用枠（含む枠 + 追加クレジット）を超えていれば、生成前にブロックする。
+    await assertSubscribed(request.auth.uid, request.auth.token);
     await assertWithinBudget(request.auth.uid);
 
     const apiKey = geminiApiKey.value();
-    if (!apiKey) throw new HttpsError('internal', 'サーバー設定エラーです。管理者にお問い合わせください。');
+    if (!apiKey) {
+      throw new HttpsError('internal', 'サーバー設定エラーです。管理者にお問い合わせください。');
+    }
 
     const {
       type,
@@ -127,7 +163,7 @@ exports.geminiProxy = onCall(
       prompt,
       maxTokens = 1024,
       thinkingLevel,
-    } = request.data;
+    } = request.data ?? {};
 
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({ model: MODEL_ID });
@@ -135,7 +171,6 @@ exports.geminiProxy = onCall(
     try {
       let result;
       if (type === 'text') {
-        // テキスト生成（栄養アドバイス・トレーニング評価・プラン生成）
         const generationConfig = { maxOutputTokens: maxTokens };
         if (thinkingLevel) {
           generationConfig.thinkingConfig = { thinkingLevel };
@@ -145,10 +180,7 @@ exports.geminiProxy = onCall(
           contents: [{ role: 'user', parts: [{ text: userMessage }] }],
           generationConfig,
         });
-
       } else if (type === 'chat') {
-        // 会話型（マルチターン）。AIトレーナーチャット用。
-        // messages は [{ role: 'user' | 'model', text }] の配列で、古い順に並ぶ。
         if (!Array.isArray(messages) || messages.length === 0) {
           throw new HttpsError('invalid-argument', 'メッセージが空です。');
         }
@@ -161,9 +193,7 @@ exports.geminiProxy = onCall(
           contents,
           generationConfig: { maxOutputTokens: maxTokens },
         });
-
       } else if (type === 'vision') {
-        // 画像解析（食事写真）
         result = await model.generateContent({
           contents: [{
             role: 'user',
@@ -174,12 +204,10 @@ exports.geminiProxy = onCall(
           }],
           generationConfig: { maxOutputTokens: maxTokens },
         });
-
       } else {
         throw new HttpsError('invalid-argument', '不正なリクエストタイプです。');
       }
 
-      // 実トークン数を当月使用量へ記帳（ベストエフォート）。
       await accrueUsage(request.auth.uid, result);
       return { text: result.response.text() };
     } catch (err) {
@@ -187,22 +215,22 @@ exports.geminiProxy = onCall(
       console.error('Gemini API error:', err);
       throw new HttpsError('internal', 'AI処理中にエラーが発生しました。もう一度試してください。');
     }
-  }
+  },
 );
 
-// ── activateSubscription: 購入完了後にサブスクをFirestoreへ書き込む ──────────────
+// ── activateSubscription ──────────────────────────────────────────────────────
 
 exports.activateSubscription = onCall(
   { timeoutSeconds: 30, secrets: receiptSecrets },
   async (request) => {
     if (!request.auth) throw new HttpsError('unauthenticated', 'ログインが必要です。');
 
-    const { productId, purchaseToken, platform } = request.data;
+    const uid = request.auth.uid;
+    const { productId, purchaseToken, platform } = request.data ?? {};
     if (!productId || !purchaseToken || !platform) {
       throw new HttpsError('invalid-argument', '必要なパラメータが不足しています。');
     }
 
-    // ストアのレシート（購入トークン）をサーバ検証する。
     try {
       await verifyPurchase({
         platform, productId, purchaseToken, kind: 'subscription',
@@ -212,7 +240,6 @@ exports.activateSubscription = onCall(
       throw new HttpsError('permission-denied', '購入の検証に失敗しました。');
     }
 
-    // 有効期限の計算
     const now = new Date();
     const isAnnual = productId.includes('annual');
     const expiresAt = new Date(now);
@@ -222,30 +249,29 @@ exports.activateSubscription = onCall(
       expiresAt.setMonth(expiresAt.getMonth() + 1);
     }
 
-    await admin.firestore()
-      .collection('users').doc(request.auth.uid)
-      .collection('subscription').doc('status')
-      .set({
-        active: true,
-        productId,
-        purchaseToken,
-        platform,
-        activatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        expiresAt: admin.firestore.Timestamp.fromDate(expiresAt),
-      }, { merge: true });
+    await writeSubscriptionStatus(uid, {
+      active: true,
+      productId,
+      purchaseToken,
+      platform,
+      activatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      expiresAt: admin.firestore.Timestamp.fromDate(expiresAt),
+    });
 
-    return { success: true };
-  }
+    await recordPurchaseLink(purchaseToken, uid);
+
+    return { success: true, expiresAt: expiresAt.toISOString() };
+  },
 );
 
-// ── addAiCredit: 追加パック（消費型IAP）購入で当月のAI利用枠を増やす ──────────────
+// ── addAiCredit ─────────────────────────────────────────────────────────────
 
 exports.addAiCredit = onCall(
   { timeoutSeconds: 30, secrets: receiptSecrets },
   async (request) => {
     if (!request.auth) throw new HttpsError('unauthenticated', 'ログインが必要です。');
 
-    const { productId, purchaseToken, platform } = request.data;
+    const { productId, purchaseToken, platform } = request.data ?? {};
     if (!productId || !purchaseToken || !platform) {
       throw new HttpsError('invalid-argument', '必要なパラメータが不足しています。');
     }
@@ -255,7 +281,6 @@ exports.addAiCredit = onCall(
       throw new HttpsError('invalid-argument', '不明な商品IDです。');
     }
 
-    // 消費型IAP（プロダクト）の購入をサーバ検証する。
     try {
       await verifyPurchase({
         platform, productId, purchaseToken, kind: 'product',
@@ -270,12 +295,9 @@ exports.addAiCredit = onCall(
       .collection('ai_credit_purchases').doc(purchaseToken);
     const usageRef = usageDocRef(uid, currentMonthKey());
 
-    // purchaseToken をキーに二重付与を防止する（消費型は同一トークンの再通知があり得る）。
     await admin.firestore().runTransaction(async (tx) => {
       const existing = await tx.get(purchaseRef);
-      if (existing.exists) {
-        return; // 既に付与済み
-      }
+      if (existing.exists) return;
       tx.set(purchaseRef, {
         uid,
         productId,
@@ -291,10 +313,10 @@ exports.addAiCredit = onCall(
     });
 
     return { success: true, creditYen };
-  }
+  },
 );
 
-// ── redeemPromoCode: プロモコードを適用してサブスクを有効化 ─────────────────────
+// ── redeemPromoCode ───────────────────────────────────────────────────────────
 
 exports.redeemPromoCode = onCall(
   { timeoutSeconds: 30 },
@@ -315,36 +337,30 @@ exports.redeemPromoCode = onCall(
         tx.get(userSubRef),
       ]);
 
-      // コードの存在チェック
       if (!promoSnap.exists) {
         throw new HttpsError('not-found', '無効なコードです。もう一度確認してください。');
       }
 
       const promo = promoSnap.data();
 
-      // 有効フラグ
       if (!promo.active) {
         throw new HttpsError('failed-precondition', 'このコードは現在使用できません。');
       }
 
-      // コード自体の有効期限
       const promoExpiry = promo.expiresAt?.toDate?.() ?? null;
       if (promoExpiry && promoExpiry < new Date()) {
         throw new HttpsError('failed-precondition', 'このコードの有効期限が切れています。');
       }
 
-      // 使用回数の上限
       if (promo.maxUses != null && (promo.usedCount ?? 0) >= promo.maxUses) {
         throw new HttpsError('resource-exhausted', 'このコードは使用上限に達しました。');
       }
 
-      // ユーザーの使用済みチェック
       const usedCodes = userSnap.exists ? (userSnap.data().usedPromoCodes ?? []) : [];
       if (usedCodes.includes(code)) {
         throw new HttpsError('already-exists', 'このコードは既に使用済みです。');
       }
 
-      // 有効期限の計算（既存サブスクがあれば期間を延長）
       const now = new Date();
       let baseDate = now;
       if (userSnap.exists && userSnap.data().active) {
@@ -354,10 +370,8 @@ exports.redeemPromoCode = onCall(
       const newExpiry = new Date(baseDate);
       newExpiry.setDate(newExpiry.getDate() + promo.durationDays);
 
-      // プロモの使用回数を更新
       tx.update(promoRef, { usedCount: admin.firestore.FieldValue.increment(1) });
 
-      // サブスクを有効化
       tx.set(userSubRef, {
         active: true,
         productId: `promo_${code}`,
@@ -372,9 +386,8 @@ exports.redeemPromoCode = onCall(
     });
 
     return { success: true, ...result };
-  }
+  },
 );
-
 
 exports.checkSubscription = onCall(
   { timeoutSeconds: 10 },
@@ -397,5 +410,102 @@ exports.checkSubscription = onCall(
       productId: data.productId ?? null,
       expiresAt: expiresAt?.toISOString() ?? null,
     };
-  }
+  },
+);
+
+// ── appleNotifications ────────────────────────────────────────────────────────
+
+exports.appleNotifications = onRequest(
+  { timeoutSeconds: 30, secrets: [appleSharedSecret] },
+  async (req, res) => {
+    if (req.method !== 'POST') {
+      res.status(405).send('Method Not Allowed');
+      return;
+    }
+    try {
+      const signedPayload = req.body && req.body.signedPayload;
+      if (!signedPayload) {
+        res.status(400).send('signedPayload がありません。');
+        return;
+      }
+
+      const note = parseAppleNotificationV2(signedPayload);
+      const uid = await findUidByPurchaseKey(note.originalTransactionId);
+
+      if (uid) {
+        await writeSubscriptionStatus(uid, {
+          active: note.isActive,
+          expiresAt: note.expiresDateMs > 0
+            ? admin.firestore.Timestamp.fromMillis(note.expiresDateMs)
+            : null,
+          lastNotificationType: note.notificationType,
+          autoRenewStatus: note.autoRenewStatus,
+        });
+      } else {
+        console.warn('Apple通知: 該当ユーザーが見つかりません',
+          note.originalTransactionId);
+      }
+
+      res.status(200).send('OK');
+    } catch (err) {
+      console.error('Apple通知の処理エラー:', err);
+      res.status(200).send('OK');
+    }
+  },
+);
+
+// ── googleNotifications ───────────────────────────────────────────────────────
+
+exports.googleNotifications = onRequest(
+  { timeoutSeconds: 30, secrets: [googlePlayServiceAccount] },
+  async (req, res) => {
+    if (req.method !== 'POST') {
+      res.status(405).send('Method Not Allowed');
+      return;
+    }
+    try {
+      const rtdn = parseGoogleRtdn(req.body);
+      if (rtdn.test || !rtdn.subscription) {
+        res.status(200).send('OK');
+        return;
+      }
+
+      const { purchaseToken, subscriptionId } = rtdn.subscription;
+      const uid = await findUidByPurchaseKey(purchaseToken);
+
+      if (uid) {
+        const result = await verifyGoogleSubscription({
+          packageName: rtdn.packageName || androidPackageName.value(),
+          productId: subscriptionId,
+          purchaseToken,
+          serviceAccountJson: googlePlayServiceAccount.value(),
+        });
+        await writeSubscriptionStatus(uid, {
+          active: result.valid ? result.isActive : false,
+          expiresAt: result.expiresDateMs > 0
+            ? admin.firestore.Timestamp.fromMillis(result.expiresDateMs)
+            : null,
+          lastNotificationType: rtdn.subscription.notificationType,
+        });
+      } else {
+        console.warn('Google通知: 該当ユーザーが見つかりません', purchaseToken);
+      }
+
+      res.status(200).send('OK');
+    } catch (err) {
+      console.error('Google通知の処理エラー:', err);
+      res.status(200).send('OK');
+    }
+  },
+);
+
+// ── purgeUserData ─────────────────────────────────────────────────────────────
+
+exports.purgeUserData = onCall(
+  { timeoutSeconds: 60 },
+  async (request) => {
+    if (!request.auth) throw new HttpsError('unauthenticated', 'ログインが必要です。');
+    await purgeUser(request.auth.uid);
+    return { success: true };
+  },
 );

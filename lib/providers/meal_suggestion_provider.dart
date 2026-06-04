@@ -4,8 +4,10 @@ import 'package:riverpod/legacy.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/meal_suggestion.dart';
 import '../services/meal_suggestion_service.dart';
+import 'ai_access.dart';
 import 'meal_provider.dart';
 import 'settings_provider.dart';
+import 'subscription_provider.dart';
 
 class MealSuggestionState {
   final DailyMealSuggestion? suggestion;
@@ -156,10 +158,13 @@ class MealSuggestionNotifier extends StateNotifier<MealSuggestionState> {
 
   Future<void> generate() async {
     final settings = _ref.read(settingsProvider);
-    if (settings.currentApiKey.isEmpty) {
-      state = state.copyWith(
-        error: 'APIキーが設定されていません。設定 → AIキー設定 から入力してください。',
-      );
+    final isSubscribed = _ref.read(isSubscribedProvider);
+    final access = resolveAiAccess(
+      isSubscribed: isSubscribed,
+      apiKey: settings.currentApiKey,
+    );
+    if (!access.allowed) {
+      state = state.copyWith(error: '__paywall__');
       return;
     }
 
@@ -181,6 +186,7 @@ class MealSuggestionNotifier extends StateNotifier<MealSuggestionState> {
           apiKey: settings.currentApiKey,
           provider: settings.selectedProvider,
           model: model,
+          useSystemAi: access.useSystemAi,
         );
         state = MealSuggestionState(
           weeklySuggestion: suggestion,
@@ -200,6 +206,7 @@ class MealSuggestionNotifier extends StateNotifier<MealSuggestionState> {
           model: model,
           isTomorrow: currentPeriod == SuggestionPeriod.tomorrow,
           weeklyDay: weeklyDay,
+          useSystemAi: access.useSystemAi,
         );
         state = MealSuggestionState(
           suggestion: suggestion,

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod/legacy.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/training_log.dart';
+import '../providers/ai_access.dart';
 import '../providers/energy_profile_provider.dart';
 import '../providers/settings_provider.dart';
 import '../providers/subscription_provider.dart';
@@ -98,8 +99,9 @@ class TrainingDailyAdviceNotifier
     if (!forceRefresh && state.adviceByDate.containsKey(key)) return;
 
     final isSubscribed = _ref.read(isSubscribedProvider);
+    final access = resolveAiAccess(isSubscribed: isSubscribed, apiKey: apiKey);
 
-    if (!isSubscribed && apiKey.isEmpty) {
+    if (!access.allowed) {
       state = state.copyWith(
         error: '__paywall__',
         errorDateKey: key,
@@ -140,7 +142,7 @@ class TrainingDailyAdviceNotifier
         date: date,
         bodyWeightKg: effectiveBw,
         adviceLevel: adviceLevel,
-        useSystemAi: isSubscribed,
+        useSystemAi: access.useSystemAi,
         apiKey: apiKey,
         provider: provider,
         model: effectiveModel,

@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import '../models/training_log.dart';
 import '../providers/settings_provider.dart';
+import '../services/ai_proxy_purpose.dart';
 import '../services/ai_proxy_service.dart';
 
 class TrainingAdviceService {
@@ -312,6 +313,7 @@ class TrainingAdviceService {
         systemPrompt: systemPrompt,
         userMessage: userMessage,
         maxTokens: _maxTokens,
+        purpose: AiProxyPurpose.trainingAdvice,
       );
     }
 
@@ -355,6 +357,7 @@ class TrainingAdviceService {
         systemPrompt: systemPrompt,
         userMessage: userMessage,
         maxTokens: _maxTokens,
+        purpose: AiProxyPurpose.trainingAdvice,
       );
     }
 

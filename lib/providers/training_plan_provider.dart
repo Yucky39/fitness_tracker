@@ -5,10 +5,13 @@ import '../models/training_plan.dart';
 import '../services/database_service.dart';
 import '../services/sync_service.dart';
 import '../services/training_plan_service.dart';
+import '../providers/ai_access.dart';
 import '../providers/settings_provider.dart';
 import '../providers/subscription_provider.dart';
 import '../providers/training_provider.dart';
 import '../providers/energy_profile_provider.dart';
+import '../providers/progress_provider.dart';
+import '../providers/sleep_provider.dart';
 
 class TrainingPlanState {
   final List<TrainingPlan> plans;
@@ -74,7 +77,8 @@ class TrainingPlanNotifier extends StateNotifier<TrainingPlanState> {
     final provider = settings.selectedProvider;
     final model = settings.currentModel;
 
-    if (!isSubscribed && apiKey.isEmpty) {
+    final access = resolveAiAccess(isSubscribed: isSubscribed, apiKey: apiKey);
+    if (!access.allowed) {
       state = state.copyWith(
         isGenerating: false,
         error: '__paywall__',
@@ -103,7 +107,7 @@ class TrainingPlanNotifier extends StateNotifier<TrainingPlanState> {
         equipment: equipment,
         profile: profileState.toProfileIfComplete(),
         recentLogs: recentLogs,
-        useSystemAi: isSubscribed,
+        useSystemAi: access.useSystemAi,
         apiKey: apiKey,
         provider: provider,
         model: model.isNotEmpty ? model : null,
@@ -118,6 +122,84 @@ class TrainingPlanNotifier extends StateNotifier<TrainingPlanState> {
     } catch (e) {
       final msg = e.toString().replaceFirst('Exception: ', '');
       state = state.copyWith(isGenerating: false, error: msg);
+      return null;
+    }
+  }
+
+  /// 既存プランを直近の実績・体型推移・睡眠で「来週用」に調整して新規保存する。
+  /// 元プランは残し、調整版を別プランとして追加する（履歴を保てる）。
+  Future<TrainingPlan?> adjustPlan(String planId) async {
+    final current = state.plans.firstWhere(
+      (p) => p.id == planId,
+      orElse: () => state.plans.isNotEmpty
+          ? state.plans.first
+          : throw StateError('プランが見つかりません'),
+    );
+
+    final isSubscribed = _ref.read(isSubscribedProvider);
+    final settings = _ref.read(settingsProvider);
+    final apiKey = settings.currentApiKey;
+    final access = resolveAiAccess(isSubscribed: isSubscribed, apiKey: apiKey);
+    if (!access.allowed) {
+      state = state.copyWith(isGenerating: false, error: '__paywall__');
+      return null;
+    }
+
+    state = state.copyWith(isGenerating: true, clearError: true);
+    try {
+      final allLogs = _ref.read(trainingProvider).logs;
+      final cutoff = DateTime.now().subtract(const Duration(days: 14));
+      final recentLogs = allLogs.where((l) => l.date.isAfter(cutoff)).toList();
+
+      final days = <String>{};
+      for (final l in recentLogs) {
+        final d = l.date.toLocal();
+        days.add('${d.year}-${d.month}-${d.day}');
+      }
+
+      // 体重推移（直近2件の差）
+      final progress = _ref.read(progressProvider);
+      double? weightDelta;
+      if (progress.latest != null && progress.previous != null) {
+        weightDelta = progress.latest!.weight - progress.previous!.weight;
+      }
+
+      // 平均睡眠（直近14日）
+      final sleep = _ref.read(sleepProvider);
+      int? avgSleep;
+      if (sleep.recentLogs.isNotEmpty) {
+        final total = sleep.recentLogs
+            .fold<int>(0, (s, l) => s + l.durationMinutes);
+        avgSleep = (total / sleep.recentLogs.length).round();
+      }
+
+      final profile = _ref.read(energyProfileProvider).toProfileIfComplete();
+
+      final adjusted = await TrainingPlanService().adjustPlan(
+        id: const Uuid().v4(),
+        current: current,
+        recentLogs: recentLogs,
+        trainingDaysLast14: days.length,
+        weightDeltaKg: weightDelta,
+        avgSleepMinutes: avgSleep,
+        profile: profile,
+        useSystemAi: access.useSystemAi,
+        apiKey: apiKey,
+        provider: settings.selectedProvider,
+        model: settings.currentModel.isNotEmpty ? settings.currentModel : null,
+      );
+
+      await _savePlan(adjusted);
+      state = state.copyWith(
+        plans: [adjusted, ...state.plans],
+        isGenerating: false,
+      );
+      return adjusted;
+    } catch (e) {
+      state = state.copyWith(
+        isGenerating: false,
+        error: e.toString().replaceFirst('Exception: ', ''),
+      );
       return null;
     }
   }

@@ -3,14 +3,15 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
 import '../models/meal_suggestion.dart';
+import '../providers/ai_access.dart';
 import '../providers/meal_provider.dart';
 import '../providers/meal_suggestion_provider.dart';
-import '../providers/settings_provider.dart';
 import '../services/ai_exceptions.dart';
 import '../services/ingredient_merge_service.dart';
 import '../services/meal_suggestion_service.dart';
 import '../utils/suggestion_shopping_list.dart';
 import '../widgets/ai_credit_sheet.dart';
+import '../widgets/ai_error_text.dart';
 import '../widgets/source_reference_link.dart';
 
 /// 1日の食事提案を表示する画面
@@ -21,7 +22,7 @@ class MealSuggestionScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(mealSuggestionProvider);
     final mealState = ref.watch(mealProvider);
-    final settings = ref.watch(settingsProvider);
+    final access = ref.watch(aiAccessProvider);
     final notifier = ref.read(mealSuggestionProvider.notifier);
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
@@ -131,39 +132,41 @@ class MealSuggestionScreen extends ConsumerWidget {
               child: Center(
                 child: Padding(
                   padding: const EdgeInsets.all(24),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.error_outline,
-                          size: 48, color: colorScheme.error),
-                      const SizedBox(height: 12),
-                      Text(
-                        state.error!,
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: colorScheme.error),
-                      ),
-                      const SizedBox(height: 20),
-                      if (AiUsageLimitException.isLimit(state.error))
-                        FilledButton.icon(
-                          icon: const Icon(Icons.bolt_rounded),
-                          label: const Text('追加パックを見る'),
-                          onPressed: () => AiCreditSheet.show(context),
-                        )
-                      else
-                        FilledButton.icon(
-                          icon: const Icon(Icons.refresh),
-                          label: const Text('再試行'),
-                          onPressed: () => notifier.generate(),
+                  child: isPaywallError(state.error)
+                      ? AiErrorText(state.error!, center: true)
+                      : Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.error_outline,
+                                size: 48, color: colorScheme.error),
+                            const SizedBox(height: 12),
+                            Text(
+                              state.error!,
+                              textAlign: TextAlign.center,
+                              style: TextStyle(color: colorScheme.error),
+                            ),
+                            const SizedBox(height: 20),
+                            if (AiUsageLimitException.isLimit(state.error))
+                              FilledButton.icon(
+                                icon: const Icon(Icons.bolt_rounded),
+                                label: const Text('追加パックを見る'),
+                                onPressed: () => AiCreditSheet.show(context),
+                              )
+                            else
+                              FilledButton.icon(
+                                icon: const Icon(Icons.refresh),
+                                label: const Text('再試行'),
+                                onPressed: () => notifier.generate(),
+                              ),
+                          ],
                         ),
-                    ],
-                  ),
                 ),
               ),
             )
           else if (!hasContentForPeriod)
             SliverFillRemaining(
               child: _EmptyState(
-                hasApiKey: settings.currentApiKey.isNotEmpty,
+                canUseAi: access.allowed,
                 period: state.period,
                 hasWeeklyPlanCached: hasWeekly,
                 onGenerate: () => notifier.generate(),
@@ -848,12 +851,14 @@ class _DayCard extends StatelessWidget {
 
 class _EmptyState extends StatelessWidget {
   const _EmptyState({
-    required this.hasApiKey,
+    required this.canUseAi,
     required this.period,
     required this.onGenerate,
     this.hasWeeklyPlanCached = false,
   });
-  final bool hasApiKey;
+
+  /// 加入済み、または自前APIキーありで、AIを実行できる状態か。
+  final bool canUseAi;
   final SuggestionPeriod period;
 
   /// 今日／明日タブで日次が未生成でも、週間キャッシュがあるとき true
@@ -908,22 +913,8 @@ class _EmptyState extends StatelessWidget {
               ),
             ],
             const SizedBox(height: 24),
-            if (!hasApiKey) ...[
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.errorContainer,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  'AIキーが未設定です。\nサイドバー → AIキー設定 から入力してください。',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: theme.colorScheme.onErrorContainer,
-                  ),
-                ),
-              ),
+            if (!canUseAi) ...[
+              const AiErrorText(kPaywallErrorMarker, center: true),
             ] else
               FilledButton.icon(
                 icon: const Icon(Icons.auto_awesome),

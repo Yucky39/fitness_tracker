@@ -4,6 +4,7 @@ import '../models/energy_profile.dart';
 import '../models/training_log.dart';
 import '../models/training_plan.dart';
 import '../providers/settings_provider.dart';
+import '../services/ai_proxy_purpose.dart';
 import '../services/ai_proxy_service.dart';
 
 class TrainingPlanService {
@@ -220,6 +221,158 @@ class TrainingPlanService {
     return s;
   }
 
+  /// 既存プランを、直近の実績・体型推移・睡眠を踏まえて「来週用」に調整する。
+  ///
+  /// 「手の中にあるパーソナルトレーナー」の核：記録に応じて指導（メニュー）が
+  /// 自動で変わる適応ループ。漸進的過負荷・回復状況・継続率を反映する。
+  static String _adjustSystemPrompt() {
+    return '経験豊富なパーソナルトレーナーとして、既存のトレーニングプランを「来週用」に調整してください。\n'
+        '直近の実績（実施した種目・重量・RPE）、体重の推移、睡眠の平均、消化率（実施できた割合）を踏まえ、\n'
+        '- 順調にこなせていれば漸進的過負荷（重量/レップ/セットを少し増やす）\n'
+        '- 睡眠不足や消化率が低い・RPEが高すぎる場合は強度や量を抑え、回復を優先\n'
+        '- 停滞している種目は種目変更やレップレンジの調整を検討\n'
+        'を行い、調整理由を overview に簡潔に記してください。\n'
+        '出力は generatePlan と同一のJSON形式のみ（マークダウン不要）。種目名は日本語。';
+  }
+
+  static String _buildAdjustPrompt({
+    required TrainingPlan current,
+    required List<TrainingLog> recentLogs,
+    required int trainingDaysLast14,
+    double? weightDeltaKg,
+    int? avgSleepMinutes,
+    EnergyProfile? profile,
+  }) {
+    final b = StringBuffer();
+    b.writeln('【既存プラン】');
+    b.writeln('名称: ${current.name}');
+    b.writeln('目標: ${current.goal.label} / 強度: ${current.intensity.label} / 週${current.daysPerWeek}日');
+    b.writeln('器具: ${current.equipment.label}');
+    b.writeln('消化率: ${(current.completionRatio * 100).round()}%（${current.completedExerciseCount}/${current.totalExerciseCount}種目）');
+    for (final day in current.days) {
+      b.writeln('- ${day.label}: ${day.exercises.map((e) => '${e.name} ${e.sets}x${e.repRange}${e.suggestedWeightKg != null ? ' @${e.suggestedWeightKg}kg' : ''}').join(' / ')}');
+    }
+    b.writeln();
+
+    b.writeln('【直近2週間の実績】');
+    b.writeln('トレーニング実施日数: $trainingDaysLast14 日');
+    if (recentLogs.isNotEmpty) {
+      final byExercise = <String, List<TrainingLog>>{};
+      for (final log in recentLogs) {
+        byExercise.putIfAbsent(log.exerciseName, () => []).add(log);
+      }
+      for (final entry in byExercise.entries.take(15)) {
+        final logs = entry.value;
+        if (logs.first.exerciseType == ExerciseType.cardio) {
+          final best = logs.reduce((a, b) => a.distanceKm > b.distanceKm ? a : b);
+          b.writeln('・${entry.key}: 最長 ${best.distanceKm.toStringAsFixed(1)}km/${best.durationMinutes}分 (${logs.length}回)');
+        } else {
+          final bestWeight = logs.map((l) => l.weight).reduce((a, b) => a > b ? a : b);
+          final rpes = logs.where((l) => l.rpe != null).map((l) => l.rpe!).toList();
+          final avgRpe = rpes.isEmpty
+              ? null
+              : (rpes.reduce((a, b) => a + b) / rpes.length).toStringAsFixed(1);
+          b.write('・${entry.key}: 最大 ${bestWeight}kg (${logs.length}回)');
+          if (avgRpe != null) b.write(' / 平均RPE $avgRpe');
+          b.writeln();
+        }
+      }
+    } else {
+      b.writeln('（記録なし。量を増やしすぎず、まず継続を促す調整を）');
+    }
+    b.writeln();
+
+    b.writeln('【コンディション】');
+    if (weightDeltaKg != null) {
+      final sign = weightDeltaKg > 0 ? '+' : '';
+      b.writeln('体重推移: $sign${weightDeltaKg.toStringAsFixed(1)}kg');
+    }
+    if (avgSleepMinutes != null && avgSleepMinutes > 0) {
+      b.writeln('平均睡眠: ${avgSleepMinutes ~/ 60}時間${avgSleepMinutes % 60}分');
+    }
+    if (profile != null) {
+      b.writeln('体重: ${profile.weightKg}kg / 目標体重: ${profile.targetWeightKg}kg');
+    }
+    b.writeln();
+    b.writeln('上記を踏まえ、来週の調整版プランを${current.daysPerWeek}日分で作成してください。');
+    return b.toString();
+  }
+
+  Future<TrainingPlan> adjustPlan({
+    required String id,
+    required TrainingPlan current,
+    required List<TrainingLog> recentLogs,
+    required int trainingDaysLast14,
+    double? weightDeltaKg,
+    int? avgSleepMinutes,
+    EnergyProfile? profile,
+    bool useSystemAi = false,
+    required String apiKey,
+    required AiProviderType provider,
+    String? model,
+  }) async {
+    if (!useSystemAi && apiKey.isEmpty) {
+      throw Exception('APIキーが設定されていません。設定画面から入力してください。');
+    }
+
+    final systemPrompt = _adjustSystemPrompt();
+    final userMessage = _buildAdjustPrompt(
+      current: current,
+      recentLogs: recentLogs,
+      trainingDaysLast14: trainingDaysLast14,
+      weightDeltaKg: weightDeltaKg,
+      avgSleepMinutes: avgSleepMinutes,
+      profile: profile,
+    );
+
+    final String raw;
+    if (useSystemAi) {
+      raw = await AiProxyService.callText(
+        systemPrompt: systemPrompt,
+        userMessage: userMessage,
+        maxTokens: _maxTokens,
+        purpose: AiProxyPurpose.trainingPlan,
+      );
+    } else {
+      final resolvedModel = model ?? provider.defaultModel;
+      switch (provider) {
+        case AiProviderType.anthropic:
+          raw = await _callAnthropic(systemPrompt, userMessage, apiKey, resolvedModel);
+        case AiProviderType.openai:
+          raw = await _callOpenAi(systemPrompt, userMessage, apiKey, resolvedModel);
+        case AiProviderType.gemini:
+          raw = await _callGemini(systemPrompt, userMessage, apiKey, resolvedModel);
+      }
+    }
+
+    final jsonText = _extractJson(raw);
+    Map<String, dynamic> data;
+    try {
+      data = jsonDecode(jsonText) as Map<String, dynamic>;
+    } catch (_) {
+      data = jsonDecode(_repairJson(jsonText)) as Map<String, dynamic>;
+    }
+
+    final daysRaw = (data['days'] as List<dynamic>? ?? []);
+    final days = daysRaw
+        .map((d) => TrainingPlanDay.fromMap(Map<String, dynamic>.from(d as Map)))
+        .toList();
+
+    return TrainingPlan(
+      id: id,
+      name: data['name'] as String? ?? '${current.name}（調整版）',
+      goal: current.goal,
+      targetMuscles: current.targetMuscles,
+      cutStyle: current.cutStyle,
+      daysPerWeek: current.daysPerWeek,
+      intensity: current.intensity,
+      equipment: current.equipment,
+      days: days,
+      overview: data['overview'] as String?,
+      createdAt: DateTime.now(),
+    );
+  }
+
   Future<TrainingPlan> generatePlan({
     required String id,
     required TrainingGoal goal,
@@ -257,6 +410,7 @@ class TrainingPlanService {
         systemPrompt: systemPrompt,
         userMessage: userMessage,
         maxTokens: _maxTokens,
+        purpose: AiProxyPurpose.trainingPlan,
       );
     } else {
       final resolvedModel = model ?? provider.defaultModel;

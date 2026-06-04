@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 
 import '../models/training_log.dart';
 import '../providers/settings_provider.dart';
+import 'ai_proxy_purpose.dart';
 import 'ai_proxy_service.dart';
 
 class StretchRecommendationService {
@@ -74,6 +75,7 @@ class StretchRecommendationService {
         userMessage: userMessage,
         maxTokens: _maxTokens,
         thinkingLevel: _geminiThinkingLevel,
+        purpose: AiProxyPurpose.stretch,
       );
     }
 

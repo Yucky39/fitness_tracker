@@ -1,16 +1,19 @@
 import 'dart:convert';
+
 import 'package:cloud_functions/cloud_functions.dart';
 
 import 'ai_exceptions.dart';
+import 'ai_proxy_purpose.dart';
 
-/// サブスク加入済みユーザー向けのAI呼び出しプロキシ。
+/// サブスク加入者向けのAI呼び出しプロキシ。
 /// Gemini APIキーはCloud Functions側で管理し、クライアントに露出させない。
 class AiProxyService {
   static final _functions =
       FirebaseFunctions.instanceFor(region: 'asia-northeast1');
 
-  /// 共通の呼び出し。`geminiProxy` の `resource-exhausted`（利用枠の上限）を
-  /// [AiUsageLimitException] に変換し、全AI機能で統一的に扱えるようにする。
+  /// サーバーが受け付ける base64 画像の最大長（functions/index.js と一致）。
+  static const maxImageBase64Length = 9 * 1024 * 1024;
+
   static Future<String> _invoke(
     Map<String, dynamic> payload, {
     Duration? timeout,
@@ -36,16 +39,16 @@ class AiProxyService {
     }
   }
 
-  // ── テキスト生成 ─────────────────────────────────────────────────────────
-
   static Future<String> callText({
     required String systemPrompt,
     required String userMessage,
     int maxTokens = 1024,
     String? thinkingLevel,
+    AiProxyPurpose purpose = AiProxyPurpose.general,
   }) {
     final payload = <String, dynamic>{
       'type': 'text',
+      'purpose': purpose.key,
       'systemPrompt': systemPrompt,
       'userMessage': userMessage,
       'maxTokens': maxTokens,
@@ -56,10 +59,6 @@ class AiProxyService {
     return _invoke(payload);
   }
 
-  // ── 会話（マルチターン） ─────────────────────────────────────────────────
-
-  /// AIトレーナーチャット用。会話履歴を保ったまま生成する。
-  /// [messages] は古い順に並んだ `{role: 'user'|'model', text}` の配列。
   static Future<String> callChat({
     required String systemPrompt,
     required List<Map<String, String>> messages,
@@ -76,18 +75,23 @@ class AiProxyService {
     );
   }
 
-  // ── 画像解析 ─────────────────────────────────────────────────────────────
-
   static Future<String> callVision({
     required List<int> imageBytes,
     required String mediaType,
     required String prompt,
     int maxTokens = 2048,
+    AiProxyPurpose purpose = AiProxyPurpose.vision,
   }) {
     final base64Image = base64Encode(imageBytes);
+    if (base64Image.length > maxImageBase64Length) {
+      throw Exception(
+        '画像が大きすぎます。別の写真を選ぶか、解像度を下げてください。',
+      );
+    }
     return _invoke(
       {
         'type': 'vision',
+        'purpose': purpose.key,
         'base64Image': base64Image,
         'mediaType': mediaType,
         'prompt': prompt,

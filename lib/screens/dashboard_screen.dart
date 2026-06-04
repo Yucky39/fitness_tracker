@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../models/period_summary.dart';
+import '../providers/daily_coach_provider.dart';
 import '../providers/dashboard_provider.dart';
 import '../providers/energy_profile_provider.dart';
 import '../providers/home_tab_provider.dart';
@@ -22,6 +23,8 @@ import '../models/training_routine.dart';
 import '../providers/training_provider.dart';
 import '../services/health_service.dart';
 import '../services/training_calorie_calculator.dart';
+import '../widgets/coach_plan_nudge_card.dart';
+import '../widgets/daily_coach_card.dart';
 import '../widgets/micro_tap.dart';
 import 'routine_screen.dart';
 import 'trainer_chat_screen.dart';
@@ -71,6 +74,7 @@ class DashboardScreen extends ConsumerWidget {
         ref.read(sleepProvider.notifier).syncOnDashboardVisible(),
         ref.read(stepsProvider.notifier).syncOnDashboardVisible(),
       ]);
+      await ref.read(dailyCoachProvider.notifier).maybeAutoGenerate();
     }
 
     return ColoredBox(
@@ -85,7 +89,10 @@ class DashboardScreen extends ConsumerWidget {
               sliver: SliverList(
                 delegate: SliverChildListDelegate([
                   _buildHeroHeader(context, scheme, refresh),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 12),
+                  const DailyCoachCard(),
+                  const CoachPlanNudgeCard(),
+                  const SizedBox(height: 12),
                   _buildBalanceCard(
                     context,
                     scheme,

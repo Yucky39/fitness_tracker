@@ -20,6 +20,7 @@ import '../providers/training_session_provider.dart';
 import '../services/health_service.dart';
 import '../services/training_calorie_calculator.dart';
 import '../services/ai_exceptions.dart';
+import '../widgets/ai_error_text.dart';
 import '../widgets/ai_limit_banner.dart';
 import '../widgets/muscle_heatmap_painter.dart';
 import '../widgets/training/exercise_weight_chart_sheet.dart';
@@ -677,6 +678,8 @@ class _DailyAdviceCard extends ConsumerWidget {
                 children: [
                   if (AiUsageLimitException.isLimit(error)) ...[
                     AiLimitBanner(error: error),
+                  ] else if (isPaywallError(error)) ...[
+                    AiErrorText(error),
                   ] else ...[
                     Text(error,
                         style:

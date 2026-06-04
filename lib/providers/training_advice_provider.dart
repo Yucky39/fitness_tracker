@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod/legacy.dart';
 import '../models/training_log.dart';
+import '../providers/ai_access.dart';
 import '../providers/settings_provider.dart';
 import '../providers/subscription_provider.dart';
 import '../providers/training_provider.dart';
@@ -40,7 +41,9 @@ class TrainingAdviceNotifier extends StateNotifier<TrainingAdviceState> {
     final effectiveProvider = provider ?? settings.selectedProvider;
     final modelStr = model ?? settings.currentModel;
 
-    if (!isSubscribed && effectiveApiKey.isEmpty) {
+    final access =
+        resolveAiAccess(isSubscribed: isSubscribed, apiKey: effectiveApiKey);
+    if (!access.allowed) {
       state = TrainingAdviceState(
         adviceByLogId: state.adviceByLogId,
         errorLogId: log.id,
@@ -70,7 +73,7 @@ class TrainingAdviceNotifier extends StateNotifier<TrainingAdviceState> {
         focusLogs: [log],
         historyByExercise: {log.exerciseName: recentHistory},
         adviceLevel: adviceLevel,
-        useSystemAi: isSubscribed,
+        useSystemAi: access.useSystemAi,
         apiKey: effectiveApiKey,
         provider: effectiveProvider,
         model: modelStr.isNotEmpty ? modelStr : null,

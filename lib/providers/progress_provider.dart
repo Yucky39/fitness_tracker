@@ -132,7 +132,7 @@ class ProgressNotifier extends StateNotifier<ProgressState> {
       date: DateTime.now(),
     );
     await adapter.insert('body_metrics', newMetrics.toMap());
-    SyncService().syncRecord('body_metrics', newMetrics.toMap());
+    SyncService().syncBodyMetrics(newMetrics.toMap());
     await _loadMetrics();
     // バッジ評価（体重記録・全体継続）
     _ref
@@ -148,14 +148,14 @@ class ProgressNotifier extends StateNotifier<ProgressState> {
       where: 'id = ?',
       whereArgs: [updated.id],
     );
-    SyncService().syncRecord('body_metrics', updated.toMap());
+    SyncService().syncBodyMetrics(updated.toMap());
     await _loadMetrics();
   }
 
   Future<void> deleteMetrics(String id) async {
     final adapter = await DatabaseService().database;
     await adapter.delete('body_metrics', where: 'id = ?', whereArgs: [id]);
-    SyncService().deleteRecord('body_metrics', id);
+    SyncService().deleteBodyMetrics(id);
     await _loadMetrics();
   }
 }

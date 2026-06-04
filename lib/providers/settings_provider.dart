@@ -62,17 +62,6 @@ enum AiProviderType {
     }
   }
 
-  String get modelLabel {
-    switch (this) {
-      case AiProviderType.anthropic:
-        return 'Claude Haiku 4.5';
-      case AiProviderType.openai:
-        return 'GPT-5.4 mini';
-      case AiProviderType.gemini:
-        return 'Gemini 3.5 Flash';
-    }
-  }
-
   String get apiKeyHint {
     switch (this) {
       case AiProviderType.anthropic:
@@ -148,6 +137,11 @@ class SettingsState {
   final bool communityFoodContributeEnabled;
   final bool mealSuggestionEnabled;
 
+  /// 横断AIコーチの毎日のリマインダー（「今日のコーチングが届いています」）
+  final bool coachReminderEnabled;
+  final int coachReminderHour;
+  final int coachReminderMinute;
+
   const SettingsState({
     this.adviceLevel = 'normal',
     this.selectedProvider = AiProviderType.anthropic,
@@ -170,6 +164,9 @@ class SettingsState {
     this.trainingAdviceEnabled = true,
     this.communityFoodContributeEnabled = true,
     this.mealSuggestionEnabled = false,
+    this.coachReminderEnabled = false,
+    this.coachReminderHour = 8,
+    this.coachReminderMinute = 0,
   });
 
   String get currentApiKey {
@@ -248,6 +245,9 @@ class SettingsState {
     bool? trainingAdviceEnabled,
     bool? communityFoodContributeEnabled,
     bool? mealSuggestionEnabled,
+    bool? coachReminderEnabled,
+    int? coachReminderHour,
+    int? coachReminderMinute,
   }) =>
       SettingsState(
         adviceLevel: adviceLevel ?? this.adviceLevel,
@@ -281,6 +281,10 @@ class SettingsState {
             this.communityFoodContributeEnabled,
         mealSuggestionEnabled:
             mealSuggestionEnabled ?? this.mealSuggestionEnabled,
+        coachReminderEnabled:
+            coachReminderEnabled ?? this.coachReminderEnabled,
+        coachReminderHour: coachReminderHour ?? this.coachReminderHour,
+        coachReminderMinute: coachReminderMinute ?? this.coachReminderMinute,
       );
 }
 
@@ -348,6 +352,9 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
       communityFoodContributeEnabled:
           prefs.getBool('communityFoodContributeEnabled') ?? true,
       mealSuggestionEnabled: prefs.getBool('mealSuggestionEnabled') ?? false,
+      coachReminderEnabled: prefs.getBool('coachReminderEnabled') ?? false,
+      coachReminderHour: prefs.getInt('coachReminderHour') ?? 8,
+      coachReminderMinute: prefs.getInt('coachReminderMinute') ?? 0,
     );
   }
 
@@ -425,6 +432,9 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
     int? waterIntervalMinutes,
     int? waterStartHour,
     int? waterEndHour,
+    bool? coachEnabled,
+    int? coachHour,
+    int? coachMinute,
   }) async {
     final prefs = await SharedPreferences.getInstance();
     if (mealEnabled != null) {
@@ -455,6 +465,13 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
     if (waterEndHour != null) {
       await prefs.setInt('waterReminderEndHour', waterEndHour);
     }
+    if (coachEnabled != null) {
+      await prefs.setBool('coachReminderEnabled', coachEnabled);
+    }
+    if (coachHour != null) await prefs.setInt('coachReminderHour', coachHour);
+    if (coachMinute != null) {
+      await prefs.setInt('coachReminderMinute', coachMinute);
+    }
     state = state.copyWith(
       mealReminderEnabled: mealEnabled,
       mealReminderHour: mealHour,
@@ -466,6 +483,9 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
       waterReminderIntervalMinutes: waterIntervalMinutes,
       waterReminderStartHour: waterStartHour,
       waterReminderEndHour: waterEndHour,
+      coachReminderEnabled: coachEnabled,
+      coachReminderHour: coachHour,
+      coachReminderMinute: coachMinute,
     );
 
     SyncService().syncFields({

@@ -2,6 +2,7 @@ import 'dart:convert';
 // ignore: avoid_web_libraries_in_flutter, deprecated_member_use
 import 'dart:html' as html;
 import 'database_interface.dart';
+import 'sync_tables.dart';
 
 /// Web implementation using in-memory storage backed by localStorage.
 class WebDatabaseAdapter implements DatabaseAdapter {
@@ -10,14 +11,10 @@ class WebDatabaseAdapter implements DatabaseAdapter {
 
   @override
   Future<void> initialize() async {
-    _tables['food_items'] = [];
-    _tables['training_logs'] = [];
-    _tables['body_metrics'] = [];
-    _tables['meal_presets'] = [];
-    _tables['exercise_animations'] = [];
-    _tables['shopping_ingredient_aliases'] = [];
-    _tables['shopping_ingredient_surface_stats'] = [];
-    _tables['training_session_records'] = [];
+    // アプリが使う全テーブルを初期化（単一の正規リストから生成）。
+    for (final table in SyncTables.all) {
+      _tables[table] = [];
+    }
     _loadFromStorage();
   }
 
@@ -26,10 +23,13 @@ class WebDatabaseAdapter implements DatabaseAdapter {
     if (raw == null) return;
     try {
       final Map<String, dynamic> data = json.decode(raw);
-      for (final table in _tables.keys) {
-        if (data[table] != null) {
-          _tables[table] = List<Map<String, dynamic>>.from(
-            (data[table] as List).map((e) => Map<String, dynamic>.from(e)),
+      // 初期化済みキーではなく保存済みデータのキーを基準に復元する。
+      // 動的に putIfAbsent で追加されたテーブルもリロード後に消えない。
+      for (final entry in data.entries) {
+        final value = entry.value;
+        if (value is List) {
+          _tables[entry.key] = List<Map<String, dynamic>>.from(
+            value.map((e) => Map<String, dynamic>.from(e)),
           );
         }
       }

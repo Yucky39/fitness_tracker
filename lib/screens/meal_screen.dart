@@ -13,6 +13,7 @@ import '../models/community_food_entry.dart';
 import '../models/food_item.dart';
 import '../models/meal_preset.dart';
 import '../providers/advice_provider.dart';
+import '../providers/ai_access.dart';
 import '../providers/meal_provider.dart';
 import '../providers/meal_suggestion_provider.dart';
 import '../providers/nutrition_trend_provider.dart';
@@ -23,9 +24,12 @@ import '../services/auth_service.dart';
 import '../services/barcode_lookup_service.dart';
 import '../services/community_food_service.dart';
 import '../services/food_search_service.dart';
+import '../services/ai_exceptions.dart';
 import '../services/meal_image_analysis_service.dart';
+import '../widgets/ai_error_text.dart';
 import '../widgets/ai_limit_banner.dart';
 import '../widgets/nutrient_bar.dart';
+import '../widgets/paywall_sheet.dart';
 import '../widgets/recipe_preset_editor_sheet.dart';
 import '../widgets/source_reference_link.dart';
 import '../widgets/supplement_entry_dialog.dart';
@@ -711,7 +715,15 @@ class MealScreen extends ConsumerWidget {
                     fontSize: 12, color: Colors.teal, height: 1.35),
               ),
             ),
-            AiLimitBanner(error: error),
+            if (error != null) ...[
+              const SizedBox(height: 8),
+              if (AiUsageLimitException.isLimit(error))
+                AiLimitBanner(error: error)
+              else if (isPaywallError(error))
+                AiErrorText(error)
+              else
+                AiErrorText(error),
+            ],
             if (adviceText != null) ...[
               const SizedBox(height: 8),
               const Divider(),
@@ -1954,6 +1966,13 @@ class MealScreen extends ConsumerWidget {
     MealNotifier notifier,
   ) async {
     final settings = ref.read(settingsProvider);
+    final access = ref.read(aiAccessProvider);
+
+    // 加入もBYOKキーも無い場合は課金導線を出して終了。
+    if (!access.allowed) {
+      await PaywallSheet.show(context);
+      return;
+    }
 
     final source = await showDialog<ImageSource>(
       context: context,
@@ -2003,6 +2022,7 @@ class MealScreen extends ConsumerWidget {
       barrierDismissible: false,
       builder: (_) => _PhotoAnalysisDialog(
         imageFile: xFile!,
+        useSystemAi: access.useSystemAi,
         apiKey: settings.currentApiKey,
         provider: settings.selectedProvider,
         model: settings.currentModel,
@@ -2595,6 +2615,7 @@ class _PresetSheet extends ConsumerWidget {
 
 class _PhotoAnalysisDialog extends StatefulWidget {
   final XFile imageFile;
+  final bool useSystemAi;
   final String apiKey;
   final AiProviderType provider;
   final String model;
@@ -2602,6 +2623,7 @@ class _PhotoAnalysisDialog extends StatefulWidget {
 
   const _PhotoAnalysisDialog({
     required this.imageFile,
+    required this.useSystemAi,
     required this.apiKey,
     required this.provider,
     required this.model,
@@ -2699,6 +2721,7 @@ class _PhotoAnalysisDialogState extends State<_PhotoAnalysisDialog> {
       final items = await MealImageAnalysisService().analyzeImage(
         imageBytes: bytes,
         filePath: widget.imageFile.path,
+        useSystemAi: widget.useSystemAi,
         apiKey: widget.apiKey,
         provider: widget.provider,
         model: widget.model,

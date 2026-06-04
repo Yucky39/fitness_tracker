@@ -3,6 +3,8 @@ import 'package:http/http.dart' as http;
 import '../models/food_item.dart';
 import '../models/meal_suggestion.dart';
 import '../providers/settings_provider.dart';
+import 'ai_proxy_purpose.dart';
+import 'ai_proxy_service.dart';
 
 enum SuggestionPeriod {
   today,
@@ -28,6 +30,11 @@ class MealSuggestionService {
   /// 週間プランの分割API（4日分／3日分）用。食材付きJSONは長くなりやすい。
   /// 日次のままだと max_tokens で出力が切れて JSON 壊れやすい。
   static const _maxTokensWeeklyPart = 16384;
+
+  /// システムAI（プロキシ）経由時の system_instruction。
+  /// プロンプト本体は userMessage 側に渡す。
+  static const _systemInstruction =
+      'あなたは日本の管理栄養士です。指示に厳密に従い、JSONのみを返答してください。';
 
   // ── Prompt builders ───────────────────────────────────────────────────────
 
@@ -258,8 +265,9 @@ JSONのみを返してください。前後の説明文や```json```マークダ
     required String model,
     required bool isTomorrow,
     WeeklyDayPlan? weeklyDay,
+    bool useSystemAi = false,
   }) async {
-    if (apiKey.isEmpty) {
+    if (!useSystemAi && apiKey.isEmpty) {
       throw Exception('APIキーが設定されていません。設定画面からAPIキーを入力してください。');
     }
 
@@ -287,7 +295,8 @@ JSONのみを返してください。前後の説明文や```json```マークダ
       );
     }
 
-    final rawText = await _callApi(prompt, apiKey, model, provider);
+    final rawText =
+        await _callApi(prompt, apiKey, model, provider, useSystemAi: useSystemAi);
     return _parseDailyResponse(rawText);
   }
 
@@ -299,8 +308,9 @@ JSONのみを返してください。前後の説明文や```json```マークダ
     required String apiKey,
     required AiProviderType provider,
     required String model,
+    bool useSystemAi = false,
   }) async {
-    if (apiKey.isEmpty) {
+    if (!useSystemAi && apiKey.isEmpty) {
       throw Exception('APIキーが設定されていません。設定画面からAPIキーを入力してください。');
     }
 
@@ -323,9 +333,9 @@ JSONのみを返してください。前後の説明文や```json```マークダ
 
     final results = await Future.wait([
       _callApi(prompt1, apiKey, model, provider,
-          maxOutputTokens: _maxTokensWeeklyPart),
+          maxOutputTokens: _maxTokensWeeklyPart, useSystemAi: useSystemAi),
       _callApi(prompt2, apiKey, model, provider,
-          maxOutputTokens: _maxTokensWeeklyPart),
+          maxOutputTokens: _maxTokensWeeklyPart, useSystemAi: useSystemAi),
     ]);
 
     final part1 = _parseWeeklyResponse(results[0]);
@@ -380,8 +390,17 @@ JSONのみを返してください。前後の説明文や```json```マークダ
     String model,
     AiProviderType provider, {
     int? maxOutputTokens,
+    bool useSystemAi = false,
   }) {
     final max = maxOutputTokens ?? _maxTokensDaily;
+    if (useSystemAi) {
+      return AiProxyService.callText(
+        systemPrompt: _systemInstruction,
+        userMessage: prompt,
+        maxTokens: max,
+        purpose: AiProxyPurpose.mealSuggestion,
+      );
+    }
     switch (provider) {
       case AiProviderType.anthropic:
         return _callAnthropic(prompt, apiKey, model, maxTokens: max);

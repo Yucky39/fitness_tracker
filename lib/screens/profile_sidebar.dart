@@ -744,6 +744,25 @@ class ProfileSidebar extends ConsumerWidget {
                     },
                   ),
                   const SizedBox(height: 8),
+                  _buildReminderRow(
+                    context,
+                    ref,
+                    label: 'コーチング（朝8時・夜20時）',
+                    enabled: settings.coachReminderEnabled,
+                    hour: settings.coachReminderHour,
+                    minute: settings.coachReminderMinute,
+                    onChanged: (enabled, hour, minute) async {
+                      await ref
+                          .read(settingsProvider.notifier)
+                          .updateNotificationSettings(
+                            coachEnabled: enabled,
+                            coachHour: hour,
+                            coachMinute: minute,
+                          );
+                      await NotificationService().rescheduleFromSettings();
+                    },
+                  ),
+                  const SizedBox(height: 8),
                   const Divider(),
                   const SizedBox(height: 4),
                   _buildWaterReminderSection(
@@ -1144,221 +1163,242 @@ class ProfileSidebar extends ConsumerWidget {
               ),
             ),
             const Divider(height: 1),
-
-            // ── サブスクリプションバナー（未加入時） ──
-            if (!isSubscribed)
-              InkWell(
-                onTap: () {
-                  scaffoldKey.currentState?.closeEndDrawer();
-                  PaywallSheet.show(context);
-                },
-                child: Container(
-                  margin: const EdgeInsets.fromLTRB(12, 8, 12, 4),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        Theme.of(context).colorScheme.primaryContainer,
-                        Theme.of(context).colorScheme.secondaryContainer,
-                      ],
-                    ),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.auto_awesome_rounded,
-                          size: 20,
-                          color: Theme.of(context).colorScheme.primary),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+            Expanded(
+              child: ListView(
+                padding: EdgeInsets.zero,
+                children: [
+                  // ── サブスクリプションバナー（未加入時） ──
+                  if (!isSubscribed)
+                    InkWell(
+                      onTap: () {
+                        scaffoldKey.currentState?.closeEndDrawer();
+                        PaywallSheet.show(context);
+                      },
+                      child: Container(
+                        margin: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 10),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              Theme.of(context)
+                                  .colorScheme
+                                  .primaryContainer,
+                              Theme.of(context)
+                                  .colorScheme
+                                  .secondaryContainer,
+                            ],
+                          ),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
                           children: [
-                            Text(
-                              'プレミアムプランを試す',
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.bold,
-                                color: Theme.of(context)
-                                    .colorScheme
-                                    .onPrimaryContainer,
+                            Icon(Icons.auto_awesome_rounded,
+                                size: 20,
+                                color:
+                                    Theme.of(context).colorScheme.primary),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'プレミアムプランを試す',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.bold,
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onPrimaryContainer,
+                                    ),
+                                  ),
+                                  Text(
+                                    'AI機能が自動で使えるようになります',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onPrimaryContainer,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
-                            Text(
-                              'AI機能が自動で使えるようになります',
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: Theme.of(context)
-                                    .colorScheme
-                                    .onPrimaryContainer,
-                              ),
-                            ),
+                            Icon(Icons.chevron_right,
+                                color:
+                                    Theme.of(context).colorScheme.primary),
                           ],
                         ),
                       ),
-                      Icon(Icons.chevron_right,
+                    ),
+
+                  // ── FAQ / 免責 / 情報源（審査で見つけやすい位置） ──
+                  ListTile(
+                    leading: const Icon(Icons.menu_book_outlined),
+                    title: const Text('FAQ / Disclaimer'),
+                    subtitle: const Text(
+                      'Sources and references',
+                      style: TextStyle(fontSize: 11),
+                    ),
+                    trailing: const Icon(Icons.chevron_right,
+                        size: 20, color: Colors.grey),
+                    onTap: () {
+                      final nav = scaffoldKey.currentContext ?? context;
+                      scaffoldKey.currentState?.closeEndDrawer();
+                      Navigator.of(nav).push(
+                        MaterialPageRoute(builder: (_) => const FaqScreen()),
+                      );
+                    },
+                  ),
+                  const Divider(height: 1),
+
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+                    child: Text(
+                      'プロフィール設定',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.grey[600],
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ),
+
+                  ListTile(
+                    leading: const Icon(Icons.calculate_outlined),
+                    title: const Text('カロリー・栄養目標設定'),
+                    trailing: const Icon(Icons.chevron_right,
+                        size: 20, color: Colors.grey),
+                    onTap: () {
+                      final ctx = scaffoldKey.currentContext!;
+                      scaffoldKey.currentState?.closeEndDrawer();
+                      _showCalorieGoalDialog(ctx, ref);
+                    },
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.psychology_outlined),
+                    title: Text(isSubscribed
+                        ? 'AIアドバイス設定'
+                        : 'AIキー・トレーニングアドバイス設定'),
+                    trailing: const Icon(Icons.chevron_right,
+                        size: 20, color: Colors.grey),
+                    onTap: () {
+                      final ctx = scaffoldKey.currentContext!;
+                      scaffoldKey.currentState?.closeEndDrawer();
+                      _showAISettingsDialog(ctx, ref);
+                    },
+                  ),
+                  if (isSubscribed)
+                    ListTile(
+                      leading: Icon(Icons.workspace_premium_outlined,
                           color: Theme.of(context).colorScheme.primary),
-                    ],
+                      title: const Text('プレミアムプラン'),
+                      subtitle: subscription.expiresAt != null
+                          ? Text(
+                              '次回更新: ${_formatDate(subscription.expiresAt!)}',
+                              style: const TextStyle(
+                                  fontSize: 11, color: Colors.grey),
+                            )
+                          : null,
+                      trailing: const Icon(Icons.chevron_right,
+                          size: 20, color: Colors.grey),
+                      onTap: () {
+                        scaffoldKey.currentState?.closeEndDrawer();
+                        _showSubscriptionInfoDialog(context, ref);
+                      },
+                    ),
+                  ListTile(
+                    leading: const Icon(Icons.notifications_outlined),
+                    title: const Text('リマインダー通知'),
+                    trailing: const Icon(Icons.chevron_right,
+                        size: 20, color: Colors.grey),
+                    onTap: () {
+                      final ctx = scaffoldKey.currentContext!;
+                      scaffoldKey.currentState?.closeEndDrawer();
+                      _showReminderDialog(ctx, ref);
+                    },
                   ),
-                ),
-              ),
-
-            const SizedBox(height: 4),
-
-            // ── セクションラベル ──
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
-              child: Text(
-                'プロフィール設定',
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.grey[600],
-                  letterSpacing: 0.5,
-                ),
-              ),
-            ),
-
-            // ── カロリー・栄養目標設定 ──
-            ListTile(
-              leading: const Icon(Icons.calculate_outlined),
-              title: const Text('カロリー・栄養目標設定'),
-              trailing:
-                  const Icon(Icons.chevron_right, size: 20, color: Colors.grey),
-              onTap: () {
-                final ctx = scaffoldKey.currentContext!;
-                scaffoldKey.currentState?.closeEndDrawer();
-                _showCalorieGoalDialog(ctx, ref);
-              },
-            ),
-
-            // ── AIキー・トレーニングアドバイス設定（サブスク未加入時のみAPIキー設定を表示） ──
-            ListTile(
-              leading: const Icon(Icons.psychology_outlined),
-              title: Text(isSubscribed ? 'AIアドバイス設定' : 'AIキー・トレーニングアドバイス設定'),
-              trailing:
-                  const Icon(Icons.chevron_right, size: 20, color: Colors.grey),
-              onTap: () {
-                final ctx = scaffoldKey.currentContext!;
-                scaffoldKey.currentState?.closeEndDrawer();
-                _showAISettingsDialog(ctx, ref);
-              },
-            ),
-
-            // ── サブスクリプション管理（加入済みのみ） ──
-            if (isSubscribed)
-              ListTile(
-                leading: Icon(Icons.workspace_premium_outlined,
-                    color: Theme.of(context).colorScheme.primary),
-                title: const Text('プレミアムプラン'),
-                subtitle: subscription.expiresAt != null
-                    ? Text(
-                        '次回更新: ${_formatDate(subscription.expiresAt!)}',
-                        style:
-                            const TextStyle(fontSize: 11, color: Colors.grey),
-                      )
-                    : null,
-                trailing: const Icon(Icons.chevron_right,
-                    size: 20, color: Colors.grey),
-                onTap: () {
-                  scaffoldKey.currentState?.closeEndDrawer();
-                  _showSubscriptionInfoDialog(context, ref);
-                },
-              ),
-
-            // ── リマインダー通知 ──
-            ListTile(
-              leading: const Icon(Icons.notifications_outlined),
-              title: const Text('リマインダー通知'),
-              trailing:
-                  const Icon(Icons.chevron_right, size: 20, color: Colors.grey),
-              onTap: () {
-                final ctx = scaffoldKey.currentContext!;
-                scaffoldKey.currentState?.closeEndDrawer();
-                _showReminderDialog(ctx, ref);
-              },
-            ),
-
-            // ── データ管理 ──
-            ListTile(
-              leading: const Icon(Icons.storage_outlined),
-              title: const Text('データ管理'),
-              trailing:
-                  const Icon(Icons.chevron_right, size: 20, color: Colors.grey),
-              onTap: () {
-                final ctx = scaffoldKey.currentContext!;
-                scaffoldKey.currentState?.closeEndDrawer();
-                _showDataManagementDialog(ctx, ref);
-              },
-            ),
-
-            if (Platform.isAndroid)
-              ListTile(
-                leading: const Icon(Icons.system_update_alt_outlined),
-                title: const Text('アプリ更新'),
-                trailing: const Icon(Icons.chevron_right,
-                    size: 20, color: Colors.grey),
-                onTap: () {
-                  final ctx = scaffoldKey.currentContext!;
-                  scaffoldKey.currentState?.closeEndDrawer();
-                  showAppUpdateDialog(ctx);
-                },
-              ),
-
-            const Spacer(),
-            const Divider(height: 1),
-
-            // ── よくある質問 ──
-            ListTile(
-              leading: const Icon(Icons.help_outline),
-              title: const Text('よくある質問'),
-              trailing:
-                  const Icon(Icons.chevron_right, size: 20, color: Colors.grey),
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const FaqScreen()),
-                );
-              },
-            ),
-            const Divider(height: 1),
-
-            // ── バッジ・実績 ──
-            ListTile(
-              leading: const Icon(Icons.emoji_events_rounded),
-              title: const Text('バッジ・実績'),
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => const _AchievementsWrapper(),
+                  ListTile(
+                    leading: const Icon(Icons.storage_outlined),
+                    title: const Text('データ管理'),
+                    trailing: const Icon(Icons.chevron_right,
+                        size: 20, color: Colors.grey),
+                    onTap: () {
+                      final ctx = scaffoldKey.currentContext!;
+                      scaffoldKey.currentState?.closeEndDrawer();
+                      _showDataManagementDialog(ctx, ref);
+                    },
                   ),
-                );
-              },
-            ),
-            const Divider(height: 1),
 
-            // ── ログアウト ──
-            ListTile(
-              leading: const Icon(Icons.logout),
-              title: const Text('ログアウト'),
-              onTap: () {
-                final ctx = scaffoldKey.currentContext!;
-                scaffoldKey.currentState?.closeEndDrawer();
-                _signOut(ctx);
-              },
-            ),
+                  if (Platform.isAndroid)
+                    ListTile(
+                      leading: const Icon(Icons.system_update_alt_outlined),
+                      title: const Text('アプリ更新'),
+                      trailing: const Icon(Icons.chevron_right,
+                          size: 20, color: Colors.grey),
+                      onTap: () {
+                        final ctx = scaffoldKey.currentContext!;
+                        scaffoldKey.currentState?.closeEndDrawer();
+                        showAppUpdateDialog(ctx);
+                      },
+                    ),
 
-            // ── アカウント削除 ──
-            ListTile(
-              leading: const Icon(Icons.delete_forever, color: Colors.red),
-              title: const Text('アカウント削除', style: TextStyle(color: Colors.red)),
-              onTap: () {
-                final ctx = scaffoldKey.currentContext!;
-                scaffoldKey.currentState?.closeEndDrawer();
-                _deleteAccount(ctx);
-              },
+                  const Divider(height: 1),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+                    child: Text(
+                      'アカウント',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.grey[600],
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.logout),
+                    title: const Text('ログアウト'),
+                    onTap: () {
+                      final ctx = scaffoldKey.currentContext!;
+                      scaffoldKey.currentState?.closeEndDrawer();
+                      _signOut(ctx);
+                    },
+                  ),
+                  ListTile(
+                    leading:
+                        const Icon(Icons.delete_forever, color: Colors.red),
+                    title: const Text(
+                      'アカウント削除',
+                      style: TextStyle(color: Colors.red),
+                    ),
+                    subtitle: const Text(
+                      'Delete account and all data',
+                      style: TextStyle(fontSize: 11),
+                    ),
+                    onTap: () {
+                      final ctx = scaffoldKey.currentContext!;
+                      scaffoldKey.currentState?.closeEndDrawer();
+                      _deleteAccount(ctx);
+                    },
+                  ),
+                  const Divider(height: 1),
+                  ListTile(
+                    leading: const Icon(Icons.emoji_events_rounded),
+                    title: const Text('バッジ・実績'),
+                    onTap: () {
+                      final nav = scaffoldKey.currentContext ?? context;
+                      scaffoldKey.currentState?.closeEndDrawer();
+                      Navigator.of(nav).push(
+                        MaterialPageRoute(
+                          builder: (_) => const _AchievementsWrapper(),
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              ),
             ),
           ],
         ),

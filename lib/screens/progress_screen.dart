@@ -9,12 +9,98 @@ import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 import '../models/body_metrics.dart';
+import '../providers/body_progress_advice_provider.dart';
 import '../providers/energy_profile_provider.dart';
 import '../providers/progress_provider.dart';
+import '../widgets/ai_error_text.dart';
 import 'photo_compare_screen.dart';
 
 // 0 = 日別, 1 = 週別, 2 = 月別
 final _aggregationProvider = StateProvider<int>((ref) => 0);
+
+/// 体型の推移をパーソナルトレーナーが講評するカード。
+class _BodyCoachCard extends ConsumerWidget {
+  const _BodyCoachCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final scheme = Theme.of(context).colorScheme;
+    final advice = ref.watch(bodyProgressAdviceProvider);
+    final notifier = ref.read(bodyProgressAdviceProvider.notifier);
+
+    Widget body;
+    if (advice.isLoading) {
+      body = Row(
+        children: [
+          const SizedBox(
+            width: 18,
+            height: 18,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+          const SizedBox(width: 12),
+          Text('体型の変化を読み取っています…',
+              style: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant)),
+        ],
+      );
+    } else if (advice.error != null) {
+      body = AiErrorText(advice.error!);
+    } else if (advice.advice != null && advice.advice!.isNotEmpty) {
+      body = Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(advice.advice!, style: const TextStyle(fontSize: 14, height: 1.55)),
+          const SizedBox(height: 8),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton.icon(
+              onPressed: () => notifier.generate(),
+              icon: const Icon(Icons.refresh, size: 16),
+              label: const Text('更新'),
+              style: TextButton.styleFrom(
+                visualDensity: VisualDensity.compact,
+                foregroundColor: scheme.onSurfaceVariant,
+              ),
+            ),
+          ),
+        ],
+      );
+    } else {
+      body = Align(
+        alignment: Alignment.centerLeft,
+        child: FilledButton.icon(
+          onPressed: () => notifier.generate(),
+          icon: const Icon(Icons.auto_awesome, size: 18),
+          label: const Text('体型の変化をコーチに見てもらう'),
+        ),
+      );
+    }
+
+    return Card(
+      margin: const EdgeInsets.fromLTRB(12, 4, 12, 8),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.insights_rounded, color: scheme.primary, size: 20),
+                const SizedBox(width: 8),
+                Text('体型のコーチング',
+                    style: Theme.of(context)
+                        .textTheme
+                        .titleSmall
+                        ?.copyWith(fontWeight: FontWeight.w700)),
+              ],
+            ),
+            const SizedBox(height: 12),
+            body,
+          ],
+        ),
+      ),
+    );
+  }
+}
 
 class ProgressScreen extends ConsumerWidget {
   const ProgressScreen({super.key});
@@ -85,6 +171,11 @@ class ProgressScreen extends ConsumerWidget {
         // ── Chart section ────────────────────────────────────────────────
         SliverToBoxAdapter(
           child: _ChartSection(state: state, epState: epState),
+        ),
+
+        // ── AI coach comment on body change ──────────────────────────────
+        const SliverToBoxAdapter(
+          child: _BodyCoachCard(),
         ),
 
         // ── List header ──────────────────────────────────────────────────

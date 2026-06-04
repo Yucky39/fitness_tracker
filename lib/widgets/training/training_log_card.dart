@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 
 import '../../models/training_log.dart';
 import '../../providers/training_provider.dart';
+import '../ai_error_text.dart';
 
 /// トレーニングログ1件のカード（メトリクス・AI評価エリアを含む）
 class TrainingLogCard extends StatefulWidget {
@@ -366,10 +367,7 @@ class _TrainingLogCardState extends State<TrainingLogCard> {
           if (aiError != null)
             Padding(
               padding: const EdgeInsets.only(top: 4),
-              child: Text(
-                aiError,
-                style: const TextStyle(color: Colors.red, fontSize: 12),
-              ),
+              child: AiErrorText(aiError),
             ),
         ],
       ),

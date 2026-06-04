@@ -166,4 +166,10 @@ async function verifyPurchase({ platform, productId, purchaseToken, kind }) {
   }
 }
 
-module.exports = { verifyPurchase, receiptSecrets };
+module.exports = {
+  verifyPurchase,
+  receiptSecrets,
+  appleSharedSecret,
+  googlePlayServiceAccount,
+  androidPackageName,
+};

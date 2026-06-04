@@ -5,11 +5,13 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/food_item.dart';
 import '../models/training_log.dart';
+import '../providers/ai_access.dart';
 import '../providers/energy_profile_provider.dart';
 import '../providers/settings_provider.dart';
 import '../services/database_service.dart';
 import '../services/review_advice_service.dart';
 import '../services/training_calorie_calculator.dart';
+import '../widgets/ai_error_text.dart';
 import '../widgets/source_reference_link.dart';
 
 // ── State classes ──────────────────────────────────────────────────────────
@@ -229,12 +231,10 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen>
   Future<void> _fetchWeeklyReview() async {
     final settings = ref.read(settingsProvider);
     final apiKey = settings.currentApiKey;
-    if (apiKey.isEmpty) {
+    final access = ref.read(aiAccessProvider);
+    if (!access.allowed) {
       setState(() {
-        _weekData = _weekData.copyWith(
-          aiError:
-              '${settings.selectedProvider.label} のAPIキーが設定されていません。⚙️設定から入力してください。',
-        );
+        _weekData = _weekData.copyWith(aiError: kPaywallErrorMarker);
       });
       return;
     }
@@ -267,6 +267,7 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen>
         apiKey: apiKey,
         provider: settings.selectedProvider,
         model: settings.currentModel,
+        useSystemAi: access.useSystemAi,
       );
 
       if (mounted) {
@@ -289,12 +290,10 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen>
   Future<void> _fetchMonthlyReview() async {
     final settings = ref.read(settingsProvider);
     final apiKey = settings.currentApiKey;
-    if (apiKey.isEmpty) {
+    final access = ref.read(aiAccessProvider);
+    if (!access.allowed) {
       setState(() {
-        _monthData = _monthData.copyWith(
-          aiError:
-              '${settings.selectedProvider.label} のAPIキーが設定されていません。⚙️設定から入力してください。',
-        );
+        _monthData = _monthData.copyWith(aiError: kPaywallErrorMarker);
       });
       return;
     }
@@ -327,6 +326,7 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen>
         apiKey: apiKey,
         provider: settings.selectedProvider,
         model: settings.currentModel,
+        useSystemAi: access.useSystemAi,
       );
 
       if (mounted) {
@@ -877,21 +877,20 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen>
                 ),
               )
             else if (reviewData.aiError != null)
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    reviewData.aiError!,
-                    style: const TextStyle(color: Colors.red, fontSize: 13),
-                  ),
-                  const SizedBox(height: 8),
-                  OutlinedButton.icon(
-                    onPressed: onFetch,
-                    icon: const Icon(Icons.refresh, size: 16),
-                    label: const Text('再試行'),
-                  ),
-                ],
-              )
+              isPaywallError(reviewData.aiError)
+                  ? AiErrorText(reviewData.aiError!)
+                  : Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        AiErrorText(reviewData.aiError!),
+                        const SizedBox(height: 8),
+                        OutlinedButton.icon(
+                          onPressed: onFetch,
+                          icon: const Icon(Icons.refresh, size: 16),
+                          label: const Text('再試行'),
+                        ),
+                      ],
+                    )
             else if (reviewData.aiReview != null)
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,

@@ -6,6 +6,7 @@ import '../models/training_log.dart';
 import '../models/training_session_record.dart';
 import '../services/database_service.dart';
 import '../services/stretch_recommendation_service.dart';
+import 'ai_access.dart';
 import 'settings_provider.dart';
 import 'subscription_provider.dart';
 
@@ -116,11 +117,20 @@ class TrainingSessionNotifier extends StateNotifier<TrainingSessionState> {
     try {
       final settings = _ref.read(settingsProvider);
       final isSubscribed = _ref.read(isSubscribedProvider);
-      final useSystemAi = isSubscribed && settings.currentApiKey.isEmpty;
+      final access = resolveAiAccess(
+        isSubscribed: isSubscribed,
+        apiKey: settings.currentApiKey,
+      );
+
+      // 加入もBYOKキーも無い場合は静かにスキップ（ストレッチ推奨は自動取得のため）。
+      if (!access.allowed) {
+        state = state.copyWith(clearFetching: true);
+        return;
+      }
 
       final text = await StretchRecommendationService().getRecommendation(
         sessionLogs: logs,
-        useSystemAi: useSystemAi,
+        useSystemAi: access.useSystemAi,
         apiKey: settings.currentApiKey,
         provider: settings.selectedProvider,
         model: settings.currentModel,

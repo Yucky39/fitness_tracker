@@ -117,6 +117,23 @@ class NotificationService {
         );
       }
 
+      if (prefs.getBool('coachReminderEnabled') ?? false) {
+        await _trySchedule(
+          id: 3,
+          title: '朝のコーチング',
+          body: '睡眠と記録を踏まえた今日の一手が届いています。ホームで確認しましょう💪',
+          hour: prefs.getInt('coachReminderHour') ?? 8,
+          minute: prefs.getInt('coachReminderMinute') ?? 0,
+        );
+        await _trySchedule(
+          id: 4,
+          title: '今夜の振り返り',
+          body: '今日1日の食事・トレ・睡眠を踏まえたコーチングを確認しましょう。',
+          hour: 20,
+          minute: 0,
+        );
+      }
+
       if (prefs.getBool('waterReminderEnabled') ?? false) {
         final intervalMinutes =
             prefs.getInt('waterReminderIntervalMinutes') ?? 60;
