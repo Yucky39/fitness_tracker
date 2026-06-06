@@ -891,6 +891,10 @@ class MealScreen extends ConsumerWidget {
                         context: context,
                         notifier: notifier,
                         existingItem: item,
+                        contributeEnabled: ref
+                            .read(settingsProvider)
+                            .communityFoodContributeEnabled,
+                        userId: AuthService().userId,
                       );
                     } else {
                       _showFoodDialog(
@@ -1079,6 +1083,10 @@ class MealScreen extends ConsumerWidget {
                   context: context,
                   notifier: notifier,
                   existingItem: item,
+                  contributeEnabled: ref
+                      .read(settingsProvider)
+                      .communityFoodContributeEnabled,
+                  userId: AuthService().userId,
                 );
               } else {
                 _showFoodDialog(
@@ -1691,6 +1699,10 @@ class MealScreen extends ConsumerWidget {
                   showSupplementEntryDialog(
                     context: context,
                     notifier: notifier,
+                    contributeEnabled: ref
+                        .read(settingsProvider)
+                        .communityFoodContributeEnabled,
+                    userId: AuthService().userId,
                   );
                 },
               ),
