@@ -429,6 +429,7 @@ class SyncService {
               prefs.getBool('communityFoodContributeEnabled') ?? true,
           'mealSuggestionEnabled':
               prefs.getBool('mealSuggestionEnabled') ?? false,
+          'restPeriodDays': prefs.getInt('restPeriodDays') ?? 5,
         },
         'streaks': streaks,
       },
@@ -520,6 +521,8 @@ class SyncService {
           settings['communityFoodContributeEnabled'] as bool? ?? true);
       await prefs.setBool('mealSuggestionEnabled',
           settings['mealSuggestionEnabled'] as bool? ?? false);
+      await prefs.setInt('restPeriodDays',
+          _toInt(settings['restPeriodDays']) ?? 5);
     }
 
     final streaks = data['streaks'] as Map<String, dynamic>?;
