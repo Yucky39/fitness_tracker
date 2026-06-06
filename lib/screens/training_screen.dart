@@ -330,10 +330,10 @@ class _TrainingScreenState extends ConsumerState<TrainingScreen> {
           child: _MuscleHeatmapCard(heatmap: heatmap),
         ),
 
-        // ── 1RM カード（全記録ベース）
+        // ── 1RM カード（選択日のセッションベース。タップ時の推移グラフは全記録から表示）
         SliverToBoxAdapter(
           child: TrainingOneRmCard(
-            logs: state.logs,
+            logs: selectedDateLogs,
             onTapExercise: (name) => showExerciseWeightChartSheet(
               context,
               exerciseName: name,
