@@ -34,6 +34,9 @@ class TrainingLog {
   /// 有酸素種目：運動時間 (分)。筋トレ種目では 0。
   final int durationMinutes;
 
+  /// 有酸素種目（トレッドミル等）：傾斜・斜度 (%)。未設定・非対応種目では 0。
+  final double inclinePercent;
+
   /// 主観的運動強度 (RPE)。Borg CR-10 風の 1〜10。未入力は null。
   final int? rpe;
   final String note;
@@ -52,6 +55,7 @@ class TrainingLog {
     required this.interval,
     this.distanceKm = 0,
     this.durationMinutes = 0,
+    this.inclinePercent = 0,
     this.rpe,
     required this.note,
     required this.date,
@@ -68,6 +72,7 @@ class TrainingLog {
     int? interval,
     double? distanceKm,
     int? durationMinutes,
+    double? inclinePercent,
     int? rpe,
     bool clearRpe = false,
     String? note,
@@ -84,6 +89,7 @@ class TrainingLog {
         interval: interval ?? this.interval,
         distanceKm: distanceKm ?? this.distanceKm,
         durationMinutes: durationMinutes ?? this.durationMinutes,
+        inclinePercent: inclinePercent ?? this.inclinePercent,
         rpe: clearRpe ? null : (rpe ?? this.rpe),
         note: note ?? this.note,
         date: date ?? this.date,
@@ -125,6 +131,7 @@ class TrainingLog {
       'interval': interval,
       'distance_km': distanceKm,
       'duration_minutes': durationMinutes,
+      'incline_percent': inclinePercent,
       'rpe': rpe,
       'note': note,
       'date': date.toIso8601String(),
@@ -143,6 +150,7 @@ class TrainingLog {
       interval: map['interval'] as int,
       distanceKm: (map['distance_km'] as num? ?? 0).toDouble(),
       durationMinutes: map['duration_minutes'] as int? ?? 0,
+      inclinePercent: (map['incline_percent'] as num? ?? 0).toDouble(),
       rpe: map['rpe'] as int?,
       note: map['note'] as String,
       date: DateTime.parse(map['date'] as String),

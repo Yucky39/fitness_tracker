@@ -189,6 +189,7 @@ class _SessionRegistrationSheetState extends State<_SessionRegistrationSheet> {
                       final isSelected = _selectedLogIds.contains(log.id);
                       final subtitle = log.exerciseType == ExerciseType.cardio
                           ? '${log.distanceKm.toStringAsFixed(1)}km / ${log.durationMinutes}分'
+                              '${log.inclinePercent > 0 ? ' / 斜度${log.inclinePercent == log.inclinePercent.roundToDouble() ? log.inclinePercent.toInt() : log.inclinePercent}%' : ''}'
                           : '${log.weight}kg × ${log.reps}回 × ${log.sets}セット';
 
                       return CheckboxListTile(

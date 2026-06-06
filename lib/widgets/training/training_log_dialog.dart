@@ -49,6 +49,10 @@ void showTrainingLogDialog({
       text: isEdit && existingLog.durationMinutes > 0
           ? existingLog.durationMinutes.toString()
           : '');
+  final inclineController = TextEditingController(
+      text: isEdit && existingLog.inclinePercent > 0
+          ? existingLog.inclinePercent.toString()
+          : '');
   final noteController =
       TextEditingController(text: isEdit ? existingLog.note : '');
 
@@ -113,6 +117,9 @@ void showTrainingLogDialog({
                     durationController.text = prev.durationMinutes > 0
                         ? prev.durationMinutes.toString()
                         : '';
+                    inclineController.text = prev.inclinePercent > 0
+                        ? prev.inclinePercent.toString()
+                        : '';
                   } else {
                     weightController.text = prev.weight.toString();
                     repsController.text = prev.reps.toString();
@@ -173,6 +180,9 @@ void showTrainingLogDialog({
                     durationController.text = prev.durationMinutes > 0
                         ? prev.durationMinutes.toString()
                         : '';
+                    inclineController.text = prev.inclinePercent > 0
+                        ? prev.inclinePercent.toString()
+                        : '';
                   } else {
                     weightController.text = prev.weight.toString();
                     repsController.text = prev.reps.toString();
@@ -198,6 +208,7 @@ void showTrainingLogDialog({
             updatePreview();
 
             final isCardio = exerciseType == ExerciseType.cardio;
+            final isTreadmill = isCardio && _isTreadmillExercise(exerciseName);
 
             return AlertDialog(
               title: Text(isEdit ? 'トレーニングを編集' : 'トレーニングを記録'),
@@ -388,6 +399,7 @@ void showTrainingLogDialog({
                                 previousLog!.exerciseType == ExerciseType.cardio
                                     ? '前回: ${previousLog!.durationMinutes}分'
                                         '${previousLog!.distanceKm > 0 ? '  ${previousLog!.distanceKm.toStringAsFixed(1)}km' : ''}'
+                                        '${previousLog!.inclinePercent > 0 ? '  斜度${_formatIncline(previousLog!.inclinePercent)}%' : ''}'
                                         '${previousLog!.rpe != null ? '  RPE ${previousLog!.rpe}' : ''}'
                                         '  (${DateFormat('M/d').format(previousLog!.date)})'
                                     : '前回: ${previousLog!.weight}kg × ${previousLog!.reps}回 × ${previousLog!.sets}セット'
@@ -427,6 +439,20 @@ void showTrainingLogDialog({
                           ),
                         ],
                       ),
+                      if (isTreadmill) ...[
+                        const SizedBox(height: 4),
+                        TextField(
+                          controller: inclineController,
+                          decoration: const InputDecoration(
+                            labelText: '斜度 (%)',
+                            hintText: 'トレッドミルの傾斜。例: 1.5',
+                            suffixText: '%',
+                          ),
+                          keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true),
+                          onChanged: (_) => setState(updatePreview),
+                        ),
+                      ],
                     ],
                     if (!isCardio) ...[
                       Row(
@@ -559,6 +585,10 @@ void showTrainingLogDialog({
                       final dist =
                           double.tryParse(distanceController.text) ?? 0;
                       final dur = int.tryParse(durationController.text) ?? 0;
+                      // 斜度はトレッドミルのみ記録（他種目では 0 に揃える）。
+                      final incl = isTreadmill
+                          ? (double.tryParse(inclineController.text) ?? 0)
+                          : 0.0;
                       if (isEdit) {
                         notifier.updateLog(existingLog.copyWith(
                           exerciseName: exerciseName,
@@ -569,6 +599,7 @@ void showTrainingLogDialog({
                           interval: 0,
                           distanceKm: dist,
                           durationMinutes: dur,
+                          inclinePercent: incl,
                           rpe: recordRpe ? rpeSlider.round() : null,
                           clearRpe: !recordRpe,
                           note: noteController.text,
@@ -583,6 +614,7 @@ void showTrainingLogDialog({
                           interval: 0,
                           distanceKm: dist,
                           durationMinutes: dur,
+                          inclinePercent: incl,
                           rpe: recordRpe ? rpeSlider.round() : null,
                           note: noteController.text,
                         );
@@ -602,6 +634,7 @@ void showTrainingLogDialog({
                           interval: iv,
                           distanceKm: 0,
                           durationMinutes: 0,
+                          inclinePercent: 0,
                           rpe: recordRpe ? rpeSlider.round() : null,
                           clearRpe: !recordRpe,
                           note: noteController.text,
@@ -763,6 +796,20 @@ class _CommunityExerciseShareDialogState
       ],
     );
   }
+}
+
+/// トレッドミル（ランニングマシン）系の種目かどうかを判定する。
+/// 斜度入力欄の表示要否に使用する。
+bool _isTreadmillExercise(String name) {
+  final n = name.toLowerCase();
+  return n.contains('トレッドミル') ||
+      n.contains('treadmill') ||
+      n.contains('ランニングマシン');
+}
+
+/// 斜度を表示用に整形する（整数なら小数点を省く。例: 2.0→"2", 1.5→"1.5"）。
+String _formatIncline(double v) {
+  return v == v.roundToDouble() ? v.toInt().toString() : v.toString();
 }
 
 String _exerciseTypeHint(ExerciseType type) {
