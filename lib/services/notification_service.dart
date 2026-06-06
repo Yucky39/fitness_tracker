@@ -36,7 +36,7 @@ class NotificationService {
   // ── 水分リマインダー関連の定数 ──────────────────────────────
   /// 通知アクションで選べる水分量（ml）。LINE のクイック返信のように
   /// 通知上のボタンから直接記録できる。ここを編集すれば候補を変えられる。
-  static const List<int> waterQuickAmountsMl = [150, 250, 500];
+  static const List<int> waterQuickAmountsMl = [100, 200, 300, 500];
 
   /// アクション ID の接頭辞。`water_intake_250` のように量を埋め込む。
   static const String _waterActionPrefix = 'water_intake_';
