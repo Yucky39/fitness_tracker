@@ -23,6 +23,7 @@ import '../services/ai_exceptions.dart';
 import '../widgets/ai_error_text.dart';
 import '../widgets/ai_limit_banner.dart';
 import '../widgets/muscle_heatmap_painter.dart';
+import '../widgets/muscle_rest_card.dart';
 import '../widgets/training/exercise_weight_chart_sheet.dart';
 import '../widgets/training/session_record_card.dart';
 import '../widgets/training/session_registration_dialog.dart';
@@ -328,6 +329,11 @@ class _TrainingScreenState extends ConsumerState<TrainingScreen> {
         // ── 筋肉ヒートマップ（過去7日間、常に表示）
         SliverToBoxAdapter(
           child: _MuscleHeatmapCard(heatmap: heatmap),
+        ),
+
+        // ── 部位ごとの休息状況（推奨休息日数に対する回復進捗）
+        const SliverToBoxAdapter(
+          child: MuscleRestCard(),
         ),
 
         // ── 1RM カード（選択日のセッションベース。タップ時の推移グラフは全記録から表示）

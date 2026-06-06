@@ -85,6 +85,7 @@ class TrainingNotifier extends StateNotifier<TrainingState> {
     required int interval,
     double distanceKm = 0,
     int durationMinutes = 0,
+    double inclinePercent = 0,
     int? rpe,
     required String note,
   }) async {
@@ -101,6 +102,7 @@ class TrainingNotifier extends StateNotifier<TrainingState> {
       interval: interval,
       distanceKm: distanceKm,
       durationMinutes: durationMinutes,
+      inclinePercent: inclinePercent,
       rpe: rpe,
       note: note,
       date: DateTime(

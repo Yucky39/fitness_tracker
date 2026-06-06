@@ -174,6 +174,9 @@ class _TrainingLogCardState extends State<TrainingLogCard> {
                               '${log.distanceKm.toStringAsFixed(2)} km', '距離'),
                         if (log.durationMinutes > 0)
                           _metricText('${log.durationMinutes} 分', '時間'),
+                        if (log.inclinePercent > 0)
+                          _metricText(
+                              '${_formatIncline(log.inclinePercent)} %', '斜度'),
                         if (log.paceMinPerKm != null)
                           _metricText(
                               _formatPace(log.paceMinPerKm!), 'ペース/km'),
@@ -378,6 +381,11 @@ class _TrainingLogCardState extends State<TrainingLogCard> {
     final min = minPerKm.floor();
     final sec = ((minPerKm - min) * 60).round();
     return '$min:${sec.toString().padLeft(2, '0')}/km';
+  }
+
+  /// 斜度を表示用に整形する（整数なら小数点を省く。例: 2.0→"2", 1.5→"1.5"）。
+  String _formatIncline(double v) {
+    return v == v.roundToDouble() ? v.toInt().toString() : v.toString();
   }
 
   Widget _metricText(String value, String label) {

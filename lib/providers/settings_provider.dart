@@ -142,6 +142,10 @@ class SettingsState {
   final int coachReminderHour;
   final int coachReminderMinute;
 
+  /// トレーニング部位ごとの推奨休息日数（デフォルト5日）。
+  /// ホーム画面・トレーニング管理の部位ヒートマップで回復状況の表示に使用する。
+  final int restPeriodDays;
+
   const SettingsState({
     this.adviceLevel = 'normal',
     this.selectedProvider = AiProviderType.anthropic,
@@ -167,6 +171,7 @@ class SettingsState {
     this.coachReminderEnabled = false,
     this.coachReminderHour = 8,
     this.coachReminderMinute = 0,
+    this.restPeriodDays = 5,
   });
 
   String get currentApiKey {
@@ -248,6 +253,7 @@ class SettingsState {
     bool? coachReminderEnabled,
     int? coachReminderHour,
     int? coachReminderMinute,
+    int? restPeriodDays,
   }) =>
       SettingsState(
         adviceLevel: adviceLevel ?? this.adviceLevel,
@@ -285,6 +291,7 @@ class SettingsState {
             coachReminderEnabled ?? this.coachReminderEnabled,
         coachReminderHour: coachReminderHour ?? this.coachReminderHour,
         coachReminderMinute: coachReminderMinute ?? this.coachReminderMinute,
+        restPeriodDays: restPeriodDays ?? this.restPeriodDays,
       );
 }
 
@@ -355,6 +362,7 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
       coachReminderEnabled: prefs.getBool('coachReminderEnabled') ?? false,
       coachReminderHour: prefs.getInt('coachReminderHour') ?? 8,
       coachReminderMinute: prefs.getInt('coachReminderMinute') ?? 0,
+      restPeriodDays: prefs.getInt('restPeriodDays') ?? 5,
     );
   }
 
@@ -504,6 +512,15 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
         'settings.waterReminderStartHour': waterStartHour,
       if (waterEndHour != null) 'settings.waterReminderEndHour': waterEndHour,
     });
+  }
+
+  /// 部位ごとの推奨休息日数を更新（1〜14日にクランプ）。
+  Future<void> updateRestPeriodDays(int days) async {
+    final clamped = days.clamp(1, 14);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('restPeriodDays', clamped);
+    state = state.copyWith(restPeriodDays: clamped);
+    SyncService().syncFields({'settings.restPeriodDays': clamped});
   }
 
   Future<void> reload() => _load();

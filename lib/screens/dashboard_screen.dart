@@ -26,6 +26,7 @@ import '../services/training_calorie_calculator.dart';
 import '../widgets/coach_plan_nudge_card.dart';
 import '../widgets/daily_coach_card.dart';
 import '../widgets/micro_tap.dart';
+import '../widgets/muscle_rest_card.dart';
 import 'routine_screen.dart';
 import 'trainer_chat_screen.dart';
 
@@ -111,6 +112,8 @@ class DashboardScreen extends ConsumerWidget {
                   ),
                   if (!achievementState.isLoading)
                     _buildStreakRow(context, scheme, achievementState),
+                  const SizedBox(height: 12),
+                  const MuscleRestCard(margin: EdgeInsets.all(4)),
                   const SizedBox(height: 12),
                   _buildSleepCard(context, scheme, ref, sleepState),
                   const SizedBox(height: 12),

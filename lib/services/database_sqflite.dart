@@ -14,7 +14,7 @@ class SqfliteDatabaseAdapter implements DatabaseAdapter {
 
     _database = await openDatabase(
       path,
-      version: 21,
+      version: 22,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -182,6 +182,10 @@ class SqfliteDatabaseAdapter implements DatabaseAdapter {
       await db.execute(
           'ALTER TABLE body_metrics ADD COLUMN image_back_path TEXT');
     }
+    if (oldVersion < 22) {
+      await db.execute(
+          'ALTER TABLE training_logs ADD COLUMN incline_percent REAL DEFAULT 0');
+    }
   }
 
   Future<void> _onCreate(Database db, int version) async {
@@ -214,6 +218,7 @@ class SqfliteDatabaseAdapter implements DatabaseAdapter {
         interval INTEGER,
         distance_km REAL DEFAULT 0,
         duration_minutes INTEGER DEFAULT 0,
+        incline_percent REAL DEFAULT 0,
         rpe INTEGER,
         note TEXT,
         date TEXT,
