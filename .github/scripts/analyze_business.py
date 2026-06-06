@@ -143,7 +143,7 @@ def analyze(ctx: dict) -> str:
     client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
     message = client.messages.create(
         model="claude-opus-4-8",
-        max_tokens=2048,
+        max_tokens=16000,
         messages=[{"role": "user", "content": build_prompt(ctx)}],
     )
     return message.content[0].text

@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod/legacy.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../services/ai_proxy_service.dart';
+import '../services/ai_exceptions.dart';
 import '../services/daily_coach_service.dart';
 import 'ai_access.dart';
 import 'dashboard_provider.dart';
@@ -234,7 +234,7 @@ class DailyCoachNotifier extends StateNotifier<DailyCoachState> {
         clearError: true,
       );
     } catch (e) {
-      final msg = e is AiProxyQuotaException
+      final msg = e is AiUsageLimitException
           ? e.message
           : e.toString().replaceFirst('Exception: ', '');
       state = state.copyWith(
