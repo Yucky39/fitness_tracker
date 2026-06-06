@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../providers/daily_coach_provider.dart';
 import '../services/daily_coach_service.dart';
+import '../theme/bewell_colors.dart';
 import 'ai_error_text.dart';
 
 /// ホーム最上部に置く「今日のコーチング」カード。
@@ -32,6 +33,7 @@ class _DailyCoachCardState extends ConsumerState<DailyCoachCard> {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final semantic = context.bewellColors;
     final coach = ref.watch(dailyCoachProvider);
     final notifier = ref.read(dailyCoachProvider.notifier);
     final slot = notifier.currentSlot;
@@ -122,7 +124,7 @@ class _DailyCoachCardState extends ConsumerState<DailyCoachCard> {
 
     return Card(
       elevation: 0,
-      color: scheme.primaryContainer.withValues(alpha: 0.35),
+      color: semantic.aiAccent.withValues(alpha: 0.08),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
         child: Column(
@@ -134,11 +136,11 @@ class _DailyCoachCardState extends ConsumerState<DailyCoachCard> {
                   width: 44,
                   height: 44,
                   decoration: BoxDecoration(
-                    color: scheme.primaryContainer,
+                    color: semantic.aiAccent.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Icon(Icons.sports_gymnastics_rounded,
-                      color: scheme.onPrimaryContainer),
+                      color: semantic.aiAccent),
                 ),
                 const SizedBox(width: 14),
                 Expanded(

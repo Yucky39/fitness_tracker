@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../providers/muscle_rest_provider.dart';
 import '../providers/settings_provider.dart';
+import '../theme/bewell_colors.dart';
 
 /// トレーニングした部位ごとの休息（回復）状況を表示するカード。
 ///
@@ -175,7 +176,7 @@ class _RestRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = _statusColor(status);
+    final color = _statusColor(context, status);
     final statusLabel = status.isRecovered
         ? '回復済み'
         : 'あと${status.remainingDays}日';
@@ -228,9 +229,10 @@ class _RestRow extends StatelessWidget {
     );
   }
 
-  Color _statusColor(MuscleRestStatus s) {
-    if (s.isRecovered) return Colors.teal;
-    if (s.recoveryFraction >= 0.5) return Colors.orange.shade700;
-    return Colors.red.shade400;
+  Color _statusColor(BuildContext context, MuscleRestStatus s) {
+    final semantic = context.bewellColors;
+    if (s.isRecovered) return semantic.success;
+    if (s.recoveryFraction >= 0.5) return semantic.warning;
+    return Theme.of(context).colorScheme.error;
   }
 }

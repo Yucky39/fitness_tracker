@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../theme/bewell_colors.dart';
+
 /// インターバルタイマー用フローティングカード
 class TrainingTimerOverlay extends StatelessWidget {
   final int secondsRemaining;
@@ -15,11 +17,14 @@ class TrainingTimerOverlay extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final semantic = context.bewellColors;
     final progress =
         totalSeconds > 0 ? secondsRemaining / totalSeconds : 0.0;
     final mins = secondsRemaining ~/ 60;
     final secs = secondsRemaining % 60;
     final isDone = secondsRemaining == 0;
+    final accent = isDone ? semantic.success : scheme.primary;
 
     return Positioned(
       bottom: 80,
@@ -28,7 +33,9 @@ class TrainingTimerOverlay extends StatelessWidget {
       child: Card(
         elevation: 8,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        color: isDone ? Colors.green.shade50 : null,
+        color: isDone
+            ? semantic.success.withValues(alpha: 0.1)
+            : null,
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Row(
@@ -41,14 +48,12 @@ class TrainingTimerOverlay extends StatelessWidget {
                   children: [
                     CircularProgressIndicator(
                       value: progress,
-                      backgroundColor: Colors.grey.withValues(alpha: 0.2),
-                      valueColor: AlwaysStoppedAnimation<Color>(
-                        isDone ? Colors.green : Colors.teal,
-                      ),
+                      backgroundColor: scheme.outlineVariant.withValues(alpha: 0.35),
+                      valueColor: AlwaysStoppedAnimation<Color>(accent),
                     ),
                     Icon(
                       isDone ? Icons.check : Icons.timer,
-                      color: isDone ? Colors.green : Colors.teal,
+                      color: accent,
                     ),
                   ],
                 ),
@@ -60,16 +65,17 @@ class TrainingTimerOverlay extends StatelessWidget {
                   children: [
                     Text(
                       isDone ? '休憩終了！' : 'インターバル休憩中',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: isDone ? Colors.green : null,
-                      ),
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: isDone ? semantic.success : null,
+                          ),
                     ),
                     if (!isDone)
                       Text(
                         '$mins:${secs.toString().padLeft(2, '0')}',
-                        style: const TextStyle(
-                            fontSize: 22, fontWeight: FontWeight.bold),
+                        style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                              fontWeight: FontWeight.w800,
+                            ),
                       ),
                   ],
                 ),

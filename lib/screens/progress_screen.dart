@@ -12,7 +12,13 @@ import '../models/body_metrics.dart';
 import '../providers/body_progress_advice_provider.dart';
 import '../providers/energy_profile_provider.dart';
 import '../providers/progress_provider.dart';
+import '../providers/home_fab_provider.dart';
+import '../theme/app_tokens.dart';
+import '../theme/bewell_colors.dart';
 import '../widgets/ai_error_text.dart';
+import '../widgets/bewell_empty_state.dart';
+import '../widgets/register_home_fab.dart';
+import '../theme/chart_metric_colors.dart';
 import 'photo_compare_screen.dart';
 
 // 0 = 日別, 1 = 週別, 2 = 月別
@@ -76,7 +82,12 @@ class _BodyCoachCard extends ConsumerWidget {
     }
 
     return Card(
-      margin: const EdgeInsets.fromLTRB(12, 4, 12, 8),
+      margin: const EdgeInsets.fromLTRB(
+        AppSpacing.lg,
+        AppSpacing.sm,
+        AppSpacing.lg,
+        AppSpacing.xs,
+      ),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
         child: Column(
@@ -84,13 +95,13 @@ class _BodyCoachCard extends ConsumerWidget {
           children: [
             Row(
               children: [
-                Icon(Icons.insights_rounded, color: scheme.primary, size: 20),
+                Icon(Icons.insights_rounded,
+                    color: context.bewellColors.aiAccent, size: 20),
                 const SizedBox(width: 8),
-                Text('体型のコーチング',
-                    style: Theme.of(context)
-                        .textTheme
-                        .titleSmall
-                        ?.copyWith(fontWeight: FontWeight.w700)),
+                Text(
+                  '体型のコーチング',
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
               ],
             ),
             const SizedBox(height: 12),
@@ -111,46 +122,40 @@ class ProgressScreen extends ConsumerWidget {
     final notifier = ref.read(progressProvider.notifier);
     final epState = ref.watch(energyProfileProvider);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('進捗トラッキング'),
-      ),
-      body: state.isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : state.metrics.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.show_chart,
-                          size: 60, color: Colors.grey),
-                      const SizedBox(height: 12),
-                      const Text('まだ記録がありません',
-                          style: TextStyle(color: Colors.grey)),
-                      const SizedBox(height: 16),
-                      FilledButton.icon(
-                        icon: const Icon(Icons.add),
-                        label: const Text('最初の記録を追加'),
-                        onPressed: () => _showMetricsDialog(
-                          context: context,
-                          ref: ref,
-                          notifier: notifier,
-                          heightCm: epState.heightCm,
-                        ),
-                      ),
-                    ],
-                  ),
-                )
-              : _buildBody(context, ref, state, notifier, epState),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _showMetricsDialog(
+    void openAddDialog() => _showMetricsDialog(
           context: context,
           ref: ref,
           notifier: notifier,
           heightCm: epState.heightCm,
+        );
+
+    final Widget body;
+    if (state.isLoading) {
+      body = const Center(child: CircularProgressIndicator());
+    } else if (state.metrics.isEmpty) {
+      body = Center(
+        child: BeWellEmptyState(
+          icon: Icons.show_chart_outlined,
+          title: 'まだ記録がありません',
+          subtitle: '体重・体脂肪率・写真を記録して変化を追いましょう',
+          action: FilledButton.icon(
+            icon: const Icon(Icons.add),
+            label: const Text('最初の記録を追加'),
+            onPressed: openAddDialog,
+          ),
         ),
-        child: const Icon(Icons.add),
+      );
+    } else {
+      body = _buildBody(context, ref, state, notifier, epState);
+    }
+
+    return RegisterHomeFab(
+      tabIndex: 3,
+      config: HomeFabConfig(
+        tooltip: '記録を追加',
+        onPressed: openAddDialog,
       ),
+      child: body,
     );
   }
 
@@ -233,7 +238,8 @@ class ProgressScreen extends ConsumerWidget {
           ),
         ),
 
-        const SliverToBoxAdapter(child: SizedBox(height: 80)),
+        const SliverToBoxAdapter(
+            child: SizedBox(height: AppSpacing.bottomNavClearance)),
       ],
     );
   }
@@ -266,6 +272,8 @@ class ProgressScreen extends ConsumerWidget {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setState) {
+          final scheme = Theme.of(ctx).colorScheme;
+          final semantic = ctx.bewellColors;
           final w = double.tryParse(weightCtrl.text) ?? 0;
           final bmiVal = heightCm > 0 ? BodyMetrics.bmi(w, heightCm) : 0.0;
 
@@ -275,23 +283,24 @@ class ProgressScreen extends ConsumerWidget {
             String? path,
             void Function(String?) onChanged,
           ) {
+            final scheme = Theme.of(ctx).colorScheme;
             return Padding(
               padding: const EdgeInsets.only(bottom: 12),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(label,
-                      style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.grey)),
+                  Text(
+                    label,
+                    style: Theme.of(ctx).textTheme.labelMedium?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                        ),
+                  ),
                   const SizedBox(height: 6),
                   Row(
                     children: [
-                      // サムネイル or プレースホルダー
                       GestureDetector(
                         onTap: path != null
-                            ? () => onChanged(null) // タップで削除
+                            ? () => onChanged(null)
                             : null,
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(6),
@@ -302,20 +311,20 @@ class ProgressScreen extends ConsumerWidget {
                                         width: 60,
                                         height: 72,
                                         fit: BoxFit.cover),
-                                    const Positioned(
+                                    Positioned(
                                       top: 2,
                                       right: 2,
                                       child: Icon(Icons.cancel,
-                                          size: 16, color: Colors.white),
+                                          size: 16, color: scheme.onPrimary),
                                     ),
                                   ],
                                 )
                               : Container(
                                   width: 60,
                                   height: 72,
-                                  color: Colors.grey.shade100,
-                                  child: const Icon(Icons.add_photo_alternate,
-                                      color: Colors.grey),
+                                  color: scheme.surfaceContainerHighest,
+                                  child: Icon(Icons.add_photo_alternate,
+                                      color: scheme.onSurfaceVariant),
                                 ),
                         ),
                       ),
@@ -381,8 +390,8 @@ class ProgressScreen extends ConsumerWidget {
                         style: TextStyle(
                             fontSize: 12,
                             color: bmiVal < 18.5 || bmiVal >= 25
-                                ? Colors.orange
-                                : Colors.green),
+                                ? semantic.warning
+                                : semantic.success),
                       ),
                     ),
                   TextField(
@@ -399,13 +408,16 @@ class ProgressScreen extends ConsumerWidget {
                         const TextInputType.numberWithOptions(decimal: true),
                   ),
                   const SizedBox(height: 16),
-                  const Text('体型写真（任意）',
-                      style: TextStyle(
-                          fontSize: 13, fontWeight: FontWeight.bold)),
+                  Text(
+                    '体型写真（任意）',
+                    style: Theme.of(ctx).textTheme.titleSmall,
+                  ),
                   const SizedBox(height: 4),
-                  const Text(
+                  Text(
                     '各向きは省略できます。同じ向きの写真が揃ったときにオーバーレイ比較が使えます。',
-                    style: TextStyle(fontSize: 11, color: Colors.grey),
+                    style: Theme.of(ctx).textTheme.labelSmall?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                        ),
                   ),
                   const SizedBox(height: 12),
                   photoRow('正面', frontPath,
@@ -491,6 +503,8 @@ class _LatestSummaryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final semantic = context.bewellColors;
     final latest = state.latest;
     if (latest == null) return const SizedBox.shrink();
 
@@ -508,22 +522,25 @@ class _LatestSummaryCard extends StatelessWidget {
         targetKg > 0 ? latest.weight - targetKg : null;
 
     return Card(
-      margin: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      margin: const EdgeInsets.fromLTRB(
+        AppSpacing.lg,
+        AppSpacing.md,
+        AppSpacing.lg,
+        AppSpacing.xs,
+      ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(AppSpacing.lg),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
-                const Icon(Icons.monitor_weight_outlined,
-                    color: Colors.blue, size: 20),
+                Icon(Icons.monitor_weight_outlined,
+                    color: scheme.primary, size: 20),
                 const SizedBox(width: 8),
                 Text(
                   '最新: ${DateFormat('yyyy/M/d').format(latest.date)}',
-                  style: const TextStyle(
-                      fontWeight: FontWeight.bold, fontSize: 15),
+                  style: Theme.of(context).textTheme.titleSmall,
                 ),
                 const Spacer(),
                 if (weightDelta != null)
@@ -535,13 +552,12 @@ class _LatestSummaryCard extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                _summaryCol(
-                    '体重', '${latest.weight.toStringAsFixed(1)} kg'),
+                _summaryCol(context, '体重', '${latest.weight.toStringAsFixed(1)} kg'),
                 if (latest.bodyFatPercentage > 0)
-                  _summaryCol('体脂肪率',
+                  _summaryCol(context, '体脂肪率',
                       '${latest.bodyFatPercentage.toStringAsFixed(1)} %'),
                 if (latest.waist > 0)
-                  _summaryCol(
+                  _summaryCol(context,
                       '腹囲', '${latest.waist.toStringAsFixed(1)} cm'),
               ],
             ),
@@ -556,22 +572,25 @@ class _LatestSummaryCard extends StatelessWidget {
                 children: [
                   if (bmiVal > 0)
                     _derivedChip(
+                      context,
                       'BMI',
                       '${bmiVal.toStringAsFixed(1)} (${BodyMetrics.bmiLabel(bmiVal)})',
                       bmiVal >= 18.5 && bmiVal < 25
-                          ? Colors.green
-                          : Colors.orange,
+                          ? semantic.success
+                          : semantic.warning,
                     ),
                   if (latest.bodyFatPercentage > 0) ...[
                     _derivedChip(
+                      context,
                       '除脂肪体重',
                       '${lbm.toStringAsFixed(1)} kg',
-                      Colors.blue,
+                      scheme.primary,
                     ),
                     _derivedChip(
+                      context,
                       '体脂肪量',
                       '${fatMass.toStringAsFixed(1)} kg',
-                      Colors.orange,
+                      scheme.tertiary,
                     ),
                   ],
                 ],
@@ -586,9 +605,9 @@ class _LatestSummaryCard extends StatelessWidget {
                     horizontal: 12, vertical: 8),
                 decoration: BoxDecoration(
                   color: toTarget.abs() < 0.5
-                      ? Colors.green.shade50
-                      : Colors.blue.shade50,
-                  borderRadius: BorderRadius.circular(8),
+                      ? semantic.success.withValues(alpha: 0.12)
+                      : scheme.primaryContainer.withValues(alpha: 0.5),
+                  borderRadius: AppRadius.smAll,
                 ),
                 child: Row(
                   children: [
@@ -598,8 +617,8 @@ class _LatestSummaryCard extends StatelessWidget {
                           : Icons.flag_outlined,
                       size: 16,
                       color: toTarget.abs() < 0.5
-                          ? Colors.green
-                          : Colors.blue,
+                          ? semantic.success
+                          : scheme.primary,
                     ),
                     const SizedBox(width: 8),
                     Text(
@@ -611,8 +630,8 @@ class _LatestSummaryCard extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 13,
                         color: toTarget.abs() < 0.5
-                            ? Colors.green.shade700
-                            : Colors.blue.shade700,
+                            ? semantic.success
+                            : scheme.primary,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -626,17 +645,33 @@ class _LatestSummaryCard extends StatelessWidget {
     );
   }
 
-  Widget _summaryCol(String label, String value) => Column(
-        children: [
-          Text(value,
-              style: const TextStyle(
-                  fontWeight: FontWeight.bold, fontSize: 16)),
-          Text(label,
-              style: const TextStyle(fontSize: 11, color: Colors.grey)),
-        ],
-      );
+  Widget _summaryCol(BuildContext context, String label, String value) {
+    final scheme = Theme.of(context).colorScheme;
+    return Column(
+      children: [
+        Text(
+          value,
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w800,
+              ),
+        ),
+        Text(
+          label,
+          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: scheme.onSurfaceVariant,
+              ),
+        ),
+      ],
+    );
+  }
 
-  Widget _derivedChip(String label, String value, Color color) => Row(
+  Widget _derivedChip(
+    BuildContext context,
+    String label,
+    String value,
+    Color color,
+  ) =>
+      Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
@@ -645,8 +680,13 @@ class _LatestSummaryCard extends StatelessWidget {
             decoration: BoxDecoration(color: color, shape: BoxShape.circle),
           ),
           const SizedBox(width: 4),
-          Text('$label: $value',
-              style: TextStyle(fontSize: 12, color: color)),
+          Text(
+            '$label: $value',
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  color: color,
+                  fontWeight: FontWeight.w600,
+                ),
+          ),
         ],
       );
 }
@@ -660,8 +700,10 @@ class _DeltaBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final semantic = context.bewellColors;
     final isGain = delta > 0;
-    final color = isGain ? Colors.red : Colors.green;
+    final color = isGain ? scheme.error : semantic.success;
     final sign = isGain ? '+' : '';
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -689,19 +731,28 @@ class _ChartSection extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     if (state.metrics.length < 2) {
-      return const SizedBox(
+      return SizedBox(
         height: 80,
         child: Center(
-            child: Text('グラフを表示するには2件以上の記録が必要です',
-                style: TextStyle(color: Colors.grey, fontSize: 13))),
+          child: Text(
+            'グラフを表示するには2件以上の記録が必要です',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+          ),
+        ),
       );
     }
 
     final aggIndex = ref.watch(_aggregationProvider);
 
     return Card(
-      margin: const EdgeInsets.fromLTRB(16, 4, 16, 4),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      margin: const EdgeInsets.fromLTRB(
+        AppSpacing.lg,
+        AppSpacing.xs,
+        AppSpacing.lg,
+        AppSpacing.xs,
+      ),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(4, 12, 4, 8),
         child: Column(
@@ -711,8 +762,12 @@ class _ChartSection extends ConsumerWidget {
               padding: const EdgeInsets.symmetric(horizontal: 12),
               child: Row(
                 children: [
-                  const Text('集計単位',
-                      style: TextStyle(fontSize: 12, color: Colors.grey)),
+                  Text(
+                    '集計単位',
+                    style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                  ),
                   const SizedBox(width: 12),
                   SegmentedButton<int>(
                     style: const ButtonStyle(
@@ -765,9 +820,9 @@ class _ChartSection extends ConsumerWidget {
 
   /// metricIndex: 0=weight, 1=fat%, 2=waist
   Widget _buildChart(BuildContext context, int aggIndex, int metricIndex) {
-    final colors = [Colors.blue, Colors.orange, Colors.green];
+    final scheme = Theme.of(context).colorScheme;
+    final color = ChartMetricColors.forMetric(metricIndex, scheme);
     final units = ['kg', '%', 'cm'];
-    final color = colors[metricIndex];
     final unit = units[metricIndex];
 
     final List<FlSpot> spots;
@@ -806,9 +861,14 @@ class _ChartSection extends ConsumerWidget {
     }
 
     if (spots.isEmpty || spots.every((s) => s.y == 0)) {
-      return const Center(
-          child: Text('データがありません',
-              style: TextStyle(color: Colors.grey, fontSize: 12)));
+      return Center(
+        child: Text(
+          'データがありません',
+          style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                color: scheme.onSurfaceVariant,
+              ),
+        ),
+      );
     }
 
     final targetLine = metricIndex == 0 && epState.targetWeightKg > 0
@@ -829,7 +889,9 @@ class _ChartSection extends ConsumerWidget {
                     s.x.toInt() < labels.length ? labels[s.x.toInt()] : '';
                 return LineTooltipItem(
                   '$label\n${s.y.toStringAsFixed(1)} $unit',
-                  const TextStyle(color: Colors.white, fontSize: 12),
+                  Theme.of(context).textTheme.labelMedium!.copyWith(
+                        color: scheme.onPrimary,
+                      ),
                 );
               }).toList(),
             ),
@@ -858,15 +920,16 @@ class _ChartSection extends ConsumerWidget {
               ? ExtraLinesData(horizontalLines: [
                   HorizontalLine(
                     y: targetLine,
-                    color: Colors.red.withValues(alpha: 0.6),
+                    color: scheme.error.withValues(alpha: 0.55),
                     strokeWidth: 1.5,
                     dashArray: [6, 4],
                     label: HorizontalLineLabel(
                       show: true,
                       labelResolver: (_) =>
                           '目標 ${targetLine.toStringAsFixed(1)} kg',
-                      style: const TextStyle(
-                          color: Colors.red, fontSize: 10),
+                      style: Theme.of(context).textTheme.labelSmall!.copyWith(
+                            color: scheme.error,
+                          ),
                       alignment: Alignment.topRight,
                     ),
                   ),
@@ -903,14 +966,16 @@ class _ChartSection extends ConsumerWidget {
           gridData: FlGridData(
             show: true,
             drawVerticalLine: false,
-            getDrawingHorizontalLine: (_) =>
-                FlLine(color: Colors.grey.shade200, strokeWidth: 1),
+            getDrawingHorizontalLine: (_) => FlLine(
+              color: scheme.outlineVariant.withValues(alpha: 0.35),
+              strokeWidth: 1,
+            ),
           ),
           borderData: FlBorderData(
             show: true,
             border: Border(
-              bottom: BorderSide(color: Colors.grey.shade300),
-              left: BorderSide(color: Colors.grey.shade300),
+              bottom: BorderSide(color: scheme.outlineVariant),
+              left: BorderSide(color: scheme.outlineVariant),
             ),
           ),
         ),
@@ -983,20 +1048,24 @@ class _MetricsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final semantic = context.bewellColors;
     final bmiVal =
         heightCm > 0 ? BodyMetrics.bmi(item.weight, heightCm) : 0.0;
 
     return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
+      margin: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.lg,
+        vertical: 5,
+      ),
       child: InkWell(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: AppRadius.lgAll,
         onTap: onEdit,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Photo thumbnail
               if (item.hasAnyPhoto && !kIsWeb)
                 GestureDetector(
                   onTap: () => Navigator.push(
@@ -1011,7 +1080,7 @@ class _MetricsCard extends StatelessWidget {
                   child: Hero(
                     tag: 'photo_${item.id}',
                     child: ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: AppRadius.smAll,
                       child: Image.file(
                         File(item.firstPhotoPath!),
                         width: 56,
@@ -1026,35 +1095,34 @@ class _MetricsCard extends StatelessWidget {
                   width: 56,
                   height: 56,
                   decoration: BoxDecoration(
-                    color: Colors.grey.shade100,
-                    borderRadius: BorderRadius.circular(8),
+                    color: scheme.surfaceContainerHighest,
+                    borderRadius: AppRadius.smAll,
                   ),
-                  child: const Icon(Icons.person_outline,
-                      color: Colors.grey),
+                  child: Icon(Icons.person_outline,
+                      color: scheme.onSurfaceVariant),
                 ),
               const SizedBox(width: 12),
-
-              // Content
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       DateFormat('yyyy/MM/dd (E)', 'ja').format(item.date),
-                      style: const TextStyle(
-                          fontSize: 12, color: Colors.grey),
+                      style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                            color: scheme.onSurfaceVariant,
+                          ),
                     ),
                     const SizedBox(height: 4),
                     Wrap(
                       spacing: 12,
                       runSpacing: 2,
                       children: [
-                        _metricText('体重', '${item.weight} kg'),
+                        _metricText(context, '体重', '${item.weight} kg'),
                         if (item.bodyFatPercentage > 0)
                           _metricText(
-                              '体脂肪率', '${item.bodyFatPercentage} %'),
+                              context, '体脂肪率', '${item.bodyFatPercentage} %'),
                         if (item.waist > 0)
-                          _metricText('腹囲', '${item.waist} cm'),
+                          _metricText(context, '腹囲', '${item.waist} cm'),
                       ],
                     ),
                     if (bmiVal > 0 || item.bodyFatPercentage > 0) ...[
@@ -1065,17 +1133,22 @@ class _MetricsCard extends StatelessWidget {
                           if (bmiVal > 0)
                             Text(
                               'BMI: ${bmiVal.toStringAsFixed(1)}',
-                              style: TextStyle(
-                                  fontSize: 11,
-                                  color: bmiVal >= 18.5 && bmiVal < 25
-                                      ? Colors.green
-                                      : Colors.orange),
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .labelSmall
+                                  ?.copyWith(
+                                    color: bmiVal >= 18.5 && bmiVal < 25
+                                        ? semantic.success
+                                        : semantic.warning,
+                                  ),
                             ),
                           if (item.bodyFatPercentage > 0)
                             Text(
                               '除脂肪: ${item.leanBodyMass.toStringAsFixed(1)} kg',
-                              style: const TextStyle(
-                                  fontSize: 11, color: Colors.blue),
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .labelSmall
+                                  ?.copyWith(color: scheme.primary),
                             ),
                         ],
                       ),
@@ -1083,27 +1156,30 @@ class _MetricsCard extends StatelessWidget {
                   ],
                 ),
               ),
-
-              // Menu
               PopupMenuButton<String>(
                 icon: const Icon(Icons.more_vert, size: 20),
                 itemBuilder: (_) => [
                   const PopupMenuItem(
-                      value: 'edit',
-                      child: Row(children: [
-                        Icon(Icons.edit, size: 18),
+                    value: 'edit',
+                    child: Row(
+                      children: [
+                        Icon(Icons.edit_outlined, size: 18),
                         SizedBox(width: 8),
-                        Text('編集')
-                      ])),
-                  const PopupMenuItem(
-                      value: 'delete',
-                      child: Row(children: [
+                        Text('編集'),
+                      ],
+                    ),
+                  ),
+                  PopupMenuItem(
+                    value: 'delete',
+                    child: Row(
+                      children: [
                         Icon(Icons.delete_outline,
-                            size: 18, color: Colors.red),
-                        SizedBox(width: 8),
-                        Text('削除',
-                            style: TextStyle(color: Colors.red))
-                      ])),
+                            size: 18, color: scheme.error),
+                        const SizedBox(width: 8),
+                        Text('削除', style: TextStyle(color: scheme.error)),
+                      ],
+                    ),
+                  ),
                 ],
                 onSelected: (v) {
                   if (v == 'edit') onEdit();
@@ -1117,19 +1193,23 @@ class _MetricsCard extends StatelessWidget {
     );
   }
 
-  Widget _metricText(String label, String value) => RichText(
-        text: TextSpan(
-          style: const TextStyle(color: Colors.black87),
-          children: [
-            TextSpan(
-                text: '$label: ',
-                style: const TextStyle(
-                    fontSize: 11, color: Colors.grey)),
-            TextSpan(
-                text: value,
-                style: const TextStyle(
-                    fontSize: 13, fontWeight: FontWeight.w600)),
-          ],
-        ),
-      );
+  Widget _metricText(BuildContext context, String label, String value) {
+    return RichText(
+      text: TextSpan(
+        style: Theme.of(context).textTheme.bodyMedium,
+        children: [
+          TextSpan(
+            text: '$label: ',
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+          ),
+          TextSpan(
+            text: value,
+            style: const TextStyle(fontWeight: FontWeight.w700),
+          ),
+        ],
+      ),
+    );
+  }
 }

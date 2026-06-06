@@ -4,6 +4,9 @@ import 'package:intl/intl.dart';
 
 import '../../models/training_log.dart';
 import '../../providers/training_provider.dart';
+import '../../theme/app_tokens.dart';
+import '../../theme/bewell_colors.dart';
+import '../../theme/exercise_colors.dart';
 import '../ai_error_text.dart';
 
 /// トレーニングログ1件のカード（メトリクス・AI評価エリアを含む）
@@ -54,17 +57,10 @@ class _TrainingLogCardState extends State<TrainingLogCard> {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final semantic = context.bewellColors;
     final log = widget.log;
-    final isPr = widget.isPr;
-    final estimatedKcal = widget.estimatedKcal;
-    final onEdit = widget.onEdit;
-    final onDelete = widget.onDelete;
-    final onIntervalTimer = widget.onIntervalTimer;
-    final showAiAdvice = widget.showAiAdvice;
-    final aiLoading = widget.aiLoading;
-    final aiAdvice = widget.aiAdvice;
-    final aiError = widget.aiError;
-    final onRequestAiAdvice = widget.onRequestAiAdvice;
+    final typeColor = ExerciseColors.forType(log.exerciseType, scheme, semantic);
     final isCardio = log.exerciseType == ExerciseType.cardio;
     final oneRm =
         isCardio ? 0.0 : TrainingNotifier.oneRepMax(log.weight, log.reps);
@@ -73,13 +69,16 @@ class _TrainingLogCardState extends State<TrainingLogCard> {
         : '${log.totalVolume.round()} kg';
 
     return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      margin: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.lg,
+        vertical: 6,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           InkWell(
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-            onTap: onEdit,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+            onTap: widget.onEdit,
             child: Padding(
               padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
               child: Column(
@@ -92,73 +91,85 @@ class _TrainingLogCardState extends State<TrainingLogCard> {
                         padding: const EdgeInsets.symmetric(
                             horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
-                          color: _typeColor(log.exerciseType)
-                              .withValues(alpha: 0.12),
+                          color: typeColor.withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(
                           log.exerciseType.label,
-                          style: TextStyle(
-                              fontSize: 10,
-                              color: _typeColor(log.exerciseType),
-                              fontWeight: FontWeight.w600),
+                          style: Theme.of(context)
+                              .textTheme
+                              .labelSmall
+                              ?.copyWith(
+                                color: typeColor,
+                                fontWeight: FontWeight.w700,
+                              ),
                         ),
                       ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           log.exerciseName,
-                          style: const TextStyle(
-                              fontWeight: FontWeight.bold, fontSize: 16),
+                          style: Theme.of(context).textTheme.titleSmall,
                         ),
                       ),
-                      if (isPr)
-                        const Tooltip(
+                      if (widget.isPr)
+                        Tooltip(
                           message: '自己ベスト（最大重量）更新！',
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(Icons.emoji_events,
-                                  color: Colors.amber, size: 18),
-                              SizedBox(width: 2),
-                              Text('PR',
-                                  style: TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.amber,
-                                      fontWeight: FontWeight.bold)),
+                              Icon(Icons.emoji_events_rounded,
+                                  color: semantic.warning, size: 18),
+                              const SizedBox(width: 2),
+                              Text(
+                                'PR',
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .labelMedium
+                                    ?.copyWith(
+                                      color: semantic.warning,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                              ),
                             ],
                           ),
                         ),
-                      if (onIntervalTimer != null)
+                      if (widget.onIntervalTimer != null)
                         IconButton(
-                          icon: const Icon(Icons.timer_outlined,
-                              color: Colors.teal, size: 22),
+                          icon: Icon(Icons.timer_outlined,
+                              color: scheme.primary, size: 22),
                           tooltip: 'インターバルタイマー開始',
-                          onPressed: onIntervalTimer,
+                          onPressed: widget.onIntervalTimer,
                         ),
                       PopupMenuButton<String>(
                         icon: const Icon(Icons.more_vert, size: 20),
                         itemBuilder: (_) => [
                           const PopupMenuItem(
-                              value: 'edit',
-                              child: Row(children: [
-                                Icon(Icons.edit, size: 18),
+                            value: 'edit',
+                            child: Row(
+                              children: [
+                                Icon(Icons.edit_outlined, size: 18),
                                 SizedBox(width: 8),
-                                Text('編集')
-                              ])),
-                          const PopupMenuItem(
-                              value: 'delete',
-                              child: Row(children: [
+                                Text('編集'),
+                              ],
+                            ),
+                          ),
+                          PopupMenuItem(
+                            value: 'delete',
+                            child: Row(
+                              children: [
                                 Icon(Icons.delete_outline,
-                                    size: 18, color: Colors.red),
-                                SizedBox(width: 8),
+                                    size: 18, color: scheme.error),
+                                const SizedBox(width: 8),
                                 Text('削除',
-                                    style: TextStyle(color: Colors.red))
-                              ])),
+                                    style: TextStyle(color: scheme.error)),
+                              ],
+                            ),
+                          ),
                         ],
                         onSelected: (v) {
-                          if (v == 'edit') onEdit();
-                          if (v == 'delete') onDelete();
+                          if (v == 'edit') widget.onEdit();
+                          if (v == 'delete') widget.onDelete();
                         },
                       ),
                     ],
@@ -170,18 +181,15 @@ class _TrainingLogCardState extends State<TrainingLogCard> {
                       runSpacing: 4,
                       children: [
                         if (log.distanceKm > 0)
-                          _metricText(
-                              '${log.distanceKm.toStringAsFixed(2)} km', '距離'),
+                          _metricText(context, '${log.distanceKm.toStringAsFixed(2)} km', '距離'),
                         if (log.durationMinutes > 0)
-                          _metricText('${log.durationMinutes} 分', '時間'),
+                          _metricText(context, '${log.durationMinutes} 分', '時間'),
                         if (log.inclinePercent > 0)
-                          _metricText(
-                              '${_formatIncline(log.inclinePercent)} %', '斜度'),
+                          _metricText(context, '${_formatIncline(log.inclinePercent)} %', '斜度'),
                         if (log.paceMinPerKm != null)
-                          _metricText(
-                              _formatPace(log.paceMinPerKm!), 'ペース/km'),
+                          _metricText(context, _formatPace(log.paceMinPerKm!), 'ペース/km'),
                         if (log.rpe != null)
-                          _metricText('${log.rpe}', 'RPE'),
+                          _metricText(context, '${log.rpe}', 'RPE'),
                       ],
                     )
                   else
@@ -190,37 +198,50 @@ class _TrainingLogCardState extends State<TrainingLogCard> {
                       runSpacing: 4,
                       children: [
                         _metricText(
+                          context,
                           log.exerciseType == ExerciseType.bodyweight &&
                                   log.weight == 0
                               ? '自体重'
                               : '${log.weight} kg',
                           '重量',
                         ),
-                        _metricText('${log.reps} 回', '回数'),
-                        _metricText('${log.sets} set', 'セット'),
+                        _metricText(context, '${log.reps} 回', '回数'),
+                        _metricText(context, '${log.sets} set', 'セット'),
                         if (log.interval > 0)
-                          _metricText('${log.interval} 秒', 'インターバル'),
+                          _metricText(context, '${log.interval} 秒', 'インターバル'),
                         if (log.rpe != null)
-                          _metricText('${log.rpe}', 'RPE'),
+                          _metricText(context, '${log.rpe}', 'RPE'),
                       ],
                     ),
                   const SizedBox(height: 8),
                   Row(
                     children: [
-                      _statChip(Icons.local_fire_department,
-                          '${estimatedKcal.round()} kcal', Colors.deepOrange,
-                          tooltip: '消費カロリー目安'),
+                      _statChip(
+                        context,
+                        Icons.local_fire_department_outlined,
+                        '${widget.estimatedKcal.round()} kcal',
+                        semantic.streak,
+                        tooltip: '消費カロリー目安',
+                      ),
                       if (!isCardio && log.totalVolume > 0) ...[
                         const SizedBox(width: 8),
-                        _statChip(Icons.stacked_bar_chart, volumeLabel,
-                            Colors.indigo,
-                            tooltip: '総ボリューム (重量×回数×セット)'),
+                        _statChip(
+                          context,
+                          Icons.stacked_bar_chart_rounded,
+                          volumeLabel,
+                          scheme.primary,
+                          tooltip: '総ボリューム (重量×回数×セット)',
+                        ),
                       ],
                       if (oneRm > 0) ...[
                         const SizedBox(width: 8),
-                        _statChip(Icons.speed, '1RM≈${oneRm.round()} kg',
-                            Colors.teal,
-                            tooltip: 'Epley式 推定1RM'),
+                        _statChip(
+                          context,
+                          Icons.speed_rounded,
+                          '1RM≈${oneRm.round()} kg',
+                          scheme.secondary,
+                          tooltip: 'Epley式 推定1RM',
+                        ),
                       ],
                     ],
                   ),
@@ -228,12 +249,16 @@ class _TrainingLogCardState extends State<TrainingLogCard> {
                     const SizedBox(height: 6),
                     Row(
                       children: [
-                        const Icon(Icons.notes, size: 13, color: Colors.grey),
+                        Icon(Icons.notes_rounded,
+                            size: 13, color: scheme.onSurfaceVariant),
                         const SizedBox(width: 4),
                         Expanded(
-                          child: Text(log.noteForDisplay,
-                              style: const TextStyle(
-                                  fontSize: 12, color: Colors.grey)),
+                          child: Text(
+                            log.noteForDisplay,
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                  color: scheme.onSurfaceVariant,
+                                ),
+                          ),
                         ),
                       ],
                     ),
@@ -241,20 +266,16 @@ class _TrainingLogCardState extends State<TrainingLogCard> {
                   const SizedBox(height: 4),
                   Text(
                     DateFormat('yyyy/MM/dd HH:mm').format(log.date),
-                    style: const TextStyle(fontSize: 11, color: Colors.grey),
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                        ),
                   ),
                 ],
               ),
             ),
           ),
-          if (showAiAdvice && onRequestAiAdvice != null)
-            _buildAiAdviceSection(
-              context,
-              aiAdvice: aiAdvice,
-              aiLoading: aiLoading,
-              aiError: aiError,
-              onRequestAiAdvice: onRequestAiAdvice,
-            ),
+          if (widget.showAiAdvice && widget.onRequestAiAdvice != null)
+            _buildAiAdviceSection(context, semantic: semantic),
         ],
       ),
     );
@@ -262,11 +283,11 @@ class _TrainingLogCardState extends State<TrainingLogCard> {
 
   Widget _buildAiAdviceSection(
     BuildContext context, {
-    required String? aiAdvice,
-    required bool aiLoading,
-    required String? aiError,
-    required VoidCallback onRequestAiAdvice,
+    required BeWellColors semantic,
   }) {
+    final scheme = Theme.of(context).colorScheme;
+    final aiAccent = semantic.aiAccent;
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(14, 0, 8, 12),
       child: Column(
@@ -274,24 +295,22 @@ class _TrainingLogCardState extends State<TrainingLogCard> {
         children: [
           const Divider(height: 1),
           const SizedBox(height: 4),
-          if (aiAdvice != null) ...[
+          if (widget.aiAdvice != null) ...[
             InkWell(
               onTap: () => setState(() => _adviceExpanded = !_adviceExpanded),
-              borderRadius: BorderRadius.circular(6),
+              borderRadius: AppRadius.smAll,
               child: Padding(
                 padding: const EdgeInsets.symmetric(vertical: 6),
                 child: Row(
                   children: [
-                    const Icon(Icons.psychology, size: 18, color: Colors.teal),
+                    Icon(Icons.psychology_outlined, size: 18, color: aiAccent),
                     const SizedBox(width: 6),
-                    const Expanded(
+                    Expanded(
                       child: Text(
                         'AI評価済み',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: Colors.teal,
-                          fontWeight: FontWeight.w500,
-                        ),
+                        style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                              color: aiAccent,
+                            ),
                       ),
                     ),
                     Icon(
@@ -299,7 +318,7 @@ class _TrainingLogCardState extends State<TrainingLogCard> {
                           ? Icons.expand_less
                           : Icons.expand_more,
                       size: 20,
-                      color: Colors.teal,
+                      color: aiAccent,
                     ),
                   ],
                 ),
@@ -308,69 +327,64 @@ class _TrainingLogCardState extends State<TrainingLogCard> {
             if (_adviceExpanded) ...[
               const SizedBox(height: 6),
               MarkdownBody(
-                data: aiAdvice,
+                data: widget.aiAdvice!,
                 listItemCrossAxisAlignment:
                     MarkdownListItemCrossAxisAlignment.start,
                 styleSheet:
                     MarkdownStyleSheet.fromTheme(Theme.of(context)).copyWith(
-                  p: const TextStyle(fontSize: 13, height: 1.6),
-                  h3: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.bold,
-                    height: 1.8,
-                  ),
-                  strong: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  p: Theme.of(context).textTheme.bodySmall,
+                  h3: Theme.of(context).textTheme.titleSmall,
+                  strong: Theme.of(context)
+                      .textTheme
+                      .bodySmall
+                      ?.copyWith(fontWeight: FontWeight.w700),
                   horizontalRuleDecoration: BoxDecoration(
                     border: Border(
-                      top: BorderSide(color: Colors.grey.shade300, width: 1),
+                      top: BorderSide(
+                          color: scheme.outlineVariant.withValues(alpha: 0.5)),
                     ),
                   ),
                 ),
               ),
               const SizedBox(height: 8),
               TextButton.icon(
-                onPressed: aiLoading ? null : onRequestAiAdvice,
-                icon: aiLoading
+                onPressed: widget.aiLoading ? null : widget.onRequestAiAdvice,
+                icon: widget.aiLoading
                     ? const SizedBox(
                         width: 16,
                         height: 16,
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
                     : const Icon(Icons.refresh, size: 18),
-                label: const Text('再評価', style: TextStyle(fontSize: 13)),
+                label: const Text('再評価'),
                 style: TextButton.styleFrom(
                   padding: const EdgeInsets.symmetric(horizontal: 8),
-                  foregroundColor: Colors.grey[600],
+                  foregroundColor: scheme.onSurfaceVariant,
                 ),
               ),
             ],
           ],
-          if (aiAdvice == null) ...[
+          if (widget.aiAdvice == null) ...[
             Align(
               alignment: Alignment.centerLeft,
               child: TextButton.icon(
-                onPressed: aiLoading ? null : onRequestAiAdvice,
-                icon: aiLoading
+                onPressed: widget.aiLoading ? null : widget.onRequestAiAdvice,
+                icon: widget.aiLoading
                     ? const SizedBox(
                         width: 18,
                         height: 18,
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
-                    : const Icon(Icons.psychology_outlined, size: 20),
-                label: const Text(
-                  'この記録をAI評価',
-                  style: TextStyle(fontSize: 13),
-                ),
+                    : Icon(Icons.psychology_outlined, size: 20, color: aiAccent),
+                label: const Text('この記録をAI評価'),
+                style: TextButton.styleFrom(foregroundColor: aiAccent),
               ),
             ),
           ],
-          if (aiError != null)
+          if (widget.aiError != null)
             Padding(
               padding: const EdgeInsets.only(top: 4),
-              child: AiErrorText(aiError),
+              child: AiErrorText(widget.aiError!),
             ),
         ],
       ),
@@ -383,31 +397,37 @@ class _TrainingLogCardState extends State<TrainingLogCard> {
     return '$min:${sec.toString().padLeft(2, '0')}/km';
   }
 
-  /// 斜度を表示用に整形する（整数なら小数点を省く。例: 2.0→"2", 1.5→"1.5"）。
   String _formatIncline(double v) {
     return v == v.roundToDouble() ? v.toInt().toString() : v.toString();
   }
 
-  Widget _metricText(String value, String label) {
+  Widget _metricText(BuildContext context, String value, String label) {
+    final scheme = Theme.of(context).colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(value,
-            style: const TextStyle(
-                fontWeight: FontWeight.bold, fontSize: 15)),
-        Text(label,
-            style: const TextStyle(fontSize: 11, color: Colors.grey)),
+        Text(value, style: Theme.of(context).textTheme.titleSmall),
+        Text(
+          label,
+          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: scheme.onSurfaceVariant,
+              ),
+        ),
       ],
     );
   }
 
-  Widget _statChip(IconData icon, String label, Color color,
-      {required String tooltip}) {
+  Widget _statChip(
+    BuildContext context,
+    IconData icon,
+    String label,
+    Color color, {
+    required String tooltip,
+  }) {
     return Tooltip(
       message: tooltip,
       child: Container(
-        padding:
-            const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
           color: color.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(20),
@@ -417,27 +437,16 @@ class _TrainingLogCardState extends State<TrainingLogCard> {
           children: [
             Icon(icon, size: 13, color: color),
             const SizedBox(width: 4),
-            Text(label,
-                style: TextStyle(
-                    fontSize: 12,
+            Text(
+              label,
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(
                     color: color,
-                    fontWeight: FontWeight.w600)),
+                    fontWeight: FontWeight.w600,
+                  ),
+            ),
           ],
         ),
       ),
     );
-  }
-
-  Color _typeColor(ExerciseType type) {
-    switch (type) {
-      case ExerciseType.freeWeight:
-        return Colors.deepOrange;
-      case ExerciseType.machine:
-        return Colors.blue;
-      case ExerciseType.bodyweight:
-        return Colors.green;
-      case ExerciseType.cardio:
-        return Colors.teal;
-    }
   }
 }

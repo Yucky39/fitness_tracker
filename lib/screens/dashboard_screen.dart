@@ -1,6 +1,5 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
@@ -17,16 +16,19 @@ import '../providers/settings_provider.dart';
 import '../providers/achievement_provider.dart';
 import '../providers/sleep_provider.dart';
 import '../providers/steps_provider.dart';
-import '../providers/water_provider.dart';
 import 'sleep_detail_screen.dart';
 import '../models/training_routine.dart';
 import '../providers/training_provider.dart';
-import '../services/health_service.dart';
 import '../services/training_calorie_calculator.dart';
 import '../widgets/coach_plan_nudge_card.dart';
 import '../widgets/daily_coach_card.dart';
+import '../widgets/dashboard/dashboard_collapsible_section.dart';
+import '../widgets/dashboard/dashboard_section_header.dart';
+import '../widgets/dashboard/wellness_summary_section.dart';
 import '../widgets/micro_tap.dart';
 import '../widgets/muscle_rest_card.dart';
+import '../theme/app_tokens.dart';
+import '../theme/bewell_colors.dart';
 import 'routine_screen.dart';
 import 'trainer_chat_screen.dart';
 
@@ -47,9 +49,7 @@ class DashboardScreen extends ConsumerWidget {
     final routineState = ref.watch(routineProvider);
     final energy = ref.watch(energyProfileProvider);
     final settings = ref.watch(settingsProvider);
-    final sleepState = ref.watch(sleepProvider);
     final stepsState = ref.watch(stepsProvider);
-    final waterState = ref.watch(waterProvider);
     final achievementState = ref.watch(achievementProvider);
 
     final intake = dashboardState.todayCalories;
@@ -86,14 +86,16 @@ class DashboardScreen extends ConsumerWidget {
           physics: const AlwaysScrollableScrollPhysics(),
           slivers: [
             SliverPadding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.lg,
+                AppSpacing.sm,
+                AppSpacing.lg,
+                AppSpacing.xxl,
+              ),
               sliver: SliverList(
                 delegate: SliverChildListDelegate([
-                  _buildHeroHeader(context, scheme, refresh),
-                  const SizedBox(height: 12),
-                  const DailyCoachCard(),
-                  const CoachPlanNudgeCard(),
-                  const SizedBox(height: 12),
+                  if (!achievementState.isLoading)
+                    _buildStreakRow(context, achievementState),
                   _buildBalanceCard(
                     context,
                     scheme,
@@ -110,27 +112,24 @@ class DashboardScreen extends ConsumerWidget {
                     fatGoal: mealState.fatGoal,
                     carbsGoal: mealState.carbsGoal,
                   ),
-                  if (!achievementState.isLoading)
-                    _buildStreakRow(context, scheme, achievementState),
-                  const SizedBox(height: 12),
-                  const MuscleRestCard(margin: EdgeInsets.all(4)),
-                  const SizedBox(height: 12),
-                  _buildSleepCard(context, scheme, ref, sleepState),
-                  const SizedBox(height: 12),
-                  _buildStepsCard(context, scheme, ref, stepsState),
-                  const SizedBox(height: 12),
-                  _buildWaterCard(context, scheme, ref, waterState),
-                  const SizedBox(height: 12),
-                  _buildPeriodSummarySection(context, scheme, ref),
-                  const SizedBox(height: 20),
-                  Text(
-                    'クイックアクセス',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 0.2,
-                        ),
+                  const DashboardSectionHeader(
+                    title: 'AIコーチ',
+                    subtitle: 'あなたの記録に基づくアドバイス',
                   ),
-                  const SizedBox(height: 12),
+                  const DailyCoachCard(),
+                  const CoachPlanNudgeCard(),
+                  const DashboardSectionHeader(
+                    title: 'ウェルネス',
+                    subtitle: '睡眠・歩数・水分',
+                  ),
+                  WellnessSummarySection(
+                    onSleepDetail: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const _SleepDetailWrapper(),
+                      ),
+                    ),
+                  ),
+                  const DashboardSectionHeader(title: 'アクティビティ'),
                   _buildPanelSection(
                     context,
                     scheme,
@@ -142,31 +141,37 @@ class DashboardScreen extends ConsumerWidget {
                     onTraining: () => goTab(_tabTraining),
                     onProgress: () => goTab(_tabProgress),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: AppSpacing.md),
                   _buildTrainerChatCard(context, scheme),
-                  const SizedBox(height: 20),
-                  _buildRoutineReminderCard(
-                    context,
-                    scheme,
-                    todaysRoutines,
-                    settings: settings,
-                    onOpenRoutine: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute<void>(
-                          builder: (_) => const RoutineScreen(),
-                        ),
-                      );
-                    },
-                    onOpenMealSettings: () => goTab(_tabMeal),
+                  DashboardCollapsibleSection(
+                    title: '詳細を見る',
+                    subtitle: '筋肉休息・週次サマリー・予定・グラフ',
+                    children: [
+                      const MuscleRestCard(margin: EdgeInsets.zero),
+                      _buildPeriodSummarySection(context, scheme, ref),
+                      _buildRoutineReminderCard(
+                        context,
+                        scheme,
+                        todaysRoutines,
+                        settings: settings,
+                        onOpenRoutine: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              builder: (_) => const RoutineScreen(),
+                            ),
+                          );
+                        },
+                        onOpenMealSettings: () => goTab(_tabMeal),
+                      ),
+                      _buildWeeklyCalorieChart(
+                        context,
+                        scheme,
+                        dashboardState,
+                        mealState.calorieGoal,
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 20),
-                  _buildWeeklyCalorieChart(
-                    context,
-                    scheme,
-                    dashboardState,
-                    mealState.calorieGoal,
-                  ),
-                  const SizedBox(height: 88),
+                  const SizedBox(height: AppSpacing.bottomNavClearance),
                 ]),
               ),
             ),
@@ -189,7 +194,6 @@ class DashboardScreen extends ConsumerWidget {
 
   Widget _buildStreakRow(
     BuildContext context,
-    ColorScheme scheme,
     AchievementState achievementState,
   ) {
     final streaks = achievementState.streaks;
@@ -199,14 +203,16 @@ class DashboardScreen extends ConsumerWidget {
       return const SizedBox.shrink();
     }
 
+    final semantic = context.bewellColors;
+
     return Padding(
-      padding: const EdgeInsets.only(top: 10),
+      padding: const EdgeInsets.only(bottom: AppSpacing.md),
       child: Row(
         children: [
           if (streaks.nutritionStreak > 0)
             _streakChip(
               context,
-              scheme,
+              semantic,
               '🍽',
               streaks.nutritionStreak,
               '食事',
@@ -214,7 +220,7 @@ class DashboardScreen extends ConsumerWidget {
           if (streaks.trainingStreak > 0)
             _streakChip(
               context,
-              scheme,
+              semantic,
               '💪',
               streaks.trainingStreak,
               'トレ',
@@ -222,7 +228,7 @@ class DashboardScreen extends ConsumerWidget {
           if (streaks.overallStreak > 0)
             _streakChip(
               context,
-              scheme,
+              semantic,
               '🚶',
               streaks.overallStreak,
               '歩数',
@@ -232,17 +238,21 @@ class DashboardScreen extends ConsumerWidget {
     );
   }
 
-  Widget _streakChip(BuildContext context, ColorScheme scheme, String emoji,
-      int streak, String label) {
+  Widget _streakChip(
+    BuildContext context,
+    BeWellColors semantic,
+    String emoji,
+    int streak,
+    String label,
+  ) {
     return Padding(
-      padding: const EdgeInsets.only(right: 8),
+      padding: const EdgeInsets.only(right: AppSpacing.sm),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
         decoration: BoxDecoration(
-          color: Colors.deepOrange.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-              color: Colors.deepOrange.withValues(alpha: 0.3)),
+          color: semantic.streak.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+          border: Border.all(color: semantic.streak.withValues(alpha: 0.3)),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -251,425 +261,15 @@ class DashboardScreen extends ConsumerWidget {
             const SizedBox(width: 4),
             Text(
               '$streak日 $label',
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
-                color: Colors.deepOrange,
+                color: semantic.streak,
               ),
             ),
           ],
         ),
       ),
-    );
-  }
-
-  Widget _buildSleepCard(
-    BuildContext context,
-    ColorScheme scheme,
-    WidgetRef ref,
-    SleepState sleepState,
-  ) {
-    if (!HealthService.isSupported) return const SizedBox.shrink();
-
-    final quality = sleepState.quality;
-    final Color qualityColor = switch (quality) {
-      SleepQuality.good => Colors.teal,
-      SleepQuality.fair => Colors.orange,
-      SleepQuality.poor => Colors.red,
-      SleepQuality.unknown => scheme.onSurfaceVariant,
-    };
-
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        child: Row(
-          children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: scheme.tertiaryContainer,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(Icons.bedtime_rounded,
-                  color: scheme.onTertiaryContainer),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('昨夜の睡眠',
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.w700,
-                          )),
-                  const SizedBox(height: 2),
-                  if (sleepState.isLoading)
-                    const SizedBox(
-                      height: 16,
-                      width: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  else if (!sleepState.permissionGranted)
-                    Text('連携ボタンをタップして睡眠時間を取得',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: scheme.onSurfaceVariant,
-                            ))
-                  else if (sleepState.sleepMinutes == null)
-                    Text('昨夜のデータがありません',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: scheme.onSurfaceVariant,
-                            ))
-                  else ...[
-                    Row(
-                      children: [
-                        Text(
-                          '${sleepState.hours}時間'
-                          '${sleepState.minutes > 0 ? '${sleepState.minutes}分' : ''}',
-                          style:
-                              Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                        ),
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: qualityColor.withValues(alpha: 0.15),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            '${quality.emoji} ${quality.label}',
-                            style:
-                                Theme.of(context).textTheme.labelSmall?.copyWith(
-                                      color: qualityColor,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    if (quality == SleepQuality.poor)
-                      Text(
-                        '睡眠不足は食欲増加・筋回復低下につながります',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: Colors.red.shade400,
-                            ),
-                      )
-                    else if (quality == SleepQuality.fair)
-                      Text(
-                        '理想は7時間以上。今日のトレーニング強度を抑えめに',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: Colors.orange.shade700,
-                            ),
-                      ),
-                  ],
-                ],
-              ),
-            ),
-            if (sleepState.isLoading)
-              const SizedBox.shrink()
-            else if (!sleepState.permissionGranted)
-              FilledButton.tonal(
-                onPressed: () async {
-                  final ok =
-                      await ref.read(sleepProvider.notifier).requestAndFetch();
-                  if (!ok && context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text(
-                          '睡眠データを取得できませんでした。\n'
-                          'iPhoneの設定 > プライバシーとセキュリティ > ヘルスケア から'
-                          'アクセスを許可してください。',
-                        ),
-                        duration: Duration(seconds: 5),
-                      ),
-                    );
-                  }
-                },
-                child: const Text('連携'),
-              )
-            else
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.refresh_rounded),
-                    tooltip: '睡眠データを更新',
-                    onPressed: () =>
-                        ref.read(sleepProvider.notifier).refresh(),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.chevron_right_rounded),
-                    tooltip: '睡眠の詳細',
-                    onPressed: () => Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => const _SleepDetailWrapper(),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildStepsCard(
-    BuildContext context,
-    ColorScheme scheme,
-    WidgetRef ref,
-    StepsState stepsState,
-  ) {
-    if (!HealthService.isSupported) return const SizedBox.shrink();
-
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        child: Row(
-          children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: scheme.secondaryContainer,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(Icons.directions_walk_rounded,
-                  color: scheme.onSecondaryContainer),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('今日の歩数',
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.w700,
-                          )),
-                  const SizedBox(height: 2),
-                  if (stepsState.isLoading)
-                    const SizedBox(
-                      height: 16,
-                      width: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  else if (!stepsState.permissionGranted)
-                    Text('連携ボタンをタップして歩数を取得',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: scheme.onSurfaceVariant,
-                            ))
-                  else ...[
-                    Text(
-                      '${_formatSteps(stepsState.steps)} 歩',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            fontWeight: FontWeight.w600,
-                          ),
-                    ),
-                    if (stepsState.burnedKcal > 0)
-                      Text(
-                        '推定消費 ${stepsState.burnedKcal} kcal',
-                        style:
-                            Theme.of(context).textTheme.bodySmall?.copyWith(
-                                  color: scheme.secondary,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                      ),
-                  ],
-                ],
-              ),
-            ),
-            if (stepsState.isLoading)
-              const SizedBox.shrink()
-            else if (!stepsState.permissionGranted)
-              FilledButton.tonal(
-                onPressed: () async {
-                  final ok =
-                      await ref.read(stepsProvider.notifier).requestAndFetch();
-                  if (!ok && context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                          content: Text('歩数へのアクセスが許可されていません')),
-                    );
-                  }
-                },
-                child: const Text('連携'),
-              )
-            else
-              IconButton(
-                icon: const Icon(Icons.refresh_rounded),
-                tooltip: '歩数を更新',
-                onPressed: () =>
-                    ref.read(stepsProvider.notifier).refresh(),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  static String _formatSteps(int steps) {
-    if (steps >= 10000) {
-      return '${(steps / 1000).toStringAsFixed(1)}k';
-    }
-    return steps.toString();
-  }
-
-  Widget _buildWaterCard(
-    BuildContext context,
-    ColorScheme scheme,
-    WidgetRef ref,
-    WaterState waterState,
-  ) {
-    final theme = Theme.of(context);
-    final totalMl = waterState.totalMl;
-    final goalMl = waterState.dailyGoalMl;
-    final progress = waterState.progressFraction;
-
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: scheme.tertiaryContainer,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(Icons.water_drop_rounded,
-                      color: scheme.onTertiaryContainer),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('今日の水分',
-                          style: theme.textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.w700,
-                          )),
-                      const SizedBox(height: 2),
-                      Text(
-                        '${totalMl}ml ／ ${goalMl}ml',
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          fontWeight: FontWeight.w600,
-                          color: progress >= 1.0
-                              ? Colors.green
-                              : theme.colorScheme.onSurface,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                if (progress >= 1.0)
-                  const Icon(Icons.check_circle_rounded,
-                      color: Colors.green, size: 24),
-              ],
-            ),
-            const SizedBox(height: 10),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(4),
-              child: LinearProgressIndicator(
-                value: progress,
-                minHeight: 8,
-                backgroundColor: Colors.blue.withValues(alpha: 0.15),
-                color: Colors.blue,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                for (final ml in [150, 200, 250, 500])
-                  Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 2),
-                      child: _WaterAddButton(
-                        ml: ml,
-                        onPressed: () {
-                          HapticFeedback.lightImpact();
-                          ref.read(waterProvider.notifier).addLog(ml);
-                        },
-                      ),
-                    ),
-                  ),
-                const SizedBox(width: 4),
-                _WaterCustomInput(onAdd: (ml) =>
-                    ref.read(waterProvider.notifier).addLog(ml)),
-              ],
-            ),
-            if (waterState.todayLogs.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 4,
-                runSpacing: 4,
-                children: waterState.todayLogs.map((log) {
-                  return GestureDetector(
-                    onLongPress: () =>
-                        ref.read(waterProvider.notifier).removeLog(log.id),
-                    child: Chip(
-                      visualDensity: VisualDensity.compact,
-                      padding: const EdgeInsets.symmetric(horizontal: 4),
-                      label: Text('${log.amountMl}ml',
-                          style: const TextStyle(fontSize: 11)),
-                      deleteIcon:
-                          const Icon(Icons.close_rounded, size: 14),
-                      onDeleted: () =>
-                          ref.read(waterProvider.notifier).removeLog(log.id),
-                    ),
-                  );
-                }).toList(),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildHeroHeader(
-    BuildContext context,
-    ColorScheme scheme,
-    Future<void> Function() refresh,
-  ) {
-    final dateStr =
-        DateFormat('M月d日 EEEE', 'ja').format(DateTime.now());
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.end,
-      children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'ホーム',
-                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                      fontWeight: FontWeight.w800,
-                      height: 1.05,
-                    ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                dateStr,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: scheme.onSurfaceVariant,
-                    ),
-              ),
-            ],
-          ),
-        ),
-        IconButton.filledTonal(
-          onPressed: refresh,
-          icon: const Icon(Icons.refresh_rounded),
-          tooltip: '更新',
-        ),
-      ],
     );
   }
 
@@ -698,16 +298,15 @@ class DashboardScreen extends ConsumerWidget {
             ? scheme.onPrimaryContainer.withValues(alpha: 0.85)
             : scheme.error;
 
+    final semantic = context.bewellColors;
+
     return DecoratedBox(
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: AppRadius.xlAll,
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [
-            scheme.primaryContainer.withValues(alpha: 0.85),
-            scheme.tertiaryContainer.withValues(alpha: 0.55),
-          ],
+          colors: [semantic.heroGradientStart, semantic.heroGradientEnd],
         ),
         boxShadow: [
           BoxShadow(
@@ -1116,7 +715,7 @@ class DashboardScreen extends ConsumerWidget {
       elevation: 0,
       shadowColor: Colors.transparent,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: AppRadius.lgAll,
         side: BorderSide(
           color: scheme.outlineVariant.withValues(alpha: 0.45),
         ),
@@ -1332,7 +931,7 @@ class DashboardScreen extends ConsumerWidget {
       elevation: 0,
       color: scheme.surfaceContainerHigh,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: AppRadius.lgAll,
         side: BorderSide(
           color: scheme.outlineVariant.withValues(alpha: 0.45),
         ),
@@ -1707,124 +1306,5 @@ class _SleepDetailWrapper extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return const SleepDetailScreen();
-  }
-}
-
-/// タップ時にスケールバウンスを伴う水分追加ボタン（48dp タッチターゲット）。
-class _WaterAddButton extends StatefulWidget {
-  const _WaterAddButton({required this.ml, required this.onPressed});
-  final int ml;
-  final VoidCallback onPressed;
-
-  @override
-  State<_WaterAddButton> createState() => _WaterAddButtonState();
-}
-
-class _WaterAddButtonState extends State<_WaterAddButton>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _ctrl;
-  late final Animation<double> _scale;
-
-  @override
-  void initState() {
-    super.initState();
-    _ctrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 80),
-      reverseDuration: const Duration(milliseconds: 200),
-    );
-    _scale = Tween<double>(begin: 1.0, end: 0.92).animate(
-      CurvedAnimation(
-        parent: _ctrl,
-        curve: Curves.easeIn,
-        reverseCurve: Curves.elasticOut,
-      ),
-    );
-  }
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTapDown: (_) => _ctrl.forward(),
-      onTapUp: (_) {
-        _ctrl.reverse();
-        widget.onPressed();
-      },
-      onTapCancel: () => _ctrl.reverse(),
-      child: ScaleTransition(
-        scale: _scale,
-        child: FilledButton.tonal(
-          style: FilledButton.styleFrom(
-            padding: EdgeInsets.zero,
-            minimumSize: const Size(0, 48),
-            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-          ),
-          onPressed: widget.onPressed,
-          child: Text('+${widget.ml}ml',
-              style: const TextStyle(fontSize: 12)),
-        ),
-      ),
-    );
-  }
-}
-
-class _WaterCustomInput extends StatefulWidget {
-  const _WaterCustomInput({required this.onAdd});
-  final void Function(int ml) onAdd;
-
-  @override
-  State<_WaterCustomInput> createState() => _WaterCustomInputState();
-}
-
-class _WaterCustomInputState extends State<_WaterCustomInput> {
-  final _controller = TextEditingController();
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  void _submit() {
-    final ml = int.tryParse(_controller.text.trim());
-    if (ml != null && ml > 0) {
-      widget.onAdd(ml);
-      _controller.clear();
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 72,
-      height: 48,
-      child: TextField(
-        controller: _controller,
-        keyboardType: TextInputType.number,
-        textAlign: TextAlign.center,
-        style: const TextStyle(fontSize: 12),
-        decoration: InputDecoration(
-          hintText: 'ml',
-          hintStyle: const TextStyle(fontSize: 12),
-          contentPadding: EdgeInsets.zero,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-          ),
-          isDense: true,
-          suffixIcon: IconButton(
-            icon: const Icon(Icons.add_rounded, size: 16),
-            padding: EdgeInsets.zero,
-            onPressed: _submit,
-          ),
-        ),
-        onSubmitted: (_) => _submit(),
-      ),
-    );
   }
 }

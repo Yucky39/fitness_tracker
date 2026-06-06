@@ -32,6 +32,10 @@ import '../widgets/training/training_log_dialog.dart';
 import '../widgets/training/training_one_rm_card.dart';
 import '../widgets/training/training_today_summary.dart';
 import '../widgets/training/training_timer_overlay.dart';
+import '../widgets/register_home_fab.dart';
+import '../providers/home_fab_provider.dart';
+import '../theme/app_tokens.dart';
+import '../theme/bewell_colors.dart';
 import '../widgets/source_reference_link.dart';
 import 'active_workout_screen.dart';
 import 'review_screen.dart';
@@ -80,22 +84,6 @@ class _TrainingScreenState extends ConsumerState<TrainingScreen> {
     }
   }
 
-  Future<void> _manualImportFromHealth() async {
-    if (!HealthService.isSupported) return;
-    final n =
-        await ref.read(trainingProvider.notifier).syncWorkoutsFromHealth();
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          n > 0
-              ? 'ヘルスケアから $n 件のワークアウトを取り込みました'
-              : '新しいワークアウトはありませんでした（または権限・データを確認してください）',
-        ),
-      ),
-    );
-  }
-
   void _startIntervalTimer(int seconds) {
     _timer?.cancel();
     setState(() {
@@ -121,16 +109,6 @@ class _TrainingScreenState extends ConsumerState<TrainingScreen> {
     });
   }
 
-  void _startSession(dynamic routine, List<TrainingLog> allLogs) {
-    ref.read(activeWorkoutProvider.notifier).startSession(
-          routine: routine,
-          allLogs: allLogs,
-        );
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const ActiveWorkoutScreen()),
-    );
-  }
-
   void _openTrainingDialog({
     required TrainingNotifier notifier,
     required double bodyWeightKg,
@@ -153,7 +131,6 @@ class _TrainingScreenState extends ConsumerState<TrainingScreen> {
     final bodyWeightKg = ref.watch(energyProfileProvider).weightKg;
     final settings = ref.watch(settingsProvider);
     final sleepState = ref.watch(sleepProvider);
-    final routineState = ref.watch(routineProvider);
     final effectiveBw = bodyWeightKg > 0
         ? bodyWeightKg
         : TrainingCalorieCalculator.defaultBodyWeightKg;
@@ -163,12 +140,6 @@ class _TrainingScreenState extends ConsumerState<TrainingScreen> {
     final isToday = selectedDate.year == today.year &&
         selectedDate.month == today.month &&
         selectedDate.day == today.day;
-
-    // 今日のルーティンでメモに種目が書かれているものを探す
-    final todaysRoutines = routineState.routines
-        .where((r) => r.weekdays.contains(DateTime.now().weekday))
-        .where((r) => r.note.trim().isNotEmpty)
-        .toList();
 
     final selectedDateLogs = trainingState.selectedDateLogs;
 
@@ -189,55 +160,16 @@ class _TrainingScreenState extends ConsumerState<TrainingScreen> {
       );
     }
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('トレーニング記録'),
-        actions: [
-          if (isToday && todaysRoutines.isNotEmpty)
-            FilledButton.tonal(
-              onPressed: () =>
-                  _startSession(todaysRoutines.first, trainingState.logs),
-              child: const Text('セッション開始'),
-            ),
-          if (HealthService.isSupported)
-            IconButton(
-              icon: const Icon(Icons.sync),
-              tooltip: 'ヘルスケアからワークアウトを取り込む',
-              onPressed: _manualImportFromHealth,
-            ),
-          IconButton(
-            icon: const Icon(Icons.bar_chart_rounded),
-            tooltip: '振り返り（週間・月間）',
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute<void>(
-                builder: (_) => const ReviewScreen(),
-              ),
-            ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.auto_awesome),
-            tooltip: 'AIプラン作成',
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute<void>(
-                builder: (_) => const TrainingPlanScreen(),
-              ),
-            ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.calendar_month),
-            tooltip: 'ルーティン管理',
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute<void>(
-                builder: (_) => const RoutineScreen(),
-              ),
-            ),
-          ),
-        ],
+    return RegisterHomeFab(
+      tabIndex: 2,
+      config: HomeFabConfig(
+        tooltip: 'トレーニングを記録',
+        onPressed: () => _openTrainingDialog(
+          notifier: trainingNotifier,
+          bodyWeightKg: effectiveBw,
+        ),
       ),
-      body: Stack(
+      child: Stack(
         children: [
           bodyChild,
           if (_timerRunning || _timerSeconds > 0)
@@ -247,13 +179,6 @@ class _TrainingScreenState extends ConsumerState<TrainingScreen> {
               onClose: _stopIntervalTimer,
             ),
         ],
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _openTrainingDialog(
-          notifier: trainingNotifier,
-          bodyWeightKg: effectiveBw,
-        ),
-        child: const Icon(Icons.add),
       ),
     );
   }
@@ -320,7 +245,8 @@ class _TrainingScreenState extends ConsumerState<TrainingScreen> {
                           : 'まだ今日の記録がありません\n右下の + ボタンで追加できます')
                       : 'この日のトレーニング記録はありません',
                   textAlign: TextAlign.center,
-                  style: const TextStyle(color: Colors.grey),
+                  style:
+                      TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
                 ),
               ),
             ),
@@ -424,7 +350,8 @@ class _TrainingScreenState extends ConsumerState<TrainingScreen> {
           ),
         ),
 
-        const SliverToBoxAdapter(child: SizedBox(height: 80)),
+        const SliverToBoxAdapter(
+            child: SizedBox(height: AppSpacing.bottomNavClearance)),
       ],
     );
   }
@@ -569,7 +496,9 @@ class _SessionSection extends ConsumerWidget {
               dayLogs.isEmpty
                   ? 'トレーニングを記録してからセッションを登録できます'
                   : '「登録」ボタンでセッションをまとめてストレッチを確認できます',
-              style: const TextStyle(fontSize: 12, color: Colors.grey),
+              style: TextStyle(
+                  fontSize: 12,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant),
             ),
           )
         else
@@ -652,8 +581,8 @@ class _DailyAdviceCard extends ConsumerWidget {
           children: [
             Row(
               children: [
-                const Icon(Icons.auto_awesome,
-                    size: 16, color: Colors.deepOrange),
+                Icon(Icons.auto_awesome,
+                    size: 16, color: context.bewellColors.aiAccent),
                 const SizedBox(width: 6),
                 const Text(
                   'AI デイリーアドバイス',
@@ -688,8 +617,9 @@ class _DailyAdviceCard extends ConsumerWidget {
                     AiErrorText(error),
                   ] else ...[
                     Text(error,
-                        style:
-                            const TextStyle(color: Colors.red, fontSize: 13)),
+                        style: TextStyle(
+                            color: Theme.of(context).colorScheme.error,
+                            fontSize: 13)),
                     const SizedBox(height: 6),
                     OutlinedButton.icon(
                       onPressed: () => fetch(),
@@ -778,3 +708,134 @@ class _MuscleHeatmapCardState extends State<_MuscleHeatmapCard> {
     );
   }
 }
+
+/// [HomeScreen] の AppBar に表示するトレーニングタブ用アクション。
+class TrainingAppBarActions extends ConsumerWidget {
+  const TrainingAppBarActions({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final trainingState = ref.watch(trainingProvider);
+    final routineState = ref.watch(routineProvider);
+
+    final today = DateTime.now();
+    final isToday = trainingState.selectedDate.year == today.year &&
+        trainingState.selectedDate.month == today.month &&
+        trainingState.selectedDate.day == today.day;
+
+    final todaysRoutines = routineState.routines
+        .where((r) => r.weekdays.contains(DateTime.now().weekday))
+        .toList();
+
+    Future<void> manualImport() async {
+      if (!HealthService.isSupported) return;
+      final n =
+          await ref.read(trainingProvider.notifier).syncWorkoutsFromHealth();
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            n > 0
+                ? 'ヘルスケアから $n 件のワークアウトを取り込みました'
+                : '新しいワークアウトはありませんでした（または権限・データを確認してください）',
+          ),
+        ),
+      );
+    }
+
+    void startSession() {
+      ref.read(activeWorkoutProvider.notifier).startSession(
+            routine: todaysRoutines.first,
+            allLogs: trainingState.logs,
+          );
+      Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const ActiveWorkoutScreen()),
+      );
+    }
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (isToday && todaysRoutines.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(right: 4),
+            child: FilledButton.tonal(
+              style: FilledButton.styleFrom(
+                minimumSize: const Size(0, 36),
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              onPressed: startSession,
+              child: const Text('開始', style: TextStyle(fontSize: 13)),
+            ),
+          ),
+        PopupMenuButton<_TrainingMenuAction>(
+          tooltip: 'その他',
+          icon: const Icon(Icons.more_vert),
+          onSelected: (action) {
+            switch (action) {
+              case _TrainingMenuAction.sync:
+                manualImport();
+              case _TrainingMenuAction.review:
+                Navigator.push(
+                  context,
+                  MaterialPageRoute<void>(builder: (_) => const ReviewScreen()),
+                );
+              case _TrainingMenuAction.aiPlan:
+                Navigator.push(
+                  context,
+                  MaterialPageRoute<void>(
+                    builder: (_) => const TrainingPlanScreen(),
+                  ),
+                );
+              case _TrainingMenuAction.routine:
+                Navigator.push(
+                  context,
+                  MaterialPageRoute<void>(
+                    builder: (_) => const RoutineScreen(),
+                  ),
+                );
+            }
+          },
+          itemBuilder: (context) => [
+            if (HealthService.isSupported)
+              const PopupMenuItem(
+                value: _TrainingMenuAction.sync,
+                child: ListTile(
+                  leading: Icon(Icons.sync),
+                  title: Text('ヘルスケアから取り込む'),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+            const PopupMenuItem(
+              value: _TrainingMenuAction.review,
+              child: ListTile(
+                leading: Icon(Icons.bar_chart_rounded),
+                title: Text('振り返り'),
+                contentPadding: EdgeInsets.zero,
+              ),
+            ),
+            const PopupMenuItem(
+              value: _TrainingMenuAction.aiPlan,
+              child: ListTile(
+                leading: Icon(Icons.auto_awesome),
+                title: Text('AIプラン作成'),
+                contentPadding: EdgeInsets.zero,
+              ),
+            ),
+            const PopupMenuItem(
+              value: _TrainingMenuAction.routine,
+              child: ListTile(
+                leading: Icon(Icons.calendar_month),
+                title: Text('ルーティン管理'),
+                contentPadding: EdgeInsets.zero,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+enum _TrainingMenuAction { sync, review, aiPlan, routine }

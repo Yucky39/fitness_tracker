@@ -18,10 +18,11 @@ class NutrientBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bool isOver = goal > 0 && current > goal;
-    final double progress = goal > 0 ? (current / goal).clamp(0.0, 1.0) : 0.0;
-    final Color displayColor = isOver ? Colors.red : color;
-    final String valueText = isOver
+    final scheme = Theme.of(context).colorScheme;
+    final isOver = goal > 0 && current > goal;
+    final progress = goal > 0 ? (current / goal).clamp(0.0, 1.0) : 0.0;
+    final displayColor = isOver ? scheme.error : color;
+    final valueText = isOver
         ? '${current.toStringAsFixed(1)} / ${goal.toStringAsFixed(1)} $unit  (+${(current - goal).toStringAsFixed(1)}超)'
         : '${current.toStringAsFixed(1)} / ${goal.toStringAsFixed(1)} $unit';
 
@@ -31,14 +32,16 @@ class NutrientBar extends StatelessWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
+            Text(
+              label,
+              style: Theme.of(context).textTheme.labelLarge,
+            ),
             Text(
               valueText,
-              style: TextStyle(
-                color: isOver ? Colors.red : Colors.grey[600],
-                fontSize: 12,
-                fontWeight: isOver ? FontWeight.bold : FontWeight.normal,
-              ),
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                    color: isOver ? scheme.error : scheme.onSurfaceVariant,
+                    fontWeight: isOver ? FontWeight.w700 : FontWeight.w500,
+                  ),
             ),
           ],
         ),
@@ -48,12 +51,14 @@ class NutrientBar extends StatelessWidget {
           duration: const Duration(milliseconds: 900),
           curve: Curves.easeOutCubic,
           builder: (context, value, _) {
-            return LinearProgressIndicator(
-              value: value,
-              backgroundColor: displayColor.withValues(alpha: 0.2),
-              color: displayColor,
-              minHeight: 8,
+            return ClipRRect(
               borderRadius: BorderRadius.circular(4),
+              child: LinearProgressIndicator(
+                value: value,
+                backgroundColor: displayColor.withValues(alpha: 0.18),
+                color: displayColor,
+                minHeight: 8,
+              ),
             );
           },
         ),

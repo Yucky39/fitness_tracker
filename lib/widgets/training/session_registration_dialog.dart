@@ -176,12 +176,14 @@ class _SessionRegistrationSheetState extends State<_SessionRegistrationSheet> {
                   ),
                   const SizedBox(height: 4),
                   if (widget.dayLogs.isEmpty)
-                    const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 16),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
                       child: Text(
                         'この日のトレーニング記録がありません',
                         textAlign: TextAlign.center,
-                        style: TextStyle(color: Colors.grey),
+                        style: TextStyle(
+                            color:
+                                Theme.of(context).colorScheme.onSurfaceVariant),
                       ),
                     )
                   else

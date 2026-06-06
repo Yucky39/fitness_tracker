@@ -11,6 +11,7 @@ import 'package:timezone/timezone.dart' as tz;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'firebase_options.dart';
+import 'theme/app_theme.dart';
 import 'providers/auth_provider.dart';
 import 'screens/auth_screen.dart';
 import 'screens/home_screen.dart';
@@ -131,70 +132,12 @@ class _BootstrapAppState extends State<_BootstrapApp> {
       title: 'BeWell',
       debugShowCheckedModeBanner: false,
       scaffoldMessengerKey: _messengerKey,
-      theme: _appLightTheme(),
-      darkTheme: _appDarkTheme(),
+      theme: AppTheme.light(),
+      darkTheme: AppTheme.dark(),
       themeMode: ThemeMode.system,
       home: _ready ? const AuthGate() : const SplashScreen(),
     );
   }
-}
-
-ThemeData _appLightTheme() {
-  return ThemeData(
-    useMaterial3: true,
-    colorScheme: ColorScheme.fromSeed(
-      seedColor: Colors.teal,
-      brightness: Brightness.light,
-    ),
-    fontFamily: 'Roboto',
-    cardTheme: CardThemeData(
-      elevation: 0,
-      clipBehavior: Clip.antiAlias,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
-      ),
-    ),
-    // サムフレンドリー: FilledButton の最小タッチターゲットを 48dp に統一
-    filledButtonTheme: FilledButtonThemeData(
-      style: FilledButton.styleFrom(
-        minimumSize: const Size(48, 48),
-      ),
-    ),
-    // IconButton は Material3 デフォルト 48dp だが明示的に設定
-    iconButtonTheme: IconButtonThemeData(
-      style: IconButton.styleFrom(
-        minimumSize: const Size(48, 48),
-      ),
-    ),
-  );
-}
-
-ThemeData _appDarkTheme() {
-  return ThemeData(
-    useMaterial3: true,
-    colorScheme: ColorScheme.fromSeed(
-      seedColor: Colors.teal,
-      brightness: Brightness.dark,
-    ),
-    fontFamily: 'Roboto',
-    cardTheme: CardThemeData(
-      elevation: 0,
-      clipBehavior: Clip.antiAlias,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
-      ),
-    ),
-    filledButtonTheme: FilledButtonThemeData(
-      style: FilledButton.styleFrom(
-        minimumSize: const Size(48, 48),
-      ),
-    ),
-    iconButtonTheme: IconButtonThemeData(
-      style: IconButton.styleFrom(
-        minimumSize: const Size(48, 48),
-      ),
-    ),
-  );
 }
 
 class FitnessTrackerApp extends StatelessWidget {
@@ -204,8 +147,8 @@ class FitnessTrackerApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'BeWell',
-      theme: _appLightTheme(),
-      darkTheme: _appDarkTheme(),
+      theme: AppTheme.light(),
+      darkTheme: AppTheme.dark(),
       themeMode: ThemeMode.system,
       home: const AuthGate(),
     );

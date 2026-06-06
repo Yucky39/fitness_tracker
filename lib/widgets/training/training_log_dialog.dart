@@ -12,6 +12,7 @@ import '../../services/auth_service.dart';
 import '../../services/community_exercise_service.dart';
 import '../../services/exercise_animation_service.dart';
 import '../../services/training_calorie_calculator.dart';
+import '../../theme/bewell_colors.dart';
 import '../../utils/exercise_inference.dart';
 import 'exercise_motion_demo_sheet.dart';
 import 'stick_figure_animation_widget.dart';
@@ -96,6 +97,10 @@ void showTrainingLogDialog({
 
         return StatefulBuilder(
           builder: (context, setState) {
+            final scheme = Theme.of(context).colorScheme;
+            final muted = Theme.of(context).textTheme.labelMedium?.copyWith(
+                  color: scheme.onSurfaceVariant,
+                );
             TrainingLog? previousLog;
             double previewKcal = 0;
 
@@ -219,18 +224,16 @@ void showTrainingLogDialog({
                   children: [
                     Row(
                       children: [
-                        const Icon(Icons.event, size: 16, color: Colors.grey),
+                        Icon(Icons.event, size: 16, color: scheme.onSurfaceVariant),
                         const SizedBox(width: 6),
                         Text(
                           '記録日: ${DateFormat('yyyy/M/d').format(targetDate)}',
-                          style:
-                              const TextStyle(fontSize: 12, color: Colors.grey),
+                          style: muted,
                         ),
                       ],
                     ),
                     const SizedBox(height: 8),
-                    const Text('部位で絞り込み',
-                        style: TextStyle(fontSize: 12, color: Colors.grey)),
+                    Text('部位で絞り込み', style: muted),
                     const SizedBox(height: 4),
                     SizedBox(
                       height: 36,
@@ -359,8 +362,7 @@ void showTrainingLogDialog({
                       ),
                     ],
                     const SizedBox(height: 10),
-                    const Text('器具・種別',
-                        style: TextStyle(fontSize: 12, color: Colors.grey)),
+                    Text('器具・種別', style: muted),
                     const SizedBox(height: 4),
                     Wrap(
                       spacing: 8,
@@ -378,7 +380,9 @@ void showTrainingLogDialog({
                     const SizedBox(height: 4),
                     Text(
                       _exerciseTypeHint(exerciseType),
-                      style: const TextStyle(fontSize: 11, color: Colors.grey),
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                            color: scheme.onSurfaceVariant,
+                          ),
                     ),
                     const SizedBox(height: 8),
                     if (previousLog != null)
@@ -386,13 +390,13 @@ void showTrainingLogDialog({
                         padding: const EdgeInsets.symmetric(
                             horizontal: 10, vertical: 6),
                         decoration: BoxDecoration(
-                          color: Colors.blue.shade50,
+                          color: scheme.primaryContainer.withValues(alpha: 0.5),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Row(
                           children: [
-                            const Icon(Icons.history,
-                                size: 14, color: Colors.blue),
+                            Icon(Icons.history,
+                                size: 14, color: scheme.primary),
                             const SizedBox(width: 6),
                             Expanded(
                               child: Text(
@@ -405,8 +409,10 @@ void showTrainingLogDialog({
                                     : '前回: ${previousLog!.weight}kg × ${previousLog!.reps}回 × ${previousLog!.sets}セット'
                                         '${previousLog!.rpe != null ? '  RPE ${previousLog!.rpe}' : ''}'
                                         '  (${DateFormat('M/d').format(previousLog!.date)})',
-                                style: const TextStyle(
-                                    fontSize: 12, color: Colors.blue),
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .labelMedium
+                                    ?.copyWith(color: scheme.primary),
                               ),
                             ),
                           ],
@@ -537,8 +543,7 @@ void showTrainingLogDialog({
                           const Expanded(
                             child: Text(
                               '1=非常に楽 … 10=限界に近い',
-                              style:
-                                  TextStyle(fontSize: 11, color: Colors.grey),
+                              style: TextStyle(fontSize: 11),
                             ),
                           ),
                         ],
@@ -724,6 +729,7 @@ class _CommunityExerciseShareDialogState
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return AlertDialog(
       title: const Text('種目を全員と共有'),
       content: SizedBox(
@@ -735,13 +741,14 @@ class _CommunityExerciseShareDialogState
             children: [
               Text(
                 '「${widget.displayName}」',
-                style:
-                    const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                style: Theme.of(context).textTheme.titleSmall,
               ),
               const SizedBox(height: 6),
-              const Text(
+              Text(
                 '主な鍛える部位（複数可）。後から他ユーザーの提案とマージされます。',
-                style: TextStyle(fontSize: 12, color: Colors.grey),
+                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                    ),
               ),
               const SizedBox(height: 8),
               Wrap(
@@ -765,9 +772,11 @@ class _CommunityExerciseShareDialogState
                 }).toList(),
               ),
               const SizedBox(height: 12),
-              const Text(
+              Text(
                 '器具のカテゴリ',
-                style: TextStyle(fontSize: 12, color: Colors.grey),
+                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                    ),
               ),
               const SizedBox(height: 4),
               Wrap(
@@ -848,29 +857,31 @@ class _CaloriePreviewChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final semantic = context.bewellColors;
     final volume = weight * reps * sets;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.deepOrange.shade50,
+        color: semantic.streak.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.deepOrange.shade200),
+        border: Border.all(color: semantic.streak.withValues(alpha: 0.35)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const Icon(Icons.local_fire_department,
-                  color: Colors.deepOrange, size: 18),
+              Icon(Icons.local_fire_department,
+                  color: semantic.streak, size: 18),
               const SizedBox(width: 6),
               Text(
                 '推定消費カロリー: ${kcal.round()} kcal',
-                style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: Colors.deepOrange,
-                    fontSize: 15),
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w800,
+                      color: semantic.streak,
+                    ),
               ),
             ],
           ),
@@ -878,19 +889,25 @@ class _CaloriePreviewChip extends StatelessWidget {
           if (isCardio && distanceKm > 0 && durationMinutes > 0)
             Text(
               'ペース: ${_formatPace(durationMinutes / distanceKm)}  ／  距離: ${distanceKm.toStringAsFixed(2)} km',
-              style: TextStyle(fontSize: 12, color: Colors.orange.shade800),
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                  ),
             )
           else if (!isCardio && volume > 0)
             Text(
               'ボリューム: ${volume.round()} kg  ／  1RM (Epley): ≈${TrainingNotifier.oneRepMax(weight, reps).round()} kg',
-              style: TextStyle(fontSize: 12, color: Colors.orange.shade800),
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                  ),
             ),
           const SizedBox(height: 2),
           Text(
             isCardio
                 ? '※ MET法（運動強度×体重×時間）による目安値です。'
                 : '※ MET法＋挙上量ベースの目安値です。実際の消費カロリーは個人差があります。',
-            style: TextStyle(fontSize: 10, color: Colors.orange.shade700),
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: scheme.onSurfaceVariant,
+                ),
           ),
         ],
       ),

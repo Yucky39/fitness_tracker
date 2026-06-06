@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../providers/active_workout_provider.dart';
 import '../providers/training_provider.dart';
+import '../theme/bewell_colors.dart';
 
 class ActiveWorkoutScreen extends ConsumerStatefulWidget {
   const ActiveWorkoutScreen({super.key});
@@ -356,8 +357,8 @@ class _ActiveWorkoutScreenState extends ConsumerState<ActiveWorkoutScreen> {
                           padding: const EdgeInsets.only(bottom: 4),
                           child: Row(
                             children: [
-                              const Icon(Icons.check_circle_outline_rounded,
-                                  size: 16, color: Colors.green),
+                              Icon(Icons.check_circle_outline_rounded,
+                                  size: 16, color: context.bewellColors.success),
                               const SizedBox(width: 8),
                               Text('${log.exerciseName}: '
                                   '${log.weight > 0 ? '${log.weight}kg × ' : ''}'

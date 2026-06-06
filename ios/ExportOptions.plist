@@ -9,12 +9,11 @@
     <key>signingStyle</key>
     <string>manual</string>
     <key>signingCertificate</key>
-    <string>iPhone Distribution</string>
+    <string>iPhone Distribution: Takayuki Masaki (X56RT9QMAG)</string>
     <key>provisioningProfiles</key>
     <dict>
-        <!-- Bundle ID に対応するプロビジョニングプロファイル名を設定 -->
         <key>com.yucky.fitnessTracker</key>
-        <string>BeWell AppStore</string>
+        <string>FitnessTracker AppStore</string>
     </dict>
     <key>uploadBitcode</key>
     <false/>

@@ -6,6 +6,7 @@ import '../models/micronutrients.dart';
 import '../models/recipe_ingredient.dart';
 import '../services/food_search_service.dart';
 import '../services/recipe_nutrition_calculator.dart';
+import '../theme/bewell_colors.dart';
 
 class _LineControllers {
   _LineControllers()
@@ -307,12 +308,14 @@ class _RecipePresetEditorSheetState extends State<RecipePresetEditorSheet> {
                   ],
                 ),
               ),
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 16),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: Text(
                   '食材ごとに100gあたりの栄養と分量（g・個・大さじ・ml など）、調理法を入れると、'
                   'カロリーとPFCなどを合算します。個数は「1個あたりのg」が必要です（調理法は油の目安補正に使います）。',
-                  style: TextStyle(fontSize: 12, color: Colors.grey),
+                  style: TextStyle(
+                      fontSize: 12,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant),
                 ),
               ),
               const SizedBox(height: 8),
@@ -330,7 +333,11 @@ class _RecipePresetEditorSheetState extends State<RecipePresetEditorSheet> {
                       onChanged: (_) => setState(() {}),
                     ),
                     const SizedBox(height: 12),
-                    const Text('食事タイプ', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                    Text('食事タイプ',
+                        style: TextStyle(
+                            fontSize: 12,
+                            color:
+                                Theme.of(context).colorScheme.onSurfaceVariant)),
                     const SizedBox(height: 6),
                     Wrap(
                       spacing: 8,
@@ -386,7 +393,11 @@ class _RecipePresetEditorSheetState extends State<RecipePresetEditorSheet> {
                                   '糖 ${preview.sugar.toStringAsFixed(1)}g  '
                                   '食物繊維 ${preview.fiber.toStringAsFixed(1)}g  '
                                   'ナトリウム ${preview.sodium.toStringAsFixed(0)}mg',
-                                  style: const TextStyle(fontSize: 12, color: Colors.grey),
+                                  style: TextStyle(
+                                      fontSize: 12,
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onSurfaceVariant),
                                 ),
                               ),
                             if (preview.micronutrients.hasAnyPositive) ...[
@@ -458,7 +469,8 @@ class _RecipePresetEditorSheetState extends State<RecipePresetEditorSheet> {
                 const Spacer(),
                 if (_lines.length > 1)
                   IconButton(
-                    icon: const Icon(Icons.delete_outline, color: Colors.red, size: 20),
+                    icon: Icon(Icons.delete_outline,
+                        color: Theme.of(context).colorScheme.error, size: 20),
                     onPressed: () => _removeLine(i),
                     tooltip: 'この行を削除',
                   ),
@@ -608,15 +620,19 @@ class _RecipePresetEditorSheetState extends State<RecipePresetEditorSheet> {
               )
             else if (line.quantityUnit == RecipeQuantityUnit.piece &&
                 (double.tryParse(line.gramsPerPiece.text) ?? 0) <= 0)
-              const Padding(
-                padding: EdgeInsets.only(top: 4),
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
                 child: Text(
                   '個数のときは「1個あたりの重量」を入力してください',
-                  style: TextStyle(fontSize: 11, color: Colors.orange),
+                  style: TextStyle(
+                      fontSize: 11, color: context.bewellColors.warning),
                 ),
               ),
             const SizedBox(height: 6),
-            const Text('100gあたり', style: TextStyle(fontSize: 11, color: Colors.grey)),
+            Text('100gあたり',
+                style: TextStyle(
+                    fontSize: 11,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant)),
             const SizedBox(height: 4),
             Row(
               children: [

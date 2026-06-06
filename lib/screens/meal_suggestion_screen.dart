@@ -294,7 +294,7 @@ class _GoalSummaryBanner extends StatelessWidget {
                 suggested: suggestion != null
                     ? '${suggestion!.totalProtein.toStringAsFixed(1)}g'
                     : null,
-                color: Colors.blue,
+                color: cs.primary,
               ),
               const SizedBox(width: 8),
               _NutritionChip(
@@ -303,7 +303,7 @@ class _GoalSummaryBanner extends StatelessWidget {
                 suggested: suggestion != null
                     ? '${suggestion!.totalFat.toStringAsFixed(1)}g'
                     : null,
-                color: Colors.orange,
+                color: cs.tertiary,
               ),
               const SizedBox(width: 8),
               _NutritionChip(
@@ -312,7 +312,7 @@ class _GoalSummaryBanner extends StatelessWidget {
                 suggested: suggestion != null
                     ? '${suggestion!.totalCarbs.toStringAsFixed(1)}g'
                     : null,
-                color: Colors.purple,
+                color: cs.secondary,
               ),
             ],
           ),

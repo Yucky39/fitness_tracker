@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../data/badge_definitions.dart';
 import '../models/achievement.dart';
 import '../providers/achievement_provider.dart';
+import '../theme/bewell_colors.dart';
 
 class AchievementsScreen extends ConsumerWidget {
   const AchievementsScreen({super.key});
@@ -80,7 +81,7 @@ class AchievementsScreen extends ConsumerWidget {
               ' $streak日',
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.bold,
-                    color: streak > 0 ? Colors.deepOrange : null,
+                    color: streak > 0 ? context.bewellColors.streak : null,
                   ),
             ),
           ],

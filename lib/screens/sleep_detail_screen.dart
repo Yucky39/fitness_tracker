@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 
 import '../providers/sleep_provider.dart';
 import '../providers/training_provider.dart';
+import '../theme/bewell_colors.dart';
 
 class SleepDetailScreen extends ConsumerStatefulWidget {
   const SleepDetailScreen({super.key});
@@ -133,7 +134,8 @@ class _SleepDetailScreenState extends ConsumerState<SleepDetailScreen> {
                         style:
                             Theme.of(context).textTheme.headlineSmall?.copyWith(
                                   fontWeight: FontWeight.bold,
-                                  color: _qualityColor(state.quality, scheme),
+                                  color:
+                                      _qualityColor(context, state.quality, scheme),
                                 ),
                       ),
                       Text(
@@ -170,8 +172,8 @@ class _SleepDetailScreenState extends ConsumerState<SleepDetailScreen> {
               child: LinearProgressIndicator(
                 value: progress,
                 minHeight: 8,
-                backgroundColor: Colors.indigo.withValues(alpha: 0.15),
-                color: _qualityColor(state.quality, scheme),
+                backgroundColor: scheme.primary.withValues(alpha: 0.15),
+                color: _qualityColor(context, state.quality, scheme),
               ),
             ),
             const SizedBox(height: 4),
@@ -256,12 +258,12 @@ class _SleepDetailScreenState extends ConsumerState<SleepDetailScreen> {
                     LineChartBarData(
                       spots: spots,
                       isCurved: true,
-                      color: Colors.indigo,
+                      color: scheme.primary,
                       barWidth: 2.5,
                       dotData: const FlDotData(show: true),
                       belowBarData: BarAreaData(
                         show: true,
-                        color: Colors.indigo.withValues(alpha: 0.1),
+                        color: scheme.primary.withValues(alpha: 0.1),
                       ),
                     ),
                   ],
@@ -269,14 +271,14 @@ class _SleepDetailScreenState extends ConsumerState<SleepDetailScreen> {
                     horizontalLines: [
                       HorizontalLine(
                         y: goalHours,
-                        color: Colors.green,
+                        color: context.bewellColors.success,
                         strokeWidth: 1.5,
                         dashArray: [6, 4],
                         label: HorizontalLineLabel(
                           show: true,
                           labelResolver: (_) => '目標 ${goalHours.toStringAsFixed(1)}h',
-                          style: const TextStyle(
-                              fontSize: 10, color: Colors.green),
+                          style: TextStyle(
+                              fontSize: 10, color: context.bewellColors.success),
                           alignment: Alignment.topRight,
                         ),
                       ),
@@ -360,7 +362,7 @@ class _SleepDetailScreenState extends ConsumerState<SleepDetailScreen> {
                     context,
                     '😴 良眠の日',
                     '$goodAvg 回/日',
-                    Colors.green,
+                    context.bewellColors.success,
                     scheme,
                   ),
                 ),
@@ -370,7 +372,7 @@ class _SleepDetailScreenState extends ConsumerState<SleepDetailScreen> {
                     context,
                     '😵 睡眠不足の日',
                     '$poorAvg 回/日',
-                    Colors.orange,
+                    context.bewellColors.warning,
                     scheme,
                   ),
                 ),
@@ -434,10 +436,10 @@ class _SleepDetailScreenState extends ConsumerState<SleepDetailScreen> {
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         color: log.durationMinutes >= state.goalMinutes
-                            ? Colors.green
+                            ? context.bewellColors.success
                             : log.durationMinutes >= 360
-                                ? Colors.orange
-                                : Colors.red,
+                                ? context.bewellColors.warning
+                                : scheme.error,
                       ),
                     ),
                     const SizedBox(width: 10),
@@ -461,14 +463,16 @@ class _SleepDetailScreenState extends ConsumerState<SleepDetailScreen> {
     );
   }
 
-  Color _qualityColor(SleepQuality quality, ColorScheme scheme) {
+  Color _qualityColor(
+      BuildContext context, SleepQuality quality, ColorScheme scheme) {
+    final semantic = context.bewellColors;
     switch (quality) {
       case SleepQuality.good:
-        return Colors.green;
+        return semantic.success;
       case SleepQuality.fair:
-        return Colors.orange;
+        return semantic.warning;
       case SleepQuality.poor:
-        return Colors.red;
+        return scheme.error;
       case SleepQuality.unknown:
         return scheme.onSurfaceVariant;
     }

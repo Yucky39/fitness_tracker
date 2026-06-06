@@ -17,19 +17,23 @@ class RoutineScreen extends ConsumerWidget {
       body: routineState.isLoading
           ? const Center(child: CircularProgressIndicator())
           : routineState.routines.isEmpty
-              ? const Center(
+              ? Center(
                   child: Padding(
-                    padding: EdgeInsets.all(32),
+                    padding: const EdgeInsets.all(32),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(Icons.calendar_today,
-                            size: 64, color: Colors.grey),
-                        SizedBox(height: 16),
+                            size: 64,
+                            color: Theme.of(context).colorScheme.onSurfaceVariant),
+                        const SizedBox(height: 16),
                         Text(
                           'ルーティンを追加して\n曜日ごとのメニューを管理しましょう',
                           textAlign: TextAlign.center,
-                          style: TextStyle(color: Colors.grey),
+                          style: TextStyle(
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurfaceVariant),
                         ),
                       ],
                     ),
@@ -54,13 +58,14 @@ class RoutineScreen extends ConsumerWidget {
       BuildContext context, WidgetRef ref, TrainingRoutine routine) {
     final today = DateTime.now().weekday;
     final isToday = routine.weekdays.contains(today);
+    final scheme = Theme.of(context).colorScheme;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
         side: isToday
-            ? const BorderSide(color: Colors.teal, width: 2)
+            ? BorderSide(color: scheme.primary, width: 2)
             : BorderSide.none,
       ),
       child: ListTile(
@@ -77,12 +82,12 @@ class RoutineScreen extends ConsumerWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                 decoration: BoxDecoration(
-                  color: Colors.teal.withValues(alpha: 0.1),
+                  color: scheme.primary.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Text(
+                child: Text(
                   '今日',
-                  style: TextStyle(fontSize: 11, color: Colors.teal),
+                  style: TextStyle(fontSize: 11, color: scheme.primary),
                 ),
               ),
           ],
@@ -93,7 +98,8 @@ class RoutineScreen extends ConsumerWidget {
             const SizedBox(height: 4),
             Row(
               children: [
-                const Icon(Icons.calendar_today, size: 14, color: Colors.grey),
+                Icon(Icons.calendar_today,
+                    size: 14, color: scheme.onSurfaceVariant),
                 const SizedBox(width: 4),
                 Text(
                   routine.weekdayLabel,
@@ -105,7 +111,8 @@ class RoutineScreen extends ConsumerWidget {
               const SizedBox(height: 2),
               Text(
                 routine.note,
-                style: const TextStyle(fontSize: 12, color: Colors.grey),
+                style:
+                    TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
               ),
             ],
           ],
@@ -118,7 +125,7 @@ class RoutineScreen extends ConsumerWidget {
               onPressed: () => _showEditDialog(context, ref, routine),
             ),
             IconButton(
-              icon: const Icon(Icons.delete, size: 20, color: Colors.red),
+              icon: Icon(Icons.delete, size: 20, color: scheme.error),
               onPressed: () => _confirmDelete(context, ref, routine),
             ),
           ],
@@ -144,7 +151,9 @@ class RoutineScreen extends ConsumerWidget {
               ref.read(routineProvider.notifier).deleteRoutine(routine.id);
               Navigator.pop(context);
             },
-            child: const Text('削除', style: TextStyle(color: Colors.red)),
+            child: Text('削除',
+                style:
+                    TextStyle(color: Theme.of(context).colorScheme.error)),
           ),
         ],
       ),
@@ -175,8 +184,11 @@ class RoutineScreen extends ConsumerWidget {
                     autofocus: true,
                   ),
                   const SizedBox(height: 16),
-                  const Text('曜日',
-                      style: TextStyle(fontSize: 13, color: Colors.grey)),
+                  Text('曜日',
+                      style: TextStyle(
+                          fontSize: 13,
+                          color:
+                              Theme.of(context).colorScheme.onSurfaceVariant)),
                   const SizedBox(height: 8),
                   Wrap(
                     spacing: 8,

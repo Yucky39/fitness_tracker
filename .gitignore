@@ -49,3 +49,20 @@ app.*.map.json
 
 # Claude Code worktrees
 .claude/worktrees/
+
+# 承認系ファイル
+ios_distribution.cer
+ios_distribution.p12
+distribution.p12
+AuthKey_2N5F76L7KZ.p8
+FitnessTracker_AppStore.mobileprovision
+CertificateSigningRequest.certSigningRequest
+
+# AppStore Connect 審査用ファイル
+BeWellアイコン.jpeg
+bewell,train icloudアカウント削除アクセスコード.pdf
+Simulator Screenshot*
+
+# デリバー用スクリプト
+scripts/deliver_ios.sh
+scripts/upload_and_release.js

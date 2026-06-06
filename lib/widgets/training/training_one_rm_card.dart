@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../models/training_log.dart';
+import '../../theme/bewell_colors.dart';
 
 /// 推定1RM（エプリー式）トップ種目のチップ一覧
 class TrainingOneRmCard extends StatelessWidget {
@@ -30,6 +31,8 @@ class TrainingOneRmCard extends StatelessWidget {
     final sorted = bestOneRm.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
     final top = sorted.take(4).toList();
+    final scheme = Theme.of(context).colorScheme;
+    final semantic = context.bewellColors;
 
     return Card(
       margin: const EdgeInsets.fromLTRB(16, 16, 16, 8),
@@ -39,11 +42,11 @@ class TrainingOneRmCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Row(
+            Row(
               children: [
-                Icon(Icons.emoji_events, color: Colors.amber, size: 18),
-                SizedBox(width: 6),
-                Text(
+                Icon(Icons.emoji_events, color: semantic.streak, size: 18),
+                const SizedBox(width: 6),
+                const Text(
                   '推定1RM（エプリー式）',
                   style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
                 ),
@@ -91,9 +94,9 @@ class TrainingOneRmCard extends StatelessWidget {
               }).toList(),
             ),
             const SizedBox(height: 4),
-            const Text(
+            Text(
               'タップで重量推移グラフを表示',
-              style: TextStyle(fontSize: 10, color: Colors.grey),
+              style: TextStyle(fontSize: 10, color: scheme.onSurfaceVariant),
             ),
           ],
         ),

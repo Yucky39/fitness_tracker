@@ -113,7 +113,8 @@ class _AppUpdateDialogState extends State<_AppUpdateDialog> {
     }
 
     if (_error != null) {
-      return Text(_error!, style: const TextStyle(color: Colors.red));
+      return Text(_error!,
+          style: TextStyle(color: Theme.of(context).colorScheme.error));
     }
 
     if (_downloading) {
@@ -155,9 +156,10 @@ class _AppUpdateDialogState extends State<_AppUpdateDialog> {
           Text(release.releaseNotes),
         ],
         const SizedBox(height: 12),
-        const Text(
+        Text(
           'ダウンロード後、システムのインストール画面が開きます。',
-          style: TextStyle(fontSize: 12, color: Colors.grey),
+          style: TextStyle(
+              fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant),
         ),
       ],
     );

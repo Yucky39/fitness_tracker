@@ -43,7 +43,7 @@ void showExerciseWeightChartSheet(
                       return FlSpot(e.key.toDouble(), e.value.weight);
                     }).toList(),
                     isCurved: true,
-                    color: Colors.teal,
+                    color: Theme.of(context).colorScheme.primary,
                     barWidth: 3,
                     dotData: const FlDotData(show: true),
                   ),

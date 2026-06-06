@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 import '../models/subscription.dart';
 import '../services/subscription_service.dart';
+import '../theme/bewell_colors.dart';
 
 /// AI機能が有料の場合に表示するボトムシート。
 /// 購入・リストアまでここで完結する。
@@ -265,7 +266,7 @@ class _PaywallSheetState extends ConsumerState<PaywallSheet> {
               const SizedBox(height: 8),
               Text(_promoSuccess!,
                   style: TextStyle(
-                      color: Colors.green.shade700,
+                      color: context.bewellColors.success,
                       fontSize: 13,
                       fontWeight: FontWeight.w500),
                   textAlign: TextAlign.center),

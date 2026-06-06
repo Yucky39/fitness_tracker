@@ -16,7 +16,11 @@ import '../services/export_service.dart';
 import '../services/notification_service.dart';
 import '../widgets/paywall_sheet.dart';
 import '../widgets/app_update_dialog.dart';
+import '../widgets/bewell_logo.dart';
+import '../widgets/drawer_section_header.dart';
 import '../widgets/source_reference_link.dart';
+import '../theme/app_tokens.dart';
+import '../theme/bewell_colors.dart';
 
 class ProfileSidebar extends ConsumerWidget {
   final GlobalKey<ScaffoldState> scaffoldKey;
@@ -64,7 +68,9 @@ class ProfileSidebar extends ConsumerWidget {
               child: const Text('キャンセル'),
             ),
             FilledButton(
-              style: FilledButton.styleFrom(backgroundColor: Colors.red),
+              style: FilledButton.styleFrom(
+                backgroundColor: Theme.of(ctx).colorScheme.error,
+              ),
               onPressed: () => Navigator.pop(ctx, true),
               child: const Text('削除する'),
             ),
@@ -165,6 +171,14 @@ class ProfileSidebar extends ConsumerWidget {
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) {
+          final scheme = Theme.of(context).colorScheme;
+          final semantic = context.bewellColors;
+          final caption = Theme.of(context).textTheme.labelMedium?.copyWith(
+                color: scheme.onSurfaceVariant,
+              );
+          final captionSmall = Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: scheme.onSurfaceVariant,
+              );
           return AlertDialog(
             title: const Text('カロリー・栄養目標設定'),
             content: SingleChildScrollView(
@@ -177,13 +191,11 @@ class ProfileSidebar extends ConsumerWidget {
                   const SizedBox(height: 6),
                   Text(
                     '身長・体重・年齢・性別から基礎代謝（Mifflin–St Jeor）、活動量から1日の推定消費カロリー（TDEE）を求め、目標体重までの期間に応じて1日の摂取目標を割り出します（体重1kgあたり約${EnergyGoalCalculator.kcalPerKgBodyChange.toInt()}kcal換算）。',
-                    style: TextStyle(
-                        fontSize: 11, color: Colors.grey[700], height: 1.35),
+                    style: captionSmall?.copyWith(height: 1.35),
                   ),
                   const SourceReferenceLink(compact: true),
                   const SizedBox(height: 10),
-                  const Text('性別',
-                      style: TextStyle(fontSize: 12, color: Colors.grey)),
+                  Text('性別', style: caption),
                   const SizedBox(height: 4),
                   Wrap(
                     spacing: 8,
@@ -228,8 +240,7 @@ class ProfileSidebar extends ConsumerWidget {
                     keyboardType: TextInputType.number,
                   ),
                   const SizedBox(height: 8),
-                  const Text('1日の活動レベル',
-                      style: TextStyle(fontSize: 12, color: Colors.grey)),
+                  Text('1日の活動レベル', style: caption),
                   const SizedBox(height: 4),
                   DropdownButtonFormField<ActivityLevel>(
                     initialValue: dialogActivity,
@@ -350,14 +361,12 @@ class ProfileSidebar extends ConsumerWidget {
                           Text(
                             _appliedEnergyBalanceLabel(
                                 lastComputed!.appliedDailyDelta),
-                            style: TextStyle(
-                                fontSize: 12, color: Colors.grey[800]),
+                            style: Theme.of(context).textTheme.labelMedium,
                           ),
                           const SizedBox(height: 2),
                           Text(
                             '理論上の体重変化ペース: 1日あたり約 ${lastComputed!.dailyEnergyBalance.round()} kcal相当',
-                            style: TextStyle(
-                                fontSize: 11, color: Colors.grey[600]),
+                            style: captionSmall,
                           ),
                           if (lastComputed!.notes.isNotEmpty) ...[
                             const SizedBox(height: 8),
@@ -366,8 +375,9 @@ class ProfileSidebar extends ConsumerWidget {
                                 padding: const EdgeInsets.only(bottom: 4),
                                 child: Text(
                                   n,
-                                  style: const TextStyle(
-                                      fontSize: 11, color: Colors.deepOrange),
+                                  style: captionSmall?.copyWith(
+                                    color: semantic.warning,
+                                  ),
                                 ),
                               ),
                             ),
@@ -469,6 +479,10 @@ class ProfileSidebar extends ConsumerWidget {
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) {
+          final scheme = Theme.of(context).colorScheme;
+          final captionSmall = Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: scheme.onSurfaceVariant,
+              );
           String currentLevel = settingsNotifier.currentSettings.adviceLevel;
           AiProviderType currentProvider =
               settingsNotifier.currentSettings.selectedProvider;
@@ -574,7 +588,7 @@ class ProfileSidebar extends ConsumerWidget {
                   const SizedBox(height: 4),
                   Text(
                     _adviceLevelDescription(currentLevel),
-                    style: const TextStyle(fontSize: 11, color: Colors.grey),
+                    style: captionSmall,
                   ),
                   const SizedBox(height: 16),
                   const Text('APIキー', style: TextStyle(fontSize: 13)),
@@ -585,9 +599,9 @@ class ProfileSidebar extends ConsumerWidget {
                   const SizedBox(height: 8),
                   apiKeyField(AiProviderType.gemini, geminiKeyCtrl),
                   const SizedBox(height: 4),
-                  const Text(
+                  Text(
                     'APIキーはデバイス内にのみ保存されます',
-                    style: TextStyle(fontSize: 11, color: Colors.grey),
+                    style: captionSmall,
                   ),
                   const SizedBox(height: 20),
                   const Divider(),
@@ -638,10 +652,10 @@ class ProfileSidebar extends ConsumerWidget {
                     ],
                   ),
                   const SizedBox(height: 4),
-                  const Text(
+                  Text(
                     'オンにすると食事管理画面に「今日の食事メニュー提案」カードが表示されます。'
                     'サプリ・プロテインの記録も考慮して献立を提案します。',
-                    style: TextStyle(fontSize: 11, color: Colors.grey),
+                    style: captionSmall,
                   ),
                   const SizedBox(height: 8),
                   const Divider(),
@@ -669,9 +683,9 @@ class ProfileSidebar extends ConsumerWidget {
                     ],
                   ),
                   const SizedBox(height: 4),
-                  const Text(
+                  Text(
                     '食品名・栄養素のみ共有されます（個人情報は含まれません）',
-                    style: TextStyle(fontSize: 11, color: Colors.grey),
+                    style: captionSmall,
                   ),
                 ],
               ),
@@ -806,6 +820,13 @@ class ProfileSidebar extends ConsumerWidget {
     }
 
     const intervalOptions = [30, 60, 90, 120, 180];
+    final scheme = Theme.of(context).colorScheme;
+    final caption = Theme.of(context).textTheme.labelMedium?.copyWith(
+          color: scheme.onSurfaceVariant,
+        );
+    final captionSmall = Theme.of(context).textTheme.labelSmall?.copyWith(
+          color: scheme.onSurfaceVariant,
+        );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -831,7 +852,7 @@ class ProfileSidebar extends ConsumerWidget {
           Row(
             children: [
               const SizedBox(width: 8),
-              const Text('間隔', style: TextStyle(fontSize: 12, color: Colors.grey)),
+              Text('間隔', style: caption),
               const SizedBox(width: 12),
               DropdownButton<int>(
                 value: settings.waterReminderIntervalMinutes,
@@ -859,7 +880,7 @@ class ProfileSidebar extends ConsumerWidget {
           Row(
             children: [
               const SizedBox(width: 8),
-              const Text('時間帯', style: TextStyle(fontSize: 12, color: Colors.grey)),
+              Text('時間帯', style: caption),
               const SizedBox(width: 8),
               TextButton(
                 style: TextButton.styleFrom(
@@ -904,7 +925,7 @@ class ProfileSidebar extends ConsumerWidget {
             child: Text(
               '${settings.waterReminderStartHour}:00〜${settings.waterReminderEndHour}:00の間、'
               '${settings.waterReminderIntervalMinutes < 60 ? '${settings.waterReminderIntervalMinutes}分' : '${settings.waterReminderIntervalMinutes ~/ 60}時間'}ごとに通知',
-              style: const TextStyle(fontSize: 11, color: Colors.grey),
+              style: captionSmall,
             ),
           ),
         ],
@@ -916,6 +937,7 @@ class ProfileSidebar extends ConsumerWidget {
 
   void _showDataManagementDialog(BuildContext context, WidgetRef ref) {
     final parentContext = context;
+    final scheme = Theme.of(context).colorScheme;
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -924,9 +946,11 @@ class ProfileSidebar extends ConsumerWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               '記録した食事・トレーニング・進捗データをCSVファイルとして書き出します。',
-              style: TextStyle(fontSize: 13, color: Colors.grey),
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                  ),
             ),
             const SizedBox(height: 16),
             OutlinedButton.icon(
@@ -950,15 +974,17 @@ class ProfileSidebar extends ConsumerWidget {
             const SizedBox(height: 12),
             Text(
               'アカウントを削除すると、デバイス内のローカルデータとクラウド同期データを完全に削除します。',
-              style: TextStyle(fontSize: 13, color: Colors.grey[700]),
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                  ),
             ),
             const SizedBox(height: 8),
             OutlinedButton.icon(
-              icon: const Icon(Icons.delete_forever, color: Colors.red),
+              icon: Icon(Icons.delete_forever, color: scheme.error),
               label: const Text('アカウントと全データを削除'),
               style: OutlinedButton.styleFrom(
-                foregroundColor: Colors.red,
-                side: const BorderSide(color: Colors.red),
+                foregroundColor: scheme.error,
+                side: BorderSide(color: scheme.error),
               ),
               onPressed: () {
                 Navigator.pop(dialogContext);
@@ -996,22 +1022,25 @@ class ProfileSidebar extends ConsumerWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _infoRow('ステータス', 'アクティブ'),
+            _infoRow(ctx, 'ステータス', 'アクティブ'),
             if (subscription.productId != null)
               _infoRow(
+                ctx,
                 'プラン',
                 subscription.productId!.contains('annual') ? '年額プラン' : '月額プラン',
               ),
             if (subscription.expiresAt != null)
-              _infoRow('次回更新', _formatDate(subscription.expiresAt!)),
+              _infoRow(ctx, '次回更新', _formatDate(subscription.expiresAt!)),
             if (subscription.platform != null)
-              _infoRow('ストア',
+              _infoRow(ctx, 'ストア',
                   subscription.platform == 'ios' ? 'App Store' : 'Google Play'),
             const SizedBox(height: 12),
             Text(
               'サブスクリプションの解約・管理は各ストアのアカウント設定から行えます。',
-              style:
-                  TextStyle(fontSize: 12, color: Colors.grey[600], height: 1.5),
+              style: Theme.of(ctx).textTheme.labelMedium?.copyWith(
+                    color: Theme.of(ctx).colorScheme.onSurfaceVariant,
+                    height: 1.5,
+                  ),
             ),
           ],
         ),
@@ -1025,20 +1054,28 @@ class ProfileSidebar extends ConsumerWidget {
     );
   }
 
-  Widget _infoRow(String label, String value) {
+  Widget _infoRow(BuildContext context, String label, String value) {
+    final scheme = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         children: [
           SizedBox(
             width: 80,
-            child: Text(label,
-                style: const TextStyle(fontSize: 12, color: Colors.grey)),
+            child: Text(
+              label,
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                  ),
+            ),
           ),
           Expanded(
-            child: Text(value,
-                style:
-                    const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+            child: Text(
+              value,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w500,
+                  ),
+            ),
           ),
         ],
       ),
@@ -1111,47 +1148,59 @@ class ProfileSidebar extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final scheme = Theme.of(context).colorScheme;
+    final semantic = context.bewellColors;
     final email = AuthService().userEmail ?? '';
     final subscription = ref.watch(subscriptionProvider);
     final isSubscribed = subscription.hasActiveAccess;
 
+    void closeAnd(VoidCallback action) {
+      scaffoldKey.currentState?.closeEndDrawer();
+      action();
+    }
+
     return Drawer(
+      backgroundColor: scheme.surface,
       child: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ── ユーザー情報ヘッダー ──
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.lg,
+                AppSpacing.lg,
+                AppSpacing.lg,
+                AppSpacing.md,
+              ),
               child: Row(
                 children: [
-                  const Icon(Icons.account_circle,
-                      size: 48, color: Colors.teal),
-                  const SizedBox(width: 12),
+                  const BeWellLogo(size: 44, showLabel: false),
+                  const SizedBox(width: AppSpacing.md),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
                           email,
-                          style: const TextStyle(fontSize: 14),
+                          style: Theme.of(context).textTheme.bodyMedium,
                           overflow: TextOverflow.ellipsis,
                         ),
                         if (isSubscribed) ...[
-                          const SizedBox(height: 2),
+                          const SizedBox(height: 4),
                           Row(
                             children: [
                               Icon(Icons.auto_awesome_rounded,
-                                  size: 12,
-                                  color: Theme.of(context).colorScheme.primary),
+                                  size: 14, color: semantic.aiAccent),
                               const SizedBox(width: 4),
                               Text(
                                 'プレミアム',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: Theme.of(context).colorScheme.primary,
-                                  fontWeight: FontWeight.bold,
-                                ),
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .labelMedium
+                                    ?.copyWith(
+                                      color: semantic.aiAccent,
+                                      fontWeight: FontWeight.w700,
+                                    ),
                               ),
                             ],
                           ),
@@ -1167,13 +1216,9 @@ class ProfileSidebar extends ConsumerWidget {
               child: ListView(
                 padding: EdgeInsets.zero,
                 children: [
-                  // ── サブスクリプションバナー（未加入時） ──
                   if (!isSubscribed)
                     InkWell(
-                      onTap: () {
-                        scaffoldKey.currentState?.closeEndDrawer();
-                        PaywallSheet.show(context);
-                      },
+                      onTap: () => closeAnd(() => PaywallSheet.show(context)),
                       child: Container(
                         margin: const EdgeInsets.fromLTRB(12, 8, 12, 4),
                         padding: const EdgeInsets.symmetric(
@@ -1181,22 +1226,16 @@ class ProfileSidebar extends ConsumerWidget {
                         decoration: BoxDecoration(
                           gradient: LinearGradient(
                             colors: [
-                              Theme.of(context)
-                                  .colorScheme
-                                  .primaryContainer,
-                              Theme.of(context)
-                                  .colorScheme
-                                  .secondaryContainer,
+                              semantic.aiAccent.withValues(alpha: 0.15),
+                              scheme.primaryContainer,
                             ],
                           ),
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: AppRadius.lgAll,
                         ),
                         child: Row(
                           children: [
                             Icon(Icons.auto_awesome_rounded,
-                                size: 20,
-                                color:
-                                    Theme.of(context).colorScheme.primary),
+                                size: 20, color: semantic.aiAccent),
                             const SizedBox(width: 10),
                             Expanded(
                               child: Column(
@@ -1204,197 +1243,150 @@ class ProfileSidebar extends ConsumerWidget {
                                 children: [
                                   Text(
                                     'プレミアムプランを試す',
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.bold,
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .onPrimaryContainer,
-                                    ),
+                                    style:
+                                        Theme.of(context).textTheme.titleSmall,
                                   ),
                                   Text(
                                     'AI機能が自動で使えるようになります',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .onPrimaryContainer,
-                                    ),
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodySmall
+                                        ?.copyWith(
+                                          color: scheme.onSurfaceVariant,
+                                        ),
                                   ),
                                 ],
                               ),
                             ),
-                            Icon(Icons.chevron_right,
-                                color:
-                                    Theme.of(context).colorScheme.primary),
+                            DrawerChevron(),
                           ],
                         ),
                       ),
                     ),
 
-                  // ── FAQ / 免責 / 情報源（審査で見つけやすい位置） ──
+                  const DrawerSectionHeader('サポート'),
                   ListTile(
                     leading: const Icon(Icons.menu_book_outlined),
                     title: const Text('FAQ / Disclaimer'),
-                    subtitle: const Text(
+                    subtitle: Text(
                       'Sources and references',
-                      style: TextStyle(fontSize: 11),
+                      style: Theme.of(context).textTheme.labelSmall,
                     ),
-                    trailing: const Icon(Icons.chevron_right,
-                        size: 20, color: Colors.grey),
+                    trailing: const DrawerChevron(),
                     onTap: () {
                       final nav = scaffoldKey.currentContext ?? context;
-                      scaffoldKey.currentState?.closeEndDrawer();
-                      Navigator.of(nav).push(
-                        MaterialPageRoute(builder: (_) => const FaqScreen()),
-                      );
+                      closeAnd(() {
+                        Navigator.of(nav).push(
+                          MaterialPageRoute(builder: (_) => const FaqScreen()),
+                        );
+                      });
                     },
                   ),
-                  const Divider(height: 1),
 
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-                    child: Text(
-                      'プロフィール設定',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.grey[600],
-                        letterSpacing: 0.5,
-                      ),
-                    ),
+                  const DrawerSectionHeader('プロフィール設定'),
+                  ListTile(
+                    leading: const Icon(Icons.emoji_events_rounded),
+                    title: const Text('バッジ・実績'),
+                    trailing: const DrawerChevron(),
+                    onTap: () {
+                      final nav = scaffoldKey.currentContext ?? context;
+                      closeAnd(() {
+                        Navigator.of(nav).push(
+                          MaterialPageRoute(
+                            builder: (_) => const _AchievementsWrapper(),
+                          ),
+                        );
+                      });
+                    },
                   ),
-
                   ListTile(
                     leading: const Icon(Icons.calculate_outlined),
                     title: const Text('カロリー・栄養目標設定'),
-                    trailing: const Icon(Icons.chevron_right,
-                        size: 20, color: Colors.grey),
+                    trailing: const DrawerChevron(),
                     onTap: () {
                       final ctx = scaffoldKey.currentContext!;
-                      scaffoldKey.currentState?.closeEndDrawer();
-                      _showCalorieGoalDialog(ctx, ref);
+                      closeAnd(() => _showCalorieGoalDialog(ctx, ref));
                     },
                   ),
                   ListTile(
-                    leading: const Icon(Icons.psychology_outlined),
+                    leading: Icon(Icons.psychology_outlined,
+                        color: semantic.aiAccent),
                     title: Text(isSubscribed
                         ? 'AIアドバイス設定'
                         : 'AIキー・トレーニングアドバイス設定'),
-                    trailing: const Icon(Icons.chevron_right,
-                        size: 20, color: Colors.grey),
+                    trailing: const DrawerChevron(),
                     onTap: () {
                       final ctx = scaffoldKey.currentContext!;
-                      scaffoldKey.currentState?.closeEndDrawer();
-                      _showAISettingsDialog(ctx, ref);
+                      closeAnd(() => _showAISettingsDialog(ctx, ref));
                     },
                   ),
                   if (isSubscribed)
                     ListTile(
                       leading: Icon(Icons.workspace_premium_outlined,
-                          color: Theme.of(context).colorScheme.primary),
+                          color: scheme.primary),
                       title: const Text('プレミアムプラン'),
                       subtitle: subscription.expiresAt != null
                           ? Text(
                               '次回更新: ${_formatDate(subscription.expiresAt!)}',
-                              style: const TextStyle(
-                                  fontSize: 11, color: Colors.grey),
+                              style: Theme.of(context).textTheme.labelSmall,
                             )
                           : null,
-                      trailing: const Icon(Icons.chevron_right,
-                          size: 20, color: Colors.grey),
-                      onTap: () {
-                        scaffoldKey.currentState?.closeEndDrawer();
-                        _showSubscriptionInfoDialog(context, ref);
-                      },
+                      trailing: const DrawerChevron(),
+                      onTap: () => closeAnd(
+                          () => _showSubscriptionInfoDialog(context, ref)),
                     ),
                   ListTile(
                     leading: const Icon(Icons.notifications_outlined),
                     title: const Text('リマインダー通知'),
-                    trailing: const Icon(Icons.chevron_right,
-                        size: 20, color: Colors.grey),
+                    trailing: const DrawerChevron(),
                     onTap: () {
                       final ctx = scaffoldKey.currentContext!;
-                      scaffoldKey.currentState?.closeEndDrawer();
-                      _showReminderDialog(ctx, ref);
+                      closeAnd(() => _showReminderDialog(ctx, ref));
                     },
                   ),
                   ListTile(
                     leading: const Icon(Icons.storage_outlined),
                     title: const Text('データ管理'),
-                    trailing: const Icon(Icons.chevron_right,
-                        size: 20, color: Colors.grey),
+                    trailing: const DrawerChevron(),
                     onTap: () {
                       final ctx = scaffoldKey.currentContext!;
-                      scaffoldKey.currentState?.closeEndDrawer();
-                      _showDataManagementDialog(ctx, ref);
+                      closeAnd(() => _showDataManagementDialog(ctx, ref));
                     },
                   ),
-
                   if (Platform.isAndroid)
                     ListTile(
                       leading: const Icon(Icons.system_update_alt_outlined),
                       title: const Text('アプリ更新'),
-                      trailing: const Icon(Icons.chevron_right,
-                          size: 20, color: Colors.grey),
+                      trailing: const DrawerChevron(),
                       onTap: () {
                         final ctx = scaffoldKey.currentContext!;
-                        scaffoldKey.currentState?.closeEndDrawer();
-                        showAppUpdateDialog(ctx);
+                        closeAnd(() => showAppUpdateDialog(ctx));
                       },
                     ),
 
-                  const Divider(height: 1),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-                    child: Text(
-                      'アカウント',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.grey[600],
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                  ),
+                  const DrawerSectionHeader('アカウント'),
                   ListTile(
-                    leading: const Icon(Icons.logout),
+                    leading: const Icon(Icons.logout_outlined),
                     title: const Text('ログアウト'),
                     onTap: () {
                       final ctx = scaffoldKey.currentContext!;
-                      scaffoldKey.currentState?.closeEndDrawer();
-                      _signOut(ctx);
+                      closeAnd(() => _signOut(ctx));
                     },
                   ),
                   ListTile(
-                    leading:
-                        const Icon(Icons.delete_forever, color: Colors.red),
-                    title: const Text(
+                    leading: Icon(Icons.delete_forever_outlined,
+                        color: scheme.error),
+                    title: Text(
                       'アカウント削除',
-                      style: TextStyle(color: Colors.red),
+                      style: TextStyle(color: scheme.error),
                     ),
-                    subtitle: const Text(
+                    subtitle: Text(
                       'Delete account and all data',
-                      style: TextStyle(fontSize: 11),
+                      style: Theme.of(context).textTheme.labelSmall,
                     ),
                     onTap: () {
                       final ctx = scaffoldKey.currentContext!;
-                      scaffoldKey.currentState?.closeEndDrawer();
-                      _deleteAccount(ctx);
-                    },
-                  ),
-                  const Divider(height: 1),
-                  ListTile(
-                    leading: const Icon(Icons.emoji_events_rounded),
-                    title: const Text('バッジ・実績'),
-                    onTap: () {
-                      final nav = scaffoldKey.currentContext ?? context;
-                      scaffoldKey.currentState?.closeEndDrawer();
-                      Navigator.of(nav).push(
-                        MaterialPageRoute(
-                          builder: (_) => const _AchievementsWrapper(),
-                        ),
-                      );
+                      closeAnd(() => _deleteAccount(ctx));
                     },
                   ),
                 ],

@@ -2,14 +2,13 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-/// スプラッシュ用 GIF のデコード完了を通知する（コールドスタートの `_bootstrap` が待機する）。
+import '../theme/app_tokens.dart';
+import '../widgets/bewell_logo.dart';
+
+/// スプラッシュ完了通知（`_bootstrap` が待機する）。
 final Completer<void> splashGifPrecacheCompleter = Completer<void>();
 
 /// コールドスタートおよび認証待ちなど、初期化中に表示する画面。
-///
-/// `assets/splash/loading.gif` は GIF アニメーション（[Image.asset] が再生）。
-/// 見た目を変える場合は同パスにファイルを置き換えてください。
-/// サンプル GIF を第三者配布物に使う場合は、各ライセンス（表示義務など）に従ってください。
 class SplashScreen extends StatefulWidget {
   const SplashScreen({
     super.key,
@@ -22,33 +21,31 @@ class SplashScreen extends StatefulWidget {
   State<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen> {
-  var _precacheRequested = false;
+class _SplashScreenState extends State<SplashScreen>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _pulse;
 
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    if (_precacheRequested) return;
-    _precacheRequested = true;
+  void initState() {
+    super.initState();
+    _pulse = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1400),
+    )..repeat(reverse: true);
+    if (!splashGifPrecacheCompleter.isCompleted) {
+      splashGifPrecacheCompleter.complete();
+    }
+  }
 
-    final asset = const AssetImage('assets/splash/loading.gif');
-    precacheImage(asset, context).then((_) {
-      if (!splashGifPrecacheCompleter.isCompleted) {
-        splashGifPrecacheCompleter.complete();
-      }
-    }).catchError((Object _) {
-      if (!splashGifPrecacheCompleter.isCompleted) {
-        splashGifPrecacheCompleter.complete();
-      }
-    });
+  @override
+  void dispose() {
+    _pulse.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final scheme = ColorScheme.fromSeed(
-      seedColor: Colors.teal,
-      brightness: Brightness.dark,
-    );
+    final scheme = Theme.of(context).colorScheme;
 
     return Scaffold(
       body: Container(
@@ -61,7 +58,7 @@ class _SplashScreenState extends State<SplashScreen> {
             colors: [
               scheme.primaryContainer,
               scheme.surface,
-              scheme.primary.withValues(alpha: 0.35),
+              scheme.primary.withValues(alpha: 0.25),
             ],
           ),
         ),
@@ -70,47 +67,35 @@ class _SplashScreenState extends State<SplashScreen> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               const Spacer(flex: 2),
-              Icon(
-                Icons.fitness_center_rounded,
-                size: 56,
-                color: scheme.onPrimaryContainer.withValues(alpha: 0.95),
+              ScaleTransition(
+                scale: Tween<double>(begin: 0.96, end: 1.0).animate(
+                  CurvedAnimation(parent: _pulse, curve: Curves.easeInOut),
+                ),
+                child: const BeWellLogo(size: 88, showLabel: false),
               ),
-              const SizedBox(height: 28),
-              Image.asset(
-                'assets/splash/loading.gif',
-                width: 160,
-                height: 160,
-                gaplessPlayback: true,
-                fit: BoxFit.contain,
-                errorBuilder: (context, error, stackTrace) {
-                  if (!splashGifPrecacheCompleter.isCompleted) {
-                    splashGifPrecacheCompleter.complete();
-                  }
-                  return SizedBox(
-                    width: 64,
-                    height: 64,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 3,
-                      color: scheme.primary,
-                    ),
-                  );
-                },
+              const SizedBox(height: AppSpacing.xxxl),
+              SizedBox(
+                width: 36,
+                height: 36,
+                child: CircularProgressIndicator(
+                  strokeWidth: 3,
+                  color: scheme.primary,
+                ),
               ),
-              const SizedBox(height: 32),
+              const SizedBox(height: AppSpacing.xxl),
               Text(
                 'BeWell',
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      color: scheme.onSurface,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: 0.5,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -0.3,
                     ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: AppSpacing.md),
               Text(
                 widget.message,
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: scheme.onSurface.withValues(alpha: 0.75),
+                      color: scheme.onSurfaceVariant,
                     ),
               ),
               const Spacer(flex: 3),

@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/energy_profile.dart';
 import '../providers/energy_profile_provider.dart';
+import '../widgets/bewell_logo.dart';
 import 'home_screen.dart';
 
 class OnboardingScreen extends ConsumerStatefulWidget {
@@ -178,10 +179,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
               color: scheme.primaryContainer,
               shape: BoxShape.circle,
             ),
-            child: Icon(
-              Icons.fitness_center_rounded,
-              size: 52,
-              color: scheme.onPrimaryContainer,
+            child: Center(
+              child: BeWellLogo(size: 56, showLabel: false),
             ),
           ),
           const SizedBox(height: 32),

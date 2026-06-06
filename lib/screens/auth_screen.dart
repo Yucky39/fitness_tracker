@@ -9,6 +9,7 @@ import '../providers/preset_provider.dart';
 import '../providers/settings_provider.dart';
 import '../providers/training_plan_provider.dart';
 import '../providers/water_provider.dart';
+import '../widgets/bewell_logo.dart';
 import '../services/auth_service.dart';
 import '../services/sync_service.dart';
 
@@ -217,20 +218,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   // Logo / header
-                  Icon(
-                    Icons.fitness_center,
-                    size: 64,
-                    color: colorScheme.primary,
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    'BeWell',
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: colorScheme.primary,
-                        ),
-                  ),
+                  const BeWellLogo(size: 64, showLabel: true),
                   const SizedBox(height: 8),
                   Text(
                     '複数のデバイスでデータを同期',

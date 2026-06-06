@@ -7,6 +7,7 @@ import '../models/food_item.dart';
 import '../models/training_log.dart';
 import '../providers/ai_access.dart';
 import '../providers/energy_profile_provider.dart';
+import '../theme/bewell_colors.dart';
 import '../providers/settings_provider.dart';
 import '../services/database_service.dart';
 import '../services/review_advice_service.dart';
@@ -522,7 +523,9 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen>
             ),
             const SizedBox(height: 12),
             if (logs.isEmpty)
-              const Text('記録なし', style: TextStyle(color: Colors.grey))
+              Text('記録なし',
+                  style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant))
             else ...[
               Wrap(
                 spacing: 12,
@@ -562,8 +565,10 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen>
               ),
               if (showDayBreakdown && daySet.isNotEmpty) ...[
                 const SizedBox(height: 12),
-                const Text('日別内訳:',
-                    style: TextStyle(fontSize: 12, color: Colors.grey)),
+                Text('日別内訳:',
+                    style: TextStyle(
+                        fontSize: 12,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant)),
                 const SizedBox(height: 4),
                 ..._buildDayBreakdown(logs),
               ],
@@ -608,7 +613,9 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen>
             ),
             Text(
               '${entry.value.length}件',
-              style: const TextStyle(fontSize: 11, color: Colors.grey),
+              style: TextStyle(
+                  fontSize: 11,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant),
             ),
           ],
         ),
@@ -646,7 +653,9 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen>
             ),
             const SizedBox(height: 12),
             if (foodItems.isEmpty)
-              const Text('記録なし', style: TextStyle(color: Colors.grey))
+              Text('記録なし',
+                  style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant))
             else ...[
               Wrap(
                 spacing: 12,
@@ -670,19 +679,19 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen>
                 label: 'タンパク質 平均',
                 value:
                     '${(foodItems.fold(0.0, (s, i) => s + i.protein) / recordedDays).toStringAsFixed(1)} g/日',
-                color: Colors.blue,
+                color: Theme.of(context).colorScheme.primary,
               ),
               _MacroRow(
                 label: '脂質 平均',
                 value:
                     '${(foodItems.fold(0.0, (s, i) => s + i.fat) / recordedDays).toStringAsFixed(1)} g/日',
-                color: Colors.orange,
+                color: Theme.of(context).colorScheme.tertiary,
               ),
               _MacroRow(
                 label: '炭水化物 平均',
                 value:
                     '${(foodItems.fold(0.0, (s, i) => s + i.carbs) / recordedDays).toStringAsFixed(1)} g/日',
-                color: Colors.green,
+                color: Theme.of(context).colorScheme.secondary,
               ),
             ],
           ],
@@ -744,10 +753,11 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen>
                 return Expanded(
                   child: Center(
                     child: Text(d,
-                        style: const TextStyle(
+                        style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.bold,
-                            color: Colors.grey)),
+                            color:
+                                Theme.of(context).colorScheme.onSurfaceVariant)),
                   ),
                 );
               }).toList(),
@@ -771,17 +781,18 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen>
                     _monthStart.month == today.month &&
                     day == today.day;
 
+                final scheme = Theme.of(context).colorScheme;
                 return Container(
                   margin: const EdgeInsets.all(2),
                   decoration: BoxDecoration(
                     color: hasTrain
-                        ? Colors.deepOrange.withValues(alpha: 0.85)
+                        ? scheme.primary.withValues(alpha: 0.85)
                         : hasFood
-                            ? Colors.blue.withValues(alpha: 0.15)
+                            ? scheme.tertiary.withValues(alpha: 0.18)
                             : null,
                     borderRadius: BorderRadius.circular(6),
                     border: isToday
-                        ? Border.all(color: Colors.deepOrange, width: 2)
+                        ? Border.all(color: scheme.primary, width: 2)
                         : null,
                   ),
                   child: Column(
@@ -793,7 +804,7 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen>
                           fontSize: 12,
                           fontWeight:
                               isToday ? FontWeight.bold : FontWeight.normal,
-                          color: hasTrain ? Colors.white : null,
+                          color: hasTrain ? scheme.onPrimary : null,
                         ),
                       ),
                       if (hasTrain && (kcalByDay[day] ?? 0) > 0)
@@ -801,7 +812,9 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen>
                           '${(kcalByDay[day]! / 1000).toStringAsFixed(1)}k',
                           style: TextStyle(
                             fontSize: 8,
-                            color: hasTrain ? Colors.white70 : Colors.grey,
+                            color: hasTrain
+                                ? scheme.onPrimary.withValues(alpha: 0.7)
+                                : scheme.onSurfaceVariant,
                           ),
                         ),
                     ],
@@ -816,7 +829,10 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen>
                     width: 12,
                     height: 12,
                     decoration: BoxDecoration(
-                        color: Colors.deepOrange.withValues(alpha: 0.85),
+                        color: Theme.of(context)
+                            .colorScheme
+                            .primary
+                            .withValues(alpha: 0.85),
                         borderRadius: BorderRadius.circular(2))),
                 const SizedBox(width: 4),
                 const Text('トレーニングあり', style: TextStyle(fontSize: 11)),
@@ -825,7 +841,10 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen>
                     width: 12,
                     height: 12,
                     decoration: BoxDecoration(
-                        color: Colors.blue.withValues(alpha: 0.2),
+                        color: Theme.of(context)
+                            .colorScheme
+                            .tertiary
+                            .withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(2))),
                 const SizedBox(width: 4),
                 const Text('食事記録あり', style: TextStyle(fontSize: 11)),
@@ -851,8 +870,8 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen>
           children: [
             Row(
               children: [
-                const Icon(Icons.auto_awesome,
-                    size: 18, color: Colors.deepOrange),
+                Icon(Icons.auto_awesome,
+                    size: 18, color: context.bewellColors.aiAccent),
                 const SizedBox(width: 8),
                 Text(
                   'AI $periodLabel振り返り',
@@ -976,7 +995,7 @@ class _StatChip extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 14, color: Colors.deepOrange),
+          Icon(icon, size: 14, color: Theme.of(context).colorScheme.primary),
           const SizedBox(width: 4),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -986,7 +1005,9 @@ class _StatChip extends StatelessWidget {
                   style: const TextStyle(
                       fontSize: 13, fontWeight: FontWeight.bold)),
               Text(label,
-                  style: const TextStyle(fontSize: 10, color: Colors.grey)),
+                  style: TextStyle(
+                      fontSize: 10,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant)),
             ],
           ),
         ],

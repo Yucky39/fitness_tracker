@@ -6,6 +6,7 @@ import '../models/chat_message.dart';
 import '../providers/ai_usage_provider.dart';
 import '../providers/subscription_provider.dart';
 import '../providers/trainer_chat_provider.dart';
+import '../services/subscription_service.dart';
 import '../widgets/ai_credit_sheet.dart';
 import '../widgets/paywall_sheet.dart';
 
@@ -80,6 +81,7 @@ class _TrainerChatScreenState extends ConsumerState<TrainerChatScreen> {
   @override
   Widget build(BuildContext context) {
     final isSubscribed = ref.watch(isSubscribedProvider);
+    final hasPending = ref.watch(hasPendingActivationProvider);
     final chat = ref.watch(trainerChatProvider);
     final scheme = Theme.of(context).colorScheme;
 
@@ -101,7 +103,47 @@ class _TrainerChatScreenState extends ConsumerState<TrainerChatScreen> {
       ),
       body: isSubscribed
           ? _buildChat(context, scheme, chat)
-          : _buildLockedView(context, scheme),
+          : hasPending
+              ? _buildPendingActivationView(context, scheme)
+              : _buildLockedView(context, scheme),
+    );
+  }
+
+  // ── 購入済みだがサーバー反映待ちのゲート ─────────────────────────────────
+
+  Widget _buildPendingActivationView(BuildContext context, ColorScheme scheme) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircularProgressIndicator(color: scheme.primary),
+            const SizedBox(height: 24),
+            Text(
+              'プレミアム反映中…',
+              style: Theme.of(context)
+                  .textTheme
+                  .titleMedium
+                  ?.copyWith(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '購入は完了しています。サーバーへの反映が完了するまでしばらくお待ちください。'
+              '反映されない場合は「以前の購入を復元する」をお試しください。',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: scheme.onSurfaceVariant, height: 1.5),
+            ),
+            const SizedBox(height: 24),
+            OutlinedButton(
+              onPressed: () async {
+                await SubscriptionService().restorePurchases();
+              },
+              child: const Text('以前の購入を復元する'),
+            ),
+          ],
+        ),
+      ),
     );
   }
 

@@ -346,9 +346,11 @@ class _SupplementEntryDialogState extends State<_SupplementEntryDialog> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               '食事タイミングとは別のカテゴリとして記録されます（朝食・昼食などは選べません）。',
-              style: TextStyle(fontSize: 12, color: Colors.grey),
+              style: TextStyle(
+                  fontSize: 12,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant),
             ),
             const SizedBox(height: 8),
             OutlinedButton.icon(
@@ -556,10 +558,11 @@ class _SupplementRecallDialogState extends State<_SupplementRecallDialog> {
               child: Center(child: CircularProgressIndicator()),
             )
           else if (showEmpty)
-            const Padding(
-              padding: EdgeInsets.all(16),
+            Padding(
+              padding: const EdgeInsets.all(16),
               child: Text('該当するサプリが見つかりませんでした。',
-                  style: TextStyle(color: Colors.grey)),
+                  style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant)),
             )
           else
             for (final e in _results)
@@ -580,7 +583,9 @@ class _SupplementRecallDialogState extends State<_SupplementRecallDialog> {
                         if (e.servingNote.trim().isNotEmpty) e.servingNote.trim(),
                         '${e.calories}kcal・P${e.protein}g',
                       ].join('  '),
-                      style: const TextStyle(fontSize: 11, color: Colors.grey),
+                      style: TextStyle(
+                          fontSize: 11,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant),
                     ),
                     children: [
                       Align(

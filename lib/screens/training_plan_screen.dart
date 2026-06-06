@@ -157,8 +157,9 @@ class _TrainingPlanScreenState extends ConsumerState<TrainingPlanScreen> {
           const Text('目標を選んでください',
               style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
           const SizedBox(height: 8),
-          const Text('過去の記録や身体データをもとに最適なプランを提案します',
-              style: TextStyle(color: Colors.grey)),
+          Text('過去の記録や身体データをもとに最適なプランを提案します',
+              style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant)),
           const SizedBox(height: 24),
           ...TrainingGoal.values.map((g) => _GoalCard(
                 goal: g,
@@ -180,7 +181,9 @@ class _TrainingPlanScreenState extends ConsumerState<TrainingPlanScreen> {
           const Text('鍛えたい部位を選んでください',
               style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
           const SizedBox(height: 8),
-          const Text('複数選択できます', style: TextStyle(color: Colors.grey)),
+          Text('複数選択できます',
+              style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant)),
           const SizedBox(height: 20),
           Wrap(
             spacing: 10,
@@ -270,8 +273,9 @@ class _TrainingPlanScreenState extends ConsumerState<TrainingPlanScreen> {
           const Text('使用できる器具・環境を選んでください',
               style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
           const SizedBox(height: 8),
-          const Text('選択した環境に合わせた種目を提案します',
-              style: TextStyle(color: Colors.grey)),
+          Text('選択した環境に合わせた種目を提案します',
+              style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant)),
           const SizedBox(height: 20),
           ...EquipmentOption.values.map((e) => _EquipmentCard(
                 option: e,
@@ -293,8 +297,9 @@ class _TrainingPlanScreenState extends ConsumerState<TrainingPlanScreen> {
           const Text('週に何日トレーニングしますか？',
               style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
           const SizedBox(height: 8),
-          const Text('現実的に続けられる日数を選んでください',
-              style: TextStyle(color: Colors.grey)),
+          Text('現実的に続けられる日数を選んでください',
+              style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant)),
           const SizedBox(height: 32),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -371,8 +376,9 @@ class _TrainingPlanScreenState extends ConsumerState<TrainingPlanScreen> {
           const Text('トレーニングの強度を選んでください',
               style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
           const SizedBox(height: 8),
-          const Text('選択した強度に合わせてセット数・重量を調整します',
-              style: TextStyle(color: Colors.grey)),
+          Text('選択した強度に合わせてセット数・重量を調整します',
+              style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant)),
           const SizedBox(height: 24),
           // 選択内容の確認サマリー
           _buildConfirmSummary(),
@@ -438,7 +444,8 @@ class _TrainingPlanScreenState extends ConsumerState<TrainingPlanScreen> {
             Text(
               '過去の記録を分析して\n最適な種目・重量・セット数を提案します',
               textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.grey[600]),
+              style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant),
             ),
           ],
         ),
@@ -571,10 +578,17 @@ class _TrainingPlanScreenState extends ConsumerState<TrainingPlanScreen> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Icon(Icons.fitness_center,
-                          size: 64, color: Colors.grey[400]),
+                          size: 64,
+                          color: Theme.of(context)
+                              .colorScheme
+                              .onSurfaceVariant
+                              .withValues(alpha: 0.5)),
                       const SizedBox(height: 16),
-                      const Text('保存済みのプランはありません',
-                          style: TextStyle(color: Colors.grey)),
+                      Text('保存済みのプランはありません',
+                          style: TextStyle(
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurfaceVariant)),
                       const SizedBox(height: 8),
                       ElevatedButton(
                         onPressed: () => setState(() {
@@ -747,7 +761,7 @@ class _StepIndicator extends StatelessWidget {
                   fontSize: 10,
                   color: active
                       ? Theme.of(context).colorScheme.primary
-                      : Colors.grey,
+                      : Theme.of(context).colorScheme.onSurfaceVariant,
                   fontWeight: active ? FontWeight.bold : FontWeight.normal,
                 ),
               ),
@@ -853,8 +867,9 @@ class _CutStyleCard extends StatelessWidget {
                             fontSize: 16, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 2),
                     Text(style.description,
-                        style:
-                            TextStyle(fontSize: 12, color: Colors.grey[600])),
+                        style: TextStyle(
+                            fontSize: 12,
+                            color: Theme.of(context).colorScheme.onSurfaceVariant)),
                   ],
                 ),
               ),
@@ -911,8 +926,9 @@ class _EquipmentCard extends StatelessWidget {
                             fontSize: 16, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 2),
                     Text(option.description,
-                        style:
-                            TextStyle(fontSize: 12, color: Colors.grey[600])),
+                        style: TextStyle(
+                            fontSize: 12,
+                            color: Theme.of(context).colorScheme.onSurfaceVariant)),
                   ],
                 ),
               ),
@@ -967,8 +983,9 @@ class _IntensityCard extends StatelessWidget {
                             fontSize: 15, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 2),
                     Text(intensity.description,
-                        style:
-                            TextStyle(fontSize: 12, color: Colors.grey[600])),
+                        style: TextStyle(
+                            fontSize: 12,
+                            color: Theme.of(context).colorScheme.onSurfaceVariant)),
                   ],
                 ),
               ),
@@ -997,7 +1014,9 @@ class _SummaryRow extends StatelessWidget {
           SizedBox(
             width: 40,
             child: Text(label,
-                style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+                style: TextStyle(
+                    fontSize: 12,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant)),
           ),
           const SizedBox(width: 8),
           Expanded(
@@ -1052,7 +1071,9 @@ class _PlanCompletionCard extends StatelessWidget {
             const SizedBox(height: 8),
             Text(
               '${plan.completedExerciseCount} / ${plan.totalExerciseCount} 種目を実施済み',
-              style: TextStyle(fontSize: 13, color: Colors.grey[700]),
+              style: TextStyle(
+                  fontSize: 13,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant),
             ),
             const SizedBox(height: 12),
             ClipRRect(
@@ -1187,7 +1208,9 @@ class _ExerciseRow extends ConsumerWidget {
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
                           decoration: done ? TextDecoration.lineThrough : null,
-                          color: done ? Colors.grey : null,
+                          color: done
+                              ? Theme.of(context).colorScheme.onSurfaceVariant
+                              : null,
                         ),
                       ),
                     ),
@@ -1227,7 +1250,7 @@ class _ExerciseRow extends ConsumerWidget {
                     exercise.note!,
                     style: TextStyle(
                       fontSize: 12,
-                      color: Colors.grey[600],
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                       decoration: done ? TextDecoration.lineThrough : null,
                     ),
                   ),
@@ -1251,9 +1274,13 @@ class _StatChip extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 13, color: Colors.grey[600]),
+        Icon(icon,
+            size: 13, color: Theme.of(context).colorScheme.onSurfaceVariant),
         const SizedBox(width: 3),
-        Text(label, style: TextStyle(fontSize: 12, color: Colors.grey[700])),
+        Text(label,
+            style: TextStyle(
+                fontSize: 12,
+                color: Theme.of(context).colorScheme.onSurfaceVariant)),
       ],
     );
   }
@@ -1315,7 +1342,9 @@ class _PlanListTileState extends State<_PlanListTile> {
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
                 child: Text(plan.overview!,
-                    style: TextStyle(fontSize: 13, color: Colors.grey[600])),
+                    style: TextStyle(
+                        fontSize: 13,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant)),
               ),
             ...plan.days.asMap().entries.map((e) => _PlanDayCard(
                   planId: plan.id,

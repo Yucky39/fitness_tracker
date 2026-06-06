@@ -140,9 +140,9 @@ class _SessionRecordCardState extends State<SessionRecordCard> {
               ),
             ),
             const SizedBox(width: 8),
-            const Text(
+            Text(
               'ストレッチを解析中…',
-              style: TextStyle(fontSize: 12, color: Colors.grey),
+              style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant),
             ),
           ],
         ),
@@ -156,10 +156,11 @@ class _SessionRecordCardState extends State<SessionRecordCard> {
           children: [
             Icon(Icons.error_outline, size: 16, color: colorScheme.error),
             const SizedBox(width: 6),
-            const Expanded(
+            Expanded(
               child: Text(
                 'ストレッチの取得に失敗しました',
-                style: TextStyle(fontSize: 12, color: Colors.grey),
+                style:
+                    TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant),
               ),
             ),
             if (widget.onRetryStretch != null)
