@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 import '../models/water_log.dart';
 import '../services/database_service.dart';
+import '../services/notification_service.dart';
 import '../services/sync_service.dart';
 
 class WaterState {
@@ -71,15 +72,50 @@ class WaterNotifier extends StateNotifier<WaterState> {
   }
 
   Future<void> addLog(int amountMl) async {
+    final log = await _persist(amountMl, DateTime.now());
+    state = state.copyWith(todayLogs: [...state.todayLogs, log]);
+  }
+
+  /// DB へ保存し Firestore 同期キューへ積む。state は呼び出し側で更新する。
+  Future<WaterLog> _persist(int amountMl, DateTime at) async {
     final log = WaterLog(
       id: _uuid.v4(),
       amountMl: amountMl,
-      date: DateTime.now(),
+      date: at,
     );
     final adapter = await DatabaseService().database;
     await adapter.insert('water_logs', log.toMap());
     SyncService().syncRecord('water_logs', log.toMap());
-    state = state.copyWith(todayLogs: [...state.todayLogs, log]);
+    return log;
+  }
+
+  /// 通知のアクションボタン（前面・背面・アプリ終了中）から積まれた
+  /// 水分記録の保留キューを DB へ反映する。
+  /// アプリ復帰時・起動時・前面でのアクション受信時に呼ぶ。
+  Future<void> flushPendingNotificationIntakes() async {
+    final prefs = await SharedPreferences.getInstance();
+    // 別 isolate（バックグラウンド通知ハンドラ）からの書き込みを取り込むため
+    // ディスクから最新を読み直す。
+    await prefs.reload();
+    final pending =
+        prefs.getStringList(NotificationService.pendingWaterIntakesKey) ??
+            const <String>[];
+    if (pending.isEmpty) return;
+
+    // 二重反映を避けるため、処理前にキューを空にする。
+    await prefs.remove(NotificationService.pendingWaterIntakesKey);
+
+    for (final entry in pending) {
+      final parts = entry.split('|');
+      final amount = int.tryParse(parts.first);
+      if (amount == null || amount <= 0) continue;
+      final at =
+          parts.length > 1 ? DateTime.tryParse(parts[1]) : null;
+      await _persist(amount, at ?? DateTime.now());
+    }
+
+    // 当日分を再読込して state（ダッシュボード表示）へ反映。
+    await loadToday();
   }
 
   Future<void> removeLog(String id) async {

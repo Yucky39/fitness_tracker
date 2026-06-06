@@ -9,6 +9,8 @@ import '../providers/achievement_provider.dart';
 import '../providers/home_tab_provider.dart';
 import '../providers/sleep_provider.dart';
 import '../providers/steps_provider.dart';
+import '../providers/water_provider.dart';
+import '../services/notification_service.dart';
 import '../widgets/badge_unlock_dialog.dart';
 import 'achievements_screen.dart';
 import 'dashboard_screen.dart';
@@ -24,7 +26,8 @@ class HomeScreen extends ConsumerStatefulWidget {
   ConsumerState<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends ConsumerState<HomeScreen> {
+class _HomeScreenState extends ConsumerState<HomeScreen>
+    with WidgetsBindingObserver {
   final _scaffoldKey = GlobalKey<ScaffoldState>();
 
   static const List<Widget> _screens = [
@@ -37,11 +40,38 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    // 前面で通知アクションが押されたら即座に水分記録へ反映する。
+    onWaterIntakeRecordedFromNotification = _flushWaterIntakes;
     // ダッシュボード初期表示時に睡眠・歩数を自動同期
     WidgetsBinding.instance.addPostFrameCallback((_) {
       unawaited(ref.read(sleepProvider.notifier).syncOnDashboardVisible());
       unawaited(ref.read(stepsProvider.notifier).syncOnDashboardVisible());
+      // 通知から（アプリ終了中も含め）登録された水分記録を取り込む。
+      _flushWaterIntakes();
     });
+  }
+
+  @override
+  void dispose() {
+    if (onWaterIntakeRecordedFromNotification == _flushWaterIntakes) {
+      onWaterIntakeRecordedFromNotification = null;
+    }
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // アプリ復帰時に、背面／終了中に通知から記録された水分を取り込む。
+    if (state == AppLifecycleState.resumed) {
+      _flushWaterIntakes();
+    }
+  }
+
+  void _flushWaterIntakes() {
+    if (!mounted) return;
+    unawaited(ref.read(waterProvider.notifier).flushPendingNotificationIntakes());
   }
 
   @override
