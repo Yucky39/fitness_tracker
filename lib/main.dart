@@ -115,6 +115,11 @@ class _BootstrapAppState extends State<_BootstrapApp> {
     }
 
     await NotificationService().initialize();
+    // アプリ更新前にスケジュールされた水分リマインダーは、アクションボタン
+    // （カテゴリ）が未設定のまま `matchDateTimeComponents` で毎日繰り返し配信
+    // され続ける。設定画面を開き直さない限り再登録されないため、起動時に必ず
+    // 再スケジュールして、古い通知を最新のアクション付きへ置き換える。
+    await NotificationService().rescheduleFromSettings();
     SubscriptionService().initialize();
     _listenActivationEvents();
 
