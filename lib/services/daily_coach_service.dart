@@ -26,7 +26,7 @@ enum CoachTimeSlot {
 /// まとめ、その日のユーザーに向けた一貫したコーチングメッセージを生成する。
 /// 既存のドメイン別アドバイス（栄養・トレ）と違い、領域をまたいで関連づけるのが役割。
 class DailyCoachService {
-  static const _maxTokens = 700;
+  static const _maxTokens = 4096;
 
   static String _systemPrompt(String level, CoachTimeSlot slot) {
     final timing = switch (slot) {
