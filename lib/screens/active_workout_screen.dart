@@ -6,6 +6,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/active_workout_provider.dart';
 import '../providers/training_provider.dart';
 import '../theme/bewell_colors.dart';
+import '../widgets/share/share_card.dart';
+import '../widgets/share/share_sheet.dart';
 
 class ActiveWorkoutScreen extends ConsumerStatefulWidget {
   const ActiveWorkoutScreen({super.key});
@@ -115,6 +117,7 @@ class _ActiveWorkoutScreenState extends ConsumerState<ActiveWorkoutScreen> {
   }
 
   Future<void> _finishWorkout() async {
+    final session = ref.read(activeWorkoutProvider).session;
     final logs = ref.read(activeWorkoutProvider.notifier).finishSession();
     if (logs.isNotEmpty) {
       await ref.read(trainingProvider.notifier).bulkAddLogs(logs);
@@ -127,6 +130,26 @@ class _ActiveWorkoutScreenState extends ConsumerState<ActiveWorkoutScreen> {
       }
     }
     if (mounted) Navigator.of(context).pop();
+
+    // ワークアウト完了後にシェアシートを表示
+    if (mounted && session != null && logs.isNotEmpty) {
+      final exerciseNames = session.exercises.map((e) => e.name).toList();
+      final duration = DateTime.now()
+          .difference(session.startedAt)
+          .inMinutes
+          .clamp(1, 999);
+      final cardKey = GlobalKey();
+      await showShareSheet(
+        context,
+        cardKey: cardKey,
+        card: WorkoutShareCard(
+          totalSets: logs.length,
+          exerciseNames: exerciseNames,
+          durationMinutes: duration,
+        ),
+        xText: '${logs.length}セットのワークアウトを完了しました！💪',
+      );
+    }
   }
 
   Future<bool> _onWillPop() async {

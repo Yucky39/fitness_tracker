@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
 import '../providers/achievement_provider.dart';
 import '../providers/energy_profile_provider.dart';
@@ -139,6 +140,40 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
     } catch (e) {
       if (!mounted) return;
       setState(() => _errorMessage = 'アカウント作成に失敗しました。もう一度お試しください。');
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _signInWithSocial(
+      Future<UserCredential> Function() signInMethod) async {
+    if (!mounted) return;
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+    try {
+      final credential = await signInMethod();
+      if (!mounted) return;
+      final isNew = credential.additionalUserInfo?.isNewUser ?? false;
+      if (isNew) {
+        await SyncService().uploadAllData();
+      } else {
+        await SyncService().downloadAndMergeData();
+      }
+      if (!mounted) return;
+      _reloadProviders();
+    } on FirebaseAuthException catch (e) {
+      if (!mounted) return;
+      setState(() => _errorMessage = _localizeAuthError(e.code));
+    } on SignInWithAppleAuthorizationException catch (e) {
+      if (e.code == AuthorizationErrorCode.canceled) return;
+      if (!mounted) return;
+      setState(() => _errorMessage = 'Appleログインに失敗しました');
+    } catch (e) {
+      if (e.toString().contains('キャンセル')) return;
+      if (!mounted) return;
+      setState(() => _errorMessage = 'ログインに失敗しました。もう一度お試しください。');
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -291,10 +326,116 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
                       ],
                     ),
                   ),
+
+                  const SizedBox(height: 24),
+
+                  // OR divider
+                  Row(
+                    children: [
+                      const Expanded(child: Divider()),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: Text(
+                          'または',
+                          style:
+                              Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: colorScheme.onSurfaceVariant,
+                                  ),
+                        ),
+                      ),
+                      const Expanded(child: Divider()),
+                    ],
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // Social login buttons
+                  _buildSocialButton(
+                    label: 'Googleでログイン',
+                    color: Colors.white,
+                    textColor: Colors.black87,
+                    borderColor: Colors.grey.shade300,
+                    icon: _GoogleIcon(),
+                    onPressed: _isLoading
+                        ? null
+                        : () => _signInWithSocial(
+                            AuthService().signInWithGoogle),
+                  ),
+                  const SizedBox(height: 10),
+                  _buildSocialButton(
+                    label: 'Appleでログイン',
+                    color: Colors.black,
+                    textColor: Colors.white,
+                    icon: const Icon(Icons.apple, color: Colors.white, size: 20),
+                    onPressed: _isLoading
+                        ? null
+                        : () => _signInWithSocial(
+                            AuthService().signInWithApple),
+                  ),
+                  const SizedBox(height: 10),
+                  _buildSocialButton(
+                    label: 'Xでログイン',
+                    color: Colors.black,
+                    textColor: Colors.white,
+                    icon: const _XIcon(),
+                    onPressed: _isLoading
+                        ? null
+                        : () => _signInWithSocial(
+                            AuthService().signInWithTwitter),
+                  ),
+                  const SizedBox(height: 10),
+                  _buildSocialButton(
+                    label: 'Metaでログイン',
+                    color: const Color(0xFF1877F2),
+                    textColor: Colors.white,
+                    icon: const _MetaIcon(),
+                    onPressed: _isLoading
+                        ? null
+                        : () => _signInWithSocial(
+                            AuthService().signInWithFacebook),
+                  ),
                 ],
               ),
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSocialButton({
+    required String label,
+    required Color color,
+    required Color textColor,
+    required Widget icon,
+    Color? borderColor,
+    VoidCallback? onPressed,
+  }) {
+    return SizedBox(
+      height: 48,
+      child: ElevatedButton(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: color,
+          foregroundColor: textColor,
+          elevation: 0,
+          side: borderColor != null
+              ? BorderSide(color: borderColor)
+              : BorderSide.none,
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8)),
+        ),
+        onPressed: onPressed,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            SizedBox(width: 20, height: 20, child: icon),
+            const SizedBox(width: 12),
+            Text(label,
+                style: TextStyle(
+                    color: textColor,
+                    fontWeight: FontWeight.w500,
+                    fontSize: 15)),
+          ],
         ),
       ),
     );
@@ -424,6 +565,104 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
                 : const Text('アカウントを作成'),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ── Brand icon widgets ────────────────────────────────────────────────────
+
+class _GoogleIcon extends StatelessWidget {
+  const _GoogleIcon();
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomPaint(painter: _GooglePainter());
+  }
+}
+
+class _GooglePainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = size.width / 2;
+
+    // Blue arc
+    canvas.drawArc(
+      Rect.fromCircle(center: center, radius: radius),
+      -0.35, 4.25, false,
+      Paint()
+        ..color = const Color(0xFF4285F4)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = size.width * 0.22,
+    );
+    // Red arc
+    canvas.drawArc(
+      Rect.fromCircle(center: center, radius: radius),
+      3.9, 0.75, false,
+      Paint()
+        ..color = const Color(0xFFEA4335)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = size.width * 0.22,
+    );
+    // Yellow arc
+    canvas.drawArc(
+      Rect.fromCircle(center: center, radius: radius),
+      -1.57, 1.22, false,
+      Paint()
+        ..color = const Color(0xFFFBBC05)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = size.width * 0.22,
+    );
+    // Green arc
+    canvas.drawArc(
+      Rect.fromCircle(center: center, radius: radius),
+      -0.35, 0.0, false,
+      Paint()
+        ..color = const Color(0xFF34A853)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = size.width * 0.22,
+    );
+    // Horizontal bar
+    canvas.drawRect(
+      Rect.fromLTWH(
+          size.width * 0.5, size.height * 0.35, size.width * 0.46, size.height * 0.3),
+      Paint()..color = const Color(0xFF4285F4),
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class _XIcon extends StatelessWidget {
+  const _XIcon();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Text(
+      '𝕏',
+      style: TextStyle(
+        color: Colors.white,
+        fontSize: 16,
+        fontWeight: FontWeight.bold,
+      ),
+    );
+  }
+}
+
+class _MetaIcon extends StatelessWidget {
+  const _MetaIcon();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Text(
+      'f',
+      style: TextStyle(
+        color: Colors.white,
+        fontSize: 18,
+        fontWeight: FontWeight.bold,
+        fontFamily: 'serif',
       ),
     );
   }

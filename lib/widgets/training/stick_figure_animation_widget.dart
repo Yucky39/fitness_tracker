@@ -227,8 +227,31 @@ class _Body3DPainter extends CustomPainter {
     return -x * math.sin(rotY) + z * math.cos(rotY);
   }
 
+  // 左右の関節に Z オフセットを付与して側面表示時の体の厚みを再現する。
+  // l_* は手前側、r_* は奥側に配置することで回転時に立体感が生まれる。
+  static const _kLateralZ = 0.10;
+
+  Map<String, List<double>> _augmentJoints() {
+    return {
+      for (final e in joints.entries)
+        e.key: [
+          e.value[0],
+          e.value[1],
+          (e.value.length > 2 ? e.value[2] : 0.0) +
+              (e.key.startsWith('l_')
+                  ? _kLateralZ
+                  : e.key.startsWith('r_')
+                      ? -_kLateralZ
+                      : e.key == 'head'
+                          ? _kLateralZ * 0.35
+                          : 0.0),
+        ],
+    };
+  }
+
   Paint _mkPaint(double dep, double alpha) {
-    final bright = (1.0 - dep.clamp(-0.4, 0.4) * 0.40).clamp(0.55, 1.0);
+    // 奥行き差を視覚的に出すためコントラストを強めに設定する。
+    final bright = (1.0 - dep.clamp(-0.5, 0.5) * 1.4).clamp(0.20, 1.0);
     return Paint()
       ..color = color.withValues(alpha: (alpha * bright).clamp(0.0, 1.0))
       ..style = PaintingStyle.fill;
@@ -242,14 +265,16 @@ class _Body3DPainter extends CustomPainter {
     final ox = (size.width - sc) / 2;
     final oy = (size.height - sc) / 2;
 
+    final augmented = _augmentJoints();
+
     Offset p(String k) {
-      final j = joints[k];
+      final j = augmented[k];
       if (j == null) return Offset(ox + sc * 0.5, oy + sc * 0.5);
       return _proj(j, sc, ox, oy);
     }
 
     double d(String k) {
-      final j = joints[k];
+      final j = augmented[k];
       return j == null ? 0.0 : _dep(j);
     }
 
@@ -277,7 +302,7 @@ class _Body3DPainter extends CustomPainter {
     );
 
     // ── 首 ──
-    final headJ = joints['head'];
+    final headJ = augmented['head'];
     if (headJ != null) {
       final headP = _proj(headJ, sc, ox, oy);
       final headR = sc * 0.068;
@@ -292,8 +317,8 @@ class _Body3DPainter extends CustomPainter {
     // ── ボーン（深度ソートして奥→手前の順に描画）──
     final boneList = <({Offset p1, Offset p2, double r, double dep})>[];
     for (final b in _kBones) {
-      final j1 = joints[b.$1];
-      final j2 = joints[b.$2];
+      final j1 = augmented[b.$1];
+      final j2 = augmented[b.$2];
       if (j1 == null || j2 == null) continue;
       boneList.add((
         p1: _proj(j1, sc, ox, oy),
@@ -304,7 +329,11 @@ class _Body3DPainter extends CustomPainter {
     }
     boneList.sort((a, b) => b.dep.compareTo(a.dep));
 
+    final outlinePaint = Paint()
+      ..color = Colors.black.withValues(alpha: 0.18)
+      ..style = PaintingStyle.fill;
     for (final b in boneList) {
+      _capsule(canvas, b.p1, b.p2, b.r * 1.26, outlinePaint);
       _capsule(canvas, b.p1, b.p2, b.r, _mkPaint(b.dep, 1.0));
     }
 
@@ -333,7 +362,7 @@ class _Body3DPainter extends CustomPainter {
       ..color = color.withValues(alpha: 0.55)
       ..style = PaintingStyle.fill;
     for (final k in ['l_elbow', 'r_elbow', 'l_knee', 'r_knee']) {
-      final j = joints[k];
+      final j = augmented[k];
       if (j != null) {
         canvas.drawCircle(_proj(j, sc, ox, oy), sc * 0.022, dotPaint);
       }

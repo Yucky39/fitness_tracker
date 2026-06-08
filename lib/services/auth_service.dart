@@ -1,8 +1,16 @@
+import 'dart:convert';
+import 'dart:io';
+import 'dart:math';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:crypto/crypto.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:cloud_functions/cloud_functions.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import 'database_service.dart';
 import 'sync_tables.dart';
 
@@ -39,6 +47,82 @@ class AuthService {
       password: password,
     );
   }
+
+  // ── Social sign-in ──────────────────────────────────────────────────────
+
+  Future<UserCredential> signInWithGoogle() async {
+    final googleUser = await GoogleSignIn().signIn();
+    if (googleUser == null) throw Exception('キャンセルされました');
+    final googleAuth = await googleUser.authentication;
+    final credential = GoogleAuthProvider.credential(
+      accessToken: googleAuth.accessToken,
+      idToken: googleAuth.idToken,
+    );
+    return await _auth.signInWithCredential(credential);
+  }
+
+  Future<UserCredential> signInWithApple() async {
+    if (Platform.isIOS || Platform.isMacOS) {
+      // iOS/macOS: ネイティブ Apple Sign-In
+      final rawNonce = _generateNonce();
+      final nonce = _sha256ofString(rawNonce);
+      final appleCredential = await SignInWithApple.getAppleIDCredential(
+        scopes: [
+          AppleIDAuthorizationScopes.email,
+          AppleIDAuthorizationScopes.fullName,
+        ],
+        nonce: nonce,
+      );
+      final oauthCredential = OAuthProvider('apple.com').credential(
+        idToken: appleCredential.identityToken,
+        rawNonce: rawNonce,
+      );
+      return await _auth.signInWithCredential(oauthCredential);
+    } else {
+      // Android: Firebase Auth の Web OAuth フロー経由
+      // Apple Developer Portal で Service ID と Firebase のリダイレクト URL の設定が必要
+      final provider = OAuthProvider('apple.com')
+        ..addScope('email')
+        ..addScope('name');
+      return await _auth.signInWithProvider(provider);
+    }
+  }
+
+  Future<UserCredential> signInWithTwitter() async {
+    final twitterProvider = TwitterAuthProvider();
+    return await _auth.signInWithProvider(twitterProvider);
+  }
+
+  Future<UserCredential> signInWithFacebook() async {
+    final result = await FacebookAuth.instance.login();
+    if (result.status == LoginStatus.cancelled) {
+      throw Exception('キャンセルされました');
+    }
+    if (result.status != LoginStatus.success || result.accessToken == null) {
+      throw Exception('Metaログインに失敗しました');
+    }
+    final credential =
+        FacebookAuthProvider.credential(result.accessToken!.tokenString);
+    return await _auth.signInWithCredential(credential);
+  }
+
+  // ── Helpers ─────────────────────────────────────────────────────────────
+
+  String _generateNonce([int length = 32]) {
+    const charset =
+        '0123456789ABCDEFGHIJKLMNOPQRSTUVXYZabcdefghijklmnopqrstuvwxyz-._';
+    final random = Random.secure();
+    return List.generate(
+        length, (_) => charset[random.nextInt(charset.length)]).join();
+  }
+
+  String _sha256ofString(String input) {
+    final bytes = utf8.encode(input);
+    final digest = sha256.convert(bytes);
+    return digest.toString();
+  }
+
+  // ────────────────────────────────────────────────────────────────────────
 
   Future<void> signOut() async {
     await _auth.signOut();

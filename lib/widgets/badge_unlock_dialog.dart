@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../data/badge_definitions.dart';
 import '../providers/achievement_provider.dart';
+import 'share/share_card.dart';
+import 'share/share_sheet.dart';
 
 /// バッジ解放時に中央に表示する祝福ダイアログ。
 ///
@@ -50,6 +52,22 @@ class _BadgeUnlockedDialogState extends State<_BadgeUnlockedDialog>
   void dispose() {
     _controller.dispose();
     super.dispose();
+  }
+
+  void _showBadgeShareSheet(
+      BuildContext context, BadgeDefinition def, Color color) {
+    final cardKey = GlobalKey();
+    showShareSheet(
+      context,
+      cardKey: cardKey,
+      card: BadgeShareCard(
+        emoji: def.emoji,
+        title: def.title,
+        description: def.description,
+        categoryColor: color,
+      ),
+      xText: '${def.emoji} 「${def.title}」バッジを獲得しました！',
+    );
   }
 
   void _next() {
@@ -171,6 +189,23 @@ class _BadgeUnlockedDialogState extends State<_BadgeUnlockedDialog>
                   ),
                 ],
               ),
+              if (isLast) ...[
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                      _showBadgeShareSheet(context, def, color);
+                    },
+                    icon: const Icon(Icons.share_outlined, size: 18),
+                    label: const Text('シェアする'),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                  ),
+                ),
+              ],
             ],
           ),
         ),

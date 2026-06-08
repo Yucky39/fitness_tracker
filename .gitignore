@@ -66,3 +66,9 @@ Simulator Screenshot*
 # デリバー用スクリプト
 scripts/deliver_ios.sh
 scripts/upload_and_release.js
+# ソーシャルログイン識別子（公開識別子だが git には載せない）
+android/app/src/main/res/values/strings.xml
+ios/Runner/GoogleService-Info.plist
+
+# ソーシャルログイン設定ファイル（識別子を含む）
+ios/Flutter/Secrets.xcconfig
